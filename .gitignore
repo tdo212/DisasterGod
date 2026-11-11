@@ -1,0 +1,9 @@
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+.env
+*.env
+credentials.json
+.vscode/
+.claude/
