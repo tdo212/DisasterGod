@@ -1,0 +1,12 @@
+# Keep LF everywhere so files on disk stay byte-identical to Studio script sources.
+* text=auto eol=lf
+
+*.luau text eol=lf
+*.lua  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+*.rbxl  binary
+*.rbxm  binary
+*.png   binary
+*.jpg   binary
