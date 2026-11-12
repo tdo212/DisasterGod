@@ -31,12 +31,15 @@ local function defaultProfile(): Profile
 		BestStreak = 0,
 		RoundsSurvived = 0,
 		Gear = gear,
+		WelcomeClaimed = false,
+		Receipts = {},
 	}
 end
 
 local function publish(player: Player, profile: Profile)
 	player:SetAttribute(Attributes.Coins, profile.Coins)
 	player:SetAttribute(Attributes.Streak, profile.Streak)
+	player:SetAttribute(Attributes.WelcomeClaimed, profile.WelcomeClaimed)
 	for id, count in profile.Gear do
 		player:SetAttribute(Attributes.GearPrefix .. id, count)
 	end
@@ -67,6 +70,14 @@ local function load(player: Player): Profile
 							profile.Gear[id] = count
 						end
 					end
+				elseif key == "Receipts" and typeof(value) == "table" then
+					for _, id in value do
+						if typeof(id) == "string" then
+							table.insert(profile.Receipts, id)
+						end
+					end
+				elseif key == "WelcomeClaimed" and typeof(value) == "boolean" then
+					profile.WelcomeClaimed = value
 				elseif typeof((profile :: any)[key]) == "number" and typeof(value) == "number" then
 					(profile :: any)[key] = value
 				end
@@ -145,6 +156,45 @@ function PlayerDataService.AddCoins(player: Player, amount: number)
 	end
 	profile.Coins = math.max(0, math.floor(profile.Coins + amount))
 	publish(player, profile)
+end
+
+-- Coins earned through play: doubled for 2x Coins pass owners. Returns the amount paid.
+function PlayerDataService.EarnCoins(player: Player, amount: number): number
+	local mult = if player:GetAttribute(Attributes.PassPrefix .. "DoubleCoins") == true
+		then Config.Monetization.DoubleCoinsMultiplier
+		else 1
+	local paid = math.floor(amount * mult)
+	PlayerDataService.AddCoins(player, paid)
+	return paid
+end
+
+function PlayerDataService.HasReceipt(player: Player, purchaseId: string): boolean
+	local profile = profiles[player]
+	return profile ~= nil and table.find(profile.Receipts, purchaseId) ~= nil
+end
+
+function PlayerDataService.AddReceipt(player: Player, purchaseId: string)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	table.insert(profile.Receipts, purchaseId)
+	while #profile.Receipts > Config.Monetization.ReceiptHistory do
+		table.remove(profile.Receipts, 1)
+	end
+end
+
+function PlayerDataService.MarkWelcomeClaimed(player: Player)
+	local profile = profiles[player]
+	if profile then
+		profile.WelcomeClaimed = true
+		publish(player, profile)
+	end
+end
+
+-- Persist right away (after Robux purchases).
+function PlayerDataService.SaveNow(player: Player)
+	task.spawn(save, player)
 end
 
 function PlayerDataService.SpendCoins(player: Player, amount: number): boolean

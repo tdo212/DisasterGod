@@ -42,6 +42,23 @@ export type GearDefinition = {
 	Color: Color3,
 }
 
+export type ProductDefinition = {
+	Id: number,
+	Name: string,
+	Price: number, -- Robux
+	Icon: string,
+	Coins: number?,
+	Badge: string, -- "Good Value" etc., "" for none
+}
+
+export type PassDefinition = {
+	Id: number,
+	Name: string,
+	Price: number, -- Robux
+	Icon: string,
+	Description: string,
+}
+
 export type MapInfo = {
 	Name: string,
 	DisplayName: string,
@@ -52,6 +69,9 @@ export type MapInfo = {
 	FluidColor: Color3,
 	FluidMaterial: Enum.Material,
 	HazardFloorY: number?, -- standing below this Y hurts (lava floors)
+	FluidName: string, -- shown in the sudden-death banner ("WATER", "LAVA", ...)
+	Lighting: string, -- EnvironmentService preset: Day | Night | Desert | Arctic | Sunset | Volcanic
+	KnockbackMultiplier: number?, -- slippery maps make knockback stronger
 	Center: Vector3,
 	Radius: number,
 }
@@ -63,6 +83,8 @@ export type PlayerProfile = {
 	BestStreak: number,
 	RoundsSurvived: number,
 	Gear: { [string]: number },
+	WelcomeClaimed: boolean,
+	Receipts: { string }, -- recent purchase ids (idempotent ProcessReceipt)
 }
 
 export type RoundRecord = {

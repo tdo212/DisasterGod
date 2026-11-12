@@ -12,6 +12,7 @@ local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 local UI = script.Parent.Parent:WaitForChild("UI")
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
+local Store = require(UI:WaitForChild("Store") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local C = Theme.Colors
@@ -21,6 +22,18 @@ local HUDController = {}
 
 local started = false
 local gui: ScreenGui
+local shopOpener: ((string?) -> ())? = nil
+
+-- MenuController registers how to open the shop (avoids a require cycle).
+function HUDController.SetShopOpener(fn: (string?) -> ())
+	shopOpener = fn
+end
+
+local function offersVisible(): boolean
+	local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
+	local role = player:GetAttribute(Attributes.Role)
+	return phase ~= "Active" or role == "Spectator"
+end
 
 local function formatTime(seconds: number): string
 	local s = math.max(0, math.floor(seconds))
@@ -241,9 +254,7 @@ local function buildGodChance()
 
 	local last = -1
 	local function refresh()
-		local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
-		local role = player:GetAttribute(Attributes.Role)
-		card.Visible = phase ~= "Active" or role == "Spectator"
+		card.Visible = offersVisible()
 		local chance = player:GetAttribute(Attributes.GodChance) :: number? or 0
 		pct.Text = string.format("%s%%", if chance % 1 == 0 then tostring(math.floor(chance)) else string.format("%.1f", chance))
 		if last >= 0 and chance > last then
@@ -256,6 +267,146 @@ local function buildGodChance()
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 	refresh()
+
+	-- Robux shortcut: guarantee God next round
+	local god = Config.Monetization.Products.GodNextRound
+	local guarantee = Components.button({
+		Name = "Guarantee",
+		Text = Store.robux(god.Price) .. " GUARANTEE",
+		TextSize = 16,
+		Size = UDim2.fromOffset(160, 34),
+		Position = UDim2.new(0.5, 0, 1, 8),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = C.Green,
+		ColorLight = C.GreenLight,
+		Parent = card,
+		OnClick = function()
+			if player:GetAttribute(Attributes.GodQueued) ~= true then
+				Store.promptProduct("GodNextRound")
+			end
+		end,
+	})
+	local function refreshGuarantee()
+		local queued = player:GetAttribute(Attributes.GodQueued) == true
+		Components.setText(guarantee, if queued then "QUEUED ✔" else Store.robux(god.Price) .. " GUARANTEE")
+	end
+	player:GetAttributeChangedSignal(Attributes.GodQueued):Connect(refreshGuarantee)
+	refreshGuarantee()
+end
+
+---------------------------------------------------------------------------
+-- Welcome Pack offer (right side, under the God card) + Second Chance revive offer
+
+local function buildWelcomeOffer()
+	local def = Config.Monetization.Products.WelcomePack
+	local offer = Instance.new("TextButton")
+	offer.Name = "WelcomePack"
+	offer.Text = ""
+	offer.AutoButtonColor = false
+	offer.Size = UDim2.fromOffset(170, 132)
+	offer.Position = UDim2.new(1, -16, 0.5, 112)
+	offer.AnchorPoint = Vector2.new(1, 0)
+	offer.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.corner(offer, Theme.Radius.Large)
+	Components.stroke(offer, Theme.Stroke.Heavy)
+	Components.gradient(offer, C.OrangeLight, C.Orange)
+	offer.Parent = gui
+	Components.label({ Name = "Title", Text = "Welcome Pack", TextSize = 20, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = offer })
+	Components.label({ Name = "Icon", Text = def.Icon, TextSize = 30, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 28), Parent = offer })
+	Components.label({
+		Name = "Coins",
+		Text = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " Coins",
+		TextSize = 20,
+		Color = C.Gold,
+		Size = UDim2.new(1, 0, 0, 24),
+		Position = UDim2.fromOffset(0, 62),
+		Parent = offer,
+	})
+	local was = Components.label({
+		Name = "ListPrice",
+		Text = Store.robux(Config.Monetization.WelcomePackListPrice),
+		TextSize = 16,
+		Color = C.RedLight,
+		Size = UDim2.fromOffset(60, 22),
+		Position = UDim2.new(0, 10, 1, -32),
+		Parent = offer,
+	})
+	local strike = Instance.new("Frame")
+	strike.Size = UDim2.new(1, 0, 0, 2)
+	strike.Position = UDim2.fromScale(0, 0.5)
+	strike.BackgroundColor3 = C.Red
+	strike.BorderSizePixel = 0
+	strike.Rotation = -12
+	strike.Parent = was
+	local price = Components.panel({
+		Name = "Price",
+		Size = UDim2.fromOffset(84, 30),
+		Position = UDim2.new(1, -8, 1, -6),
+		AnchorPoint = Vector2.new(1, 1),
+		Color = C.Green,
+		Radius = Theme.Radius.Pill,
+		Parent = offer,
+	})
+	Components.label({ Name = "Text", Text = Store.robux(def.Price), TextSize = 18, Size = UDim2.fromScale(1, 1), Parent = price })
+	local scale = Instance.new("UIScale")
+	scale.Parent = offer
+	offer.MouseEnter:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.05 })
+	end)
+	offer.MouseLeave:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
+	end)
+	offer.Activated:Connect(function()
+		Store.promptProduct("WelcomePack")
+	end)
+	local function refresh()
+		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and offersVisible()
+	end
+	player:GetAttributeChangedSignal(Attributes.WelcomeClaimed):Connect(refresh)
+	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
+	refresh()
+end
+
+local function buildReviveOffer()
+	local def = Config.Monetization.Products.Revive
+	local button = Components.button({
+		Name = "SecondChance",
+		Text = def.Icon .. " SECOND CHANCE  " .. Store.robux(def.Price),
+		TextSize = 24,
+		Size = UDim2.fromOffset(340, 60),
+		Position = UDim2.new(0.5, 0, 1, -120),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Color = C.Pink,
+		ColorLight = Color3.fromRGB(255, 150, 190),
+		Parent = gui,
+		OnClick = function()
+			Store.promptProduct("Revive")
+		end,
+	})
+	button.Visible = false
+	local token = 0
+	local function eliminated(): boolean
+		return player:GetAttribute(Attributes.Role) == "Survivor"
+			and player:GetAttribute(Attributes.Alive) ~= true
+			and ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active"
+	end
+	local function refresh()
+		token += 1
+		local my = token
+		if eliminated() then
+			button.Visible = true
+			task.delay(Config.Monetization.ReviveOfferSeconds, function()
+				if my == token then
+					button.Visible = false
+				end
+			end)
+		else
+			button.Visible = false
+		end
+	end
+	player:GetAttributeChangedSignal(Attributes.Alive):Connect(refresh)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 end
 
 ---------------------------------------------------------------------------
@@ -323,8 +474,13 @@ function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 	bannerTitle.Text = title
 	bannerTitle.TextColor3 = color or C.Text
 	bannerSub.Text = subtitle or ""
-	bannerTitle.TextTransparency = 0
-	bannerSub.TextTransparency = 0
+	for _, label in { bannerTitle, bannerSub } do
+		label.TextTransparency = 0
+		local stroke = label:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Transparency = 0
+		end
+	end
 	bannerFrame.Visible = true
 	bannerScale.Scale = 0.4
 	Components.tween(bannerScale, Theme.Tweens.Pop, { Scale = 1 })
@@ -332,8 +488,13 @@ function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 		if token ~= bannerToken then
 			return
 		end
-		Components.tween(bannerTitle, Theme.Tweens.Fade, { TextTransparency = 1 })
-		Components.tween(bannerSub, Theme.Tweens.Fade, { TextTransparency = 1 })
+		for _, label in { bannerTitle, bannerSub } do
+			Components.tween(label, Theme.Tweens.Fade, { TextTransparency = 1 })
+			local stroke = label:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				Components.tween(stroke, Theme.Tweens.Fade, { Transparency = 1 })
+			end
+		end
 		task.delay(0.3, function()
 			if token == bannerToken then
 				bannerFrame.Visible = false
@@ -411,6 +572,8 @@ function HUDController.Start()
 	buildCoins()
 	buildGodChance()
 	buildBanner()
+	buildWelcomeOffer()
+	buildReviveOffer()
 
 	Remotes.get("Popup").OnClientEvent:Connect(function(text: string, color: Color3?)
 		if typeof(text) == "string" then

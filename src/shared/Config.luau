@@ -108,6 +108,25 @@ local Gear: { Types.GearDefinition } = {
 	},
 }
 
+-- Robux catalog. Ids were created through Open Cloud for universe 10776039268.
+local Products: { [string]: Types.ProductDefinition } = {
+	CoinsSmall = { Id = 3730591954, Name = "Pouch of Coins", Price = 25, Icon = "💰", Coins = 500, Badge = "" },
+	CoinsMedium = { Id = 3730591956, Name = "Bag of Coins", Price = 60, Icon = "💰💰", Coins = 1500, Badge = "Good Value" },
+	CoinsLarge = { Id = 3730591959, Name = "Chest of Coins", Price = 140, Icon = "🧰", Coins = 4000, Badge = "Great Value" },
+	CoinsHuge = { Id = 3730591960, Name = "Vault of Coins", Price = 349, Icon = "🏦", Coins = 12000, Badge = "Most Value" },
+	GodNextRound = { Id = 3730591965, Name = "Be the God Next Round", Price = 49, Icon = "😈", Badge = "" },
+	SurvivalKit = { Id = 3730591969, Name = "Survival Kit", Price = 35, Icon = "🎒", Badge = "" },
+	WelcomePack = { Id = 3730591973, Name = "Welcome Pack", Price = 15, Icon = "🎁", Coins = 1000, Badge = "Starter Deal" },
+	Revive = { Id = 3730591976, Name = "Second Chance", Price = 19, Icon = "💖", Badge = "" },
+}
+
+local Passes: { [string]: Types.PassDefinition } = {
+	DoubleCoins = { Id = 2083112404, Name = "2x Coins", Price = 199, Icon = "💸", Description = "Double coins from every source" },
+	VIP = { Id = 2081360408, Name = "VIP", Price = 249, Icon = "👑", Description = "VIP tag, rainbow dash, +15 coins a round" },
+	GodPriority = { Id = 2082224405, Name = "God Priority", Price = 299, Icon = "⚜️", Description = "God Chance grows twice as fast" },
+	QuickDash = { Id = 2082770401, Name = "Quick Dash", Price = 99, Icon = "💨", Description = "Dash cooldown cut in half" },
+}
+
 local Config = {
 	Match = {
 		MinPlayers = 1, -- 1 keeps Play Solo fully playable
@@ -192,11 +211,20 @@ local Config = {
 			Metal = 200,
 			DiamondPlate = 200,
 			CorrodedMetal = 180,
+			Ice = 70,
+			Snow = 40,
+			Sandstone = 150,
+			Basalt = 300,
+			Marble = 180,
+			Fabric = 35,
+			Slate = 220,
 		} :: { [string]: number },
 		CollapseSupportFraction = 0.7, -- level collapses when intact supports drop below this
 		BreakImpulse = 45,
 		BuckleImpulse = 30, -- sideways kick for a failing level's last supports
 		BuckleNoCollideTime = 1, -- seconds those supports pass through the falling floors
+		DirectedFallSpeed = 16, -- push for buildings with a FallDirection (obelisks, billboards, wheel)
+		DirectedTipSpin = 1.6, -- rad/s tip-over spin for directed falls
 		DebrisLifetime = 14,
 		MaxDebris = 700,
 		VolatileRadius = 16,
@@ -222,6 +250,25 @@ local Config = {
 
 	Gear = Gear,
 
+	Monetization = {
+		Products = Products,
+		Passes = Passes,
+		DoubleCoinsMultiplier = 2,
+		VipBonusCoinsPerRound = 15,
+		GodPriorityPityMultiplier = 2,
+		QuickDashCooldownMultiplier = 0.5,
+		ReviveFallbackCoins = 250,
+		ReviveOfferSeconds = 10,
+		WelcomePackListPrice = 40, -- shown struck-through next to the real price
+		ReceiptHistory = 50, -- purchase ids remembered per profile for idempotency
+	},
+
+	Hazards = {
+		QuicksandDamagePerSecond = 8,
+		QuicksandWalkSpeed = 7,
+		VentDamagePerSecond = 25,
+	},
+
 	GearTuning = {
 		SpeedSodaWalkSpeed = 34,
 		GliderGravityScale = 0.3,
@@ -233,7 +280,7 @@ local Config = {
 		ArenaRadius = 175,
 		LobbyOrigin = Vector3.new(0, 260, -340),
 		GodPerch = Vector3.new(0, 150, 0),
-		MapRotation = { "FractureBay", "MagmaCore" },
+		MapRotation = { "FractureBay", "NeoShibuya", "MagmaCore", "SunscorchedMirage", "OutpostZero", "StarlightBoardwalk" },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
 	},
 
@@ -267,6 +314,10 @@ local Config = {
 		ChaosEnergy = "ChaosEnergy", -- Player (God)
 		CooldownPrefix = "CD_", -- Player (God): server time when ability is ready
 		GearPrefix = "Gear_", -- Player: owned count
+		PassPrefix = "Pass_", -- Player: owns game pass (bool)
+		WelcomeClaimed = "WelcomeClaimed", -- Player
+		GodQueued = "GodQueued", -- Player: bought "God next round"
+		Slowed = "Slowed", -- Player: standing in quicksand
 	},
 }
 

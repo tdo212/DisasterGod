@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = require(script.Parent.Builder)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local BASALT = Color3.fromRGB(58, 50, 52)
@@ -106,6 +107,7 @@ local function quadrants(model: Model)
 	for _, p in { Vector3.new(30, 6.15, 70), Vector3.new(-72, 6.15, -28), Vector3.new(72, 6.15, -75) } do
 		local vent = Builder.block(ground, "Vent", p, Vector3.new(8, 0.2, 8), LAVA, Enum.Material.Neon)
 		vent.CanCollide = false
+		Builder.hazard(vent, Config.Hazards.VentDamagePerSecond)
 	end
 end
 
@@ -251,6 +253,43 @@ local function industry(model: Model)
 	end
 end
 
+local function refineryAndStacks(model: Model)
+	-- SW refinery block (3 storeys, open west side ladder)
+	Builder.highrise(model, "Refinery", Vector3.new(-70, GROUND, -28), 18, 14, 3, 9, {
+		SlabColor = CONCRETE,
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = STEEL_RED,
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = Color3.fromRGB(95, 95, 105),
+		WallMaterial = Enum.Material.CorrodedMetal,
+		WallTransparency = 0,
+		OpenSide = "West",
+	})
+	-- SE smokestacks: stacked drums that topple toward the hub
+	for _, base in { Vector3.new(76, GROUND, -76), Vector3.new(24, GROUND, -76) } do
+		local stack = Builder.building(model, "Smokestack")
+		for i = 1, 4 do
+			local drum = Builder.cylinder(stack, "Drum", base + Vector3.new(0, (i - 0.5) * 8, 0), 8, 6 - i * 0.4, if i % 2 == 0 then SILO_WHITE else STEEL_RED, Enum.Material.Metal)
+			Builder.structural(drum, i, true, 160)
+		end
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Rate = 6
+		smoke.Lifetime = NumberRange.new(5, 7)
+		smoke.Speed = NumberRange.new(5, 8)
+		smoke.Size = NumberSequence.new(4, 12)
+		smoke.Transparency = NumberSequence.new(0.3, 1)
+		smoke.Color = ColorSequence.new(Color3.fromRGB(80, 75, 75))
+		smoke.EmissionDirection = Enum.NormalId.Top
+		local top = Builder.block(stack, "Vent", base + Vector3.new(0, 32.5, 0), Vector3.new(4, 1, 4), DARK, Enum.Material.Metal)
+		Builder.structural(top, 5, false, 40)
+		smoke.Parent = top
+		Builder.fallDirection(stack, Vector3.new(-base.X, 0, -base.Z))
+	end
+	-- pipe gantry from the silo farm toward the hub pad
+	local gantry = Builder.bridge(model, "PipeGantry", Vector3.new(60, DECK, 22), Vector3.new(46, DECK, 34), 4, STEEL_GRAY, Enum.Material.DiamondPlate, STEEL_YELLOW, STEEL_RED, 90)
+	gantry:SetAttribute("Gantry", true)
+end
+
 function MagmaCore.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "MagmaCore"
@@ -278,6 +317,7 @@ function MagmaCore.build(parent: Instance): Types.MapInfo
 
 	silos(model)
 	industry(model)
+	refineryAndStacks(model)
 
 	local spawns = {}
 	for _, p in {
@@ -307,6 +347,9 @@ function MagmaCore.build(parent: Instance): Types.MapInfo
 		FluidColor = LAVA,
 		FluidMaterial = Enum.Material.CrackedLava,
 		HazardFloorY = 2,
+		FluidName = "LAVA",
+		Lighting = "Volcanic",
+		KnockbackMultiplier = 1,
 		Center = Vector3.new(0, 0, 0),
 		Radius = 150,
 	}

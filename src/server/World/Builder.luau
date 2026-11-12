@@ -358,4 +358,158 @@ function Builder.highrise(
 	return model, roofY
 end
 
+-- Standing on this part hurts and/or slows (quicksand, vents). Read by MatchService.
+function Builder.hazard(part: BasePart, damagePerSecond: number, walkSpeed: number?): BasePart
+	part:SetAttribute("HazardDPS", damagePerSecond)
+	if walkSpeed then
+		part:SetAttribute("HazardWalkSpeed", walkSpeed)
+	end
+	return part
+end
+
+-- When this building collapses it tips over toward `direction` instead of slumping
+-- (dominoes, billboards that become planks, the Ferris wheel that rolls away).
+function Builder.fallDirection(model: Model, direction: Vector3)
+	local flat = Vector3.new(direction.X, 0, direction.Z)
+	if flat.Magnitude > 0 then
+		model:SetAttribute("FallDirection", flat.Unit)
+	end
+end
+
+-- Straight or sloped bridge from a to b (deck centre heights), with rails and two
+-- support brackets at each end. Returns the building.
+function Builder.bridge(
+	parent: Instance,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	width: number,
+	deckColor: Color3,
+	deckMaterial: Enum.Material,
+	railColor: Color3,
+	supportColor: Color3,
+	deckHealth: number?
+): Model
+	local model = Builder.building(parent, name)
+	local span = b - a
+	local length = span.Magnitude
+	local dir = span.Unit
+	local segs = math.max(1, math.ceil(length / 8))
+	local segLen = length / segs
+	local right = CFrame.lookAt(Vector3.zero, dir).RightVector
+	for i = 1, segs do
+		local c = a + dir * segLen * (i - 0.5)
+		local deck = Builder.part(model, {
+			Name = "Deck",
+			Size = Vector3.new(width, 1, segLen + 0.05),
+			CFrame = CFrame.lookAt(c, c + dir),
+			Color = deckColor,
+			Material = deckMaterial,
+			Transparency = if deckMaterial == Enum.Material.Glass then 0.35 else 0,
+		})
+		Builder.structural(deck, 2, false, deckHealth)
+		for _, side in { -1, 1 } do
+			local rp = c + right * side * (width / 2 - 0.2) + Vector3.new(0, 1.8, 0)
+			local rail = Builder.part(model, {
+				Name = "Rail",
+				Size = Vector3.new(0.35, 0.35, segLen),
+				CFrame = CFrame.lookAt(rp, rp + dir),
+				Color = railColor,
+				Material = Enum.Material.Neon,
+			})
+			Builder.structural(rail, 2, false, 20)
+		end
+	end
+	for _, endPoint in { a + dir * 1.5, b - dir * 1.5 } do
+		for _, side in { -1, 1 } do
+			local p = endPoint + right * side * (width / 2 - 0.6) - Vector3.new(0, 2.5, 0)
+			local bracket = Builder.part(model, {
+				Name = "Bracket",
+				Size = Vector3.new(1.2, 4, 1.2),
+				CFrame = CFrame.new(p),
+				Color = supportColor,
+				Material = Enum.Material.Metal,
+			})
+			Builder.structural(bracket, 1, true, 90)
+		end
+	end
+	return model
+end
+
+-- Glowing sign panel (neon backing + text) on two posts. Falls toward `fallDir`.
+function Builder.billboard(
+	parent: Instance,
+	name: string,
+	base: Vector3,
+	facing: Vector3,
+	width: number,
+	height: number,
+	lift: number,
+	text: string,
+	panelColor: Color3,
+	textColor: Color3,
+	fallDir: Vector3?
+): Model
+	local model = Builder.building(parent, name)
+	local look = CFrame.lookAt(base, base + facing)
+	local right = look.RightVector
+	for _, side in { -1, 1 } do
+		local post = Builder.part(model, {
+			Name = "Post",
+			Class = "TrussPart",
+			Size = Vector3.new(2, lift + height, 2),
+			CFrame = CFrame.new(base + right * side * (width / 2 - 1) + Vector3.new(0, (lift + height) / 2, 0) - facing.Unit * 1.5),
+			Color = Color3.fromRGB(60, 60, 70),
+			Material = Enum.Material.Metal,
+		})
+		Builder.structural(post, 1, true, 80)
+	end
+	local panelCf = look * CFrame.new(0, lift + height / 2, 0)
+	local panel = Builder.part(model, {
+		Name = "Panel",
+		Size = Vector3.new(width, height, 1),
+		CFrame = panelCf,
+		Color = panelColor,
+		Material = Enum.Material.Neon,
+	})
+	Builder.structural(panel, 2, false, 60)
+	Builder.sign(panel, Enum.NormalId.Front, text, textColor)
+	local frame = Builder.part(model, {
+		Name = "Frame",
+		Size = Vector3.new(width + 1, height + 1, 0.6),
+		CFrame = panelCf * CFrame.new(0, 0, 0.7),
+		Color = Color3.fromRGB(30, 30, 40),
+		Material = Enum.Material.Metal,
+	})
+	Builder.structural(frame, 2, false, 60)
+	if fallDir then
+		Builder.fallDirection(model, fallDir)
+	end
+	return model
+end
+
+-- Water tower: legs (supports) + tank. Topples toward fallDir when its legs go.
+function Builder.waterTower(parent: Instance, base: Vector3, legHeight: number, color: Color3, fallDir: Vector3?): Model
+	local model = Builder.building(parent, "WaterTower")
+	for _, c in { Vector3.new(3, 0, 3), Vector3.new(-3, 0, 3), Vector3.new(3, 0, -3), Vector3.new(-3, 0, -3) } do
+		local leg = Builder.block(model, "Leg", base + c + Vector3.new(0, legHeight / 2, 0), Vector3.new(1, legHeight, 1), Color3.fromRGB(70, 70, 80), Enum.Material.Metal)
+		Builder.structural(leg, 1, true, 70)
+	end
+	local tank = Builder.cylinder(model, "Tank", base + Vector3.new(0, legHeight + 4, 0), 8, 10, color, Enum.Material.Metal)
+	Builder.structural(tank, 2, false, 150)
+	local cap = Builder.cylinder(model, "TankCap", base + Vector3.new(0, legHeight + 8.5, 0), 1, 8, color:Lerp(Color3.new(0, 0, 0), 0.3), Enum.Material.Metal)
+	Builder.structural(cap, 2, false)
+	if fallDir then
+		Builder.fallDirection(model, fallDir)
+	end
+	return model
+end
+
+-- Decorative neon strip (not destructible).
+function Builder.neon(parent: Instance, center: Vector3, size: Vector3, color: Color3): BasePart
+	local p = Builder.block(parent, "Neon", center, size, color, Enum.Material.Neon)
+	p.CastShadow = false
+	return p
+end
+
 return Builder

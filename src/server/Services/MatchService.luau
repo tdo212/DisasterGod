@@ -210,18 +210,44 @@ end
 ---------------------------------------------------------------------------
 -- hazard floors: kill plane, rising fluid, lava floor
 
+local footParams = RaycastParams.new()
+footParams.FilterType = Enum.RaycastFilterType.Include
+
+local function setSlowed(player: Player, humanoid: Humanoid, walkSpeed: number?)
+	if walkSpeed then
+		if player:GetAttribute(Attributes.Slowed) ~= true then
+			player:SetAttribute(Attributes.Slowed, true)
+			humanoid.WalkSpeed = walkSpeed
+		end
+	elseif player:GetAttribute(Attributes.Slowed) == true then
+		player:SetAttribute(Attributes.Slowed, false)
+		humanoid.WalkSpeed = Config.Player.WalkSpeed
+	end
+end
+
 local function hazardStep(dt: number)
 	if state.Phase ~= "Active" then
 		return
 	end
 	local info = MapService.GetCurrent()
 	local fluidTop = MapService.GetFluidTop()
+	footParams.FilterDescendantsInstances = { MapService.GetArenaFolder() }
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpOf(player)
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 		if not (hrp and humanoid) or humanoid.Health <= 0 then
 			continue
 		end
+		-- hazard zones under the feet (quicksand, vents)
+		local floor = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), footParams)
+		local zone = floor and floor.Instance
+		local dps = zone and zone:GetAttribute("HazardDPS")
+		if typeof(dps) == "number" then
+			humanoid:TakeDamage(dps * dt)
+		end
+		local slow = zone and zone:GetAttribute("HazardWalkSpeed")
+		setSlowed(player, humanoid, if typeof(slow) == "number" then slow else nil)
+
 		local y = hrp.Position.Y
 		if y < Config.Player.KillPlaneY then
 			humanoid.Health = 0
@@ -247,6 +273,7 @@ local function intermission(): (boolean, string)
 
 	local info = MapService.Build(mapName)
 	ReplicatedStorage:SetAttribute(Attributes.MapName, info.DisplayName)
+	EnvironmentService.ApplyPreset(info.Lighting, 3)
 	RoleService.UpdateChances()
 
 	while state.TimeRemaining > 0 do
@@ -306,7 +333,7 @@ local function active(god: Player?)
 			MapService.StartFluid(M.SuddenDeathDuration)
 			EnvironmentService.SetMood("SuddenDeath", 3)
 			local info = MapService.GetCurrent()
-			local fluidName = if info and info.HazardFloorY then "LAVA" else "WATER"
+			local fluidName = if info then info.FluidName else "WATER"
 			banner:FireAllClients("SUDDEN DEATH", fluidName .. " IS RISING — GET TO HIGH GROUND!", RED)
 		end
 		updateAlive()
@@ -354,6 +381,7 @@ local function roundEnd(mapName: string)
 		local character = p.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if humanoid and humanoid.Health > 0 then
+			setSlowed(p, humanoid, nil)
 			LobbyService.TeleportToLobby(p)
 		end
 	end
@@ -374,6 +402,23 @@ local function runCycle()
 	local god = assignRoles()
 	active(god)
 	roundEnd(mapName)
+end
+
+-- Second Chance: put an eliminated survivor back into the live round. False if not possible.
+function MatchService.Revive(player: Player): boolean
+	if state.Phase ~= "Active" or not RoleService.Revive(player) then
+		return false
+	end
+	updateAlive()
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		task.spawn(sendToArena, player, math.random(1, 12))
+	else
+		player:LoadCharacter() -- CharacterAdded sends alive survivors to the arena
+	end
+	banner:FireClient(player, "SECOND CHANCE!", "Back into the arena — survive!", SURVIVOR_GREEN)
+	return true
 end
 
 function MatchService.GetState()

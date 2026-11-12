@@ -223,6 +223,49 @@ local function docks(model: Model)
 	Builder.crates(model, Vector3.new(-120, G, -60), 3)
 end
 
+local function townBuildings(model: Model)
+	-- harbor office (3 storeys) on the east beach
+	Builder.highrise(model, "HarborOffice", Vector3.new(128, G, -5), 20, 16, 3, 10, {
+		SlabColor = Color3.fromRGB(230, 230, 235),
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = Color3.fromRGB(70, 110, 170),
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = Color3.fromRGB(150, 205, 240),
+		WallMaterial = Enum.Material.Glass,
+		WallTransparency = 0.4,
+		OpenSide = "West",
+	})
+	-- beach huts
+	for i, spec in {
+		{ Vector3.new(-118, G, 0), Color3.fromRGB(255, 150, 120) },
+		{ Vector3.new(-92, G, 48), Color3.fromRGB(120, 200, 255) },
+		{ Vector3.new(-52, G, -12), Color3.fromRGB(255, 220, 110) },
+	} do
+		Builder.highrise(model, "BeachHut" .. i, spec[1], 10, 8, 1, 7, {
+			SlabColor = Color3.fromRGB(245, 235, 210),
+			SlabMaterial = Enum.Material.WoodPlanks,
+			ColumnColor = WOOD,
+			ColumnMaterial = Enum.Material.Wood,
+			WallColor = spec[2],
+			WallMaterial = Enum.Material.WoodPlanks,
+			WallTransparency = 0,
+		})
+	end
+	-- plateau water tower that topples toward the bridge
+	Builder.waterTower(model, Vector3.new(-30, 24.4, 5), 9, Color3.fromRGB(200, 90, 70), Vector3.new(1, 0, 0.3))
+	-- lifeguard tower
+	local lg = Builder.building(model, "LifeguardTower")
+	for _, o in { Vector3.new(2, 0, 2), Vector3.new(-2, 0, 2), Vector3.new(2, 0, -2), Vector3.new(-2, 0, -2) } do
+		local leg = Builder.block(lg, "Leg", Vector3.new(40, G + 4, -80) + o, Vector3.new(0.8, 8, 0.8), WHITE, Enum.Material.Wood)
+		Builder.structural(leg, 1, true, 40)
+	end
+	local hut = Builder.block(lg, "Hut", Vector3.new(40, G + 10, -80), Vector3.new(6, 4, 6), RED, Enum.Material.WoodPlanks)
+	Builder.structural(hut, 2, false, 50)
+	local roofPart = Builder.block(lg, "Roof", Vector3.new(40, G + 12.4, -80), Vector3.new(7, 0.8, 7), WHITE, Enum.Material.WoodPlanks)
+	Builder.structural(roofPart, 2, false, 40)
+	Builder.ramp(model, "LifeguardRamp", CFrame.lookAt(Vector3.new(40, G + 4, -89), Vector3.new(40, G + 4, -90)), Vector3.new(3, 8, 12), WOOD, Enum.Material.WoodPlanks)
+end
+
 local function decor(model: Model)
 	for _, pos in {
 		Vector3.new(-120, G, 20),
@@ -259,6 +302,7 @@ function FractureBay.build(parent: Instance): Types.MapInfo
 	lighthouse(model)
 	bridge(model)
 	docks(model)
+	townBuildings(model)
 	decor(model)
 
 	local spawns = {}
@@ -289,6 +333,9 @@ function FractureBay.build(parent: Instance): Types.MapInfo
 		FluidColor = Color3.fromRGB(40, 150, 235),
 		FluidMaterial = Enum.Material.Glass,
 		HazardFloorY = nil,
+		FluidName = "WATER",
+		Lighting = "Day",
+		KnockbackMultiplier = 1,
 		Center = Vector3.new(0, 0, 0),
 		Radius = 160,
 	}

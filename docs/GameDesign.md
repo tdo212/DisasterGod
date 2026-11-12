@@ -53,25 +53,48 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 ### Sky Sanctuary (lobby)
 A floating grass island beside the arena at (0, 260, -340). It has a glass observation balcony facing the arena, rainbow paths, a winners podium with light beams, the gear shop stall (proximity prompt), a coin leaderboard, and a 12-pad neon obby (+15 coins, 20 s cooldown). Falling off returns you to spawn.
 
-### Fracture Bay
-Two beach land masses split by a water channel and joined by a **suspension bridge** between a rock plateau and a cliff.
-- **Glass Resort**: 4 floors on exposed concrete pillars. Take out the pillars and the floors above pancake down.
-- **Lighthouse**: stacked segments with a ladder to the balcony. It's the highest ground and a prime lightning target.
-- Also: dock with crane, beach café, palms, crates.
-- Flood line: Y 20.
+Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lighting preset, sudden-death fluid and knockback multiplier.
 
-### Magma Core Station
-Four basalt quadrants over a lava sea.
-- **Catwalks** at Y 18 on climbable truss supports link the quadrant pads to the central **radar dome hub**. Snap one support and the whole catwalk drops.
-- **Cooling silos** and fuel barrels are volatile: they explode and chain-react.
-- Also: crane, twin red lattice towers joined by a sky beam (highest ground), a control block.
-- Standing in the lava channels burns. Flood line: Y 14.
+| Arena | Look | Signature destruction | Sudden death |
+|---|---|---|---|
+| Fracture Bay | Sunny beach | Glass resort on exposed pillars pancakes down; suspension bridge; lighthouse; harbor office, beach huts, water tower and lifeguard tower | Water to Y 20 |
+| Neo-Shibuya Skyline | Neon night | Four rooftops over an abyss linked by glass skybridges; hologram billboards topple across the gaps as makeshift planks; glass rooftop pavilions | Toxic smog to Y 52 |
+| Magma Core Station | Volcanic | Catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; vents burn | Lava to Y 14 |
+| Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); quicksand pits slow and hurt | Sand to Y 12 |
+| Outpost Zero | Arctic | Research containers drop when their stilts snap; breakable ice floes; ice bridge to the comms-tower island; **2x knockback** on slippery ice | Freezing water to Y 9 |
+| Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball; climbable coaster trestles; circus tent | Tide to Y 12 |
+
+**Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map.
 
 ### Destruction model
-Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. Debris despawns after ~14 s or when it sinks.
+Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel). Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris despawns after ~14 s or when it sinks.
 
 ## Economy
 - Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
-- Coins buy gear. Profiles (coins, streaks, gear) persist through DataStore on live servers; Studio sessions stay in memory.
+- Coins buy gear. Profiles (coins, streaks, gear, welcome-pack flag, recent receipt IDs) persist through DataStore on live servers; Studio sessions stay in memory.
+
+## Monetization (Robux)
+Created through Open Cloud for universe 10776039268. The IDs are in `Config.Monetization`.
+
+**Developer products** (repeatable). `ProcessReceipt` is idempotent: purchase IDs are remembered per profile.
+
+| Product | Price | Grant |
+|---|---|---|
+| Pouch / Bag / Chest / Vault of Coins | R$25 / 60 / 140 / 349 | +500 / 1,500 / 4,000 / 12,000 coins |
+| Be the God Next Round | R$49 | Guaranteed God at the next role draw (God Chance shows 100%) |
+| Survival Kit | R$35 | One of each gear item |
+| Welcome Pack | R$15 (list R$40) | +1,000 coins + Survival Kit, one-time offer card on the HUD |
+| Second Chance | R$19 | Offered for 10 s after elimination; revives you into the live round (+250 coins if the round already ended) |
+
+**Game passes:**
+
+| Pass | Price | Perk |
+|---|---|---|
+| 2x Coins | R$199 | Doubles all coins earned from play |
+| VIP | R$249 | Gold VIP tag, rainbow dash trail, +15 coins every round |
+| God Priority | R$299 | God Chance grows twice as fast |
+| Quick Dash | R$99 | Dash cooldown halved |
+
+**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The sidebar has a Passes shortcut. The HUD shows a guarantee button under the God Chance card, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
 
 All numbers live in `src/shared/Config.luau`.

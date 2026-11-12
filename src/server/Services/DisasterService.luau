@@ -110,7 +110,9 @@ local function hurt(player: Player, damage: number, caster: Player?)
 end
 
 local function knock(player: Player, velocity: Vector3)
-	clientEffect:FireClient(player, "Knockback", velocity)
+	local info = MapService.GetCurrent()
+	local mult = if info and info.KnockbackMultiplier then info.KnockbackMultiplier else 1
+	clientEffect:FireClient(player, "Knockback", velocity * mult)
 end
 
 -- Hurt + optionally knock back survivors in a sphere; near-miss everyone just outside.

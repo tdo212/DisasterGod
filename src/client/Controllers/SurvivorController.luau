@@ -63,7 +63,11 @@ local function dash()
 	if not (hrp and humanoid) or humanoid.Health <= 0 or hrp.Anchored then
 		return
 	end
-	dashReadyAt = now + Mobility.DashCooldown
+	local cooldown = Mobility.DashCooldown
+	if player:GetAttribute(Attributes.PassPrefix .. "QuickDash") == true then
+		cooldown *= Config.Monetization.QuickDashCooldownMultiplier
+	end
+	dashReadyAt = now + cooldown
 	local dir = humanoid.MoveDirection
 	if dir.Magnitude < 0.1 then
 		dir = hrp.CFrame.LookVector
@@ -89,7 +93,14 @@ local function dash()
 	trail.Attachment0 = trailA
 	trail.Attachment1 = trailB
 	trail.Lifetime = 0.25
-	trail.Color = ColorSequence.new(C.Cyan)
+	trail.Color = if player:GetAttribute(Attributes.PassPrefix .. "VIP") == true
+		then ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+			ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 220, 60)),
+			ColorSequenceKeypoint.new(0.66, Color3.fromRGB(80, 220, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 100, 255)),
+		})
+		else ColorSequence.new(C.Cyan)
 	trail.Transparency = NumberSequence.new(0.2, 1)
 	trail.Parent = hrp
 
@@ -110,7 +121,7 @@ local function dash()
 		trailB:Destroy()
 	end)
 	dashCooldown.Size = UDim2.fromScale(1, 1)
-	Components.tween(dashCooldown, TweenInfo.new(Mobility.DashCooldown, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(1, 0) })
+	Components.tween(dashCooldown, TweenInfo.new(cooldown, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(1, 0) })
 end
 
 ---------------------------------------------------------------------------

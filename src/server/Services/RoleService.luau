@@ -18,6 +18,7 @@ local RoleService = {}
 local roles: { [Player]: Role } = {}
 local alive: { [Player]: boolean } = {}
 local weights: { [Player]: number } = {}
+local godQueue: { Player } = {} -- bought "Be the God Next Round", first come first served
 
 local soloSwap = Instance.new("BindableEvent")
 -- Fired as (player, role) when the solo tester toggles Survivor <-> God.
@@ -29,6 +30,20 @@ end
 
 function RoleService.UpdateChances()
 	local players = Players:GetPlayers()
+	-- a purchased "God next round" is a guarantee: show it as 100%
+	local guaranteed: Player? = nil
+	for _, queued in godQueue do
+		if queued.Parent then
+			guaranteed = queued
+			break
+		end
+	end
+	if guaranteed then
+		for _, p in players do
+			p:SetAttribute(Attributes.GodChance, if p == guaranteed then 100 else 0)
+		end
+		return
+	end
 	if #players == 1 then
 		local p = players[1]
 		p:SetAttribute(Attributes.GodChance, if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" then 100 else 0)
@@ -59,6 +74,10 @@ function RoleService.Init()
 		roles[player] = nil
 		alive[player] = nil
 		weights[player] = nil
+		local i = table.find(godQueue, player)
+		if i then
+			table.remove(godQueue, i)
+		end
 		task.defer(RoleService.UpdateChances)
 	end)
 
@@ -135,7 +154,20 @@ function RoleService.PickGod(players: { Player }): Player?
 	end
 	if #players == 1 then
 		local p = players[1]
+		local queued = table.find(godQueue, p)
+		if queued then
+			table.remove(godQueue, queued)
+			p:SetAttribute(Attributes.GodQueued, false)
+			return p
+		end
 		return if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" then p else nil
+	end
+	while #godQueue > 0 do
+		local queued = table.remove(godQueue, 1) :: Player
+		if queued.Parent and table.find(players, queued) then
+			queued:SetAttribute(Attributes.GodQueued, false)
+			return queued
+		end
 	end
 	local total = 0
 	for _, p in players do
@@ -158,10 +190,32 @@ function RoleService.AdvancePity(participants: { Player }, god: Player?, survive
 			weights[p] = Config.Pity.BaseWeight
 		else
 			local add = Config.Pity.PerRoundParticipated + (if survivedSet[p] then Config.Pity.SurvivedBonus else 0)
+			if p:GetAttribute(Attributes.PassPrefix .. "GodPriority") == true then
+				add *= Config.Monetization.GodPriorityPityMultiplier
+			end
 			weights[p] = (weights[p] or Config.Pity.BaseWeight) + add
 		end
 	end
 	RoleService.UpdateChances()
+end
+
+-- Robux "Be the God Next Round": guaranteed pick at the next role draw.
+function RoleService.QueueGod(player: Player)
+	if not table.find(godQueue, player) then
+		table.insert(godQueue, player)
+	end
+	player:SetAttribute(Attributes.GodQueued, true)
+	RoleService.UpdateChances()
+end
+
+-- Bring an eliminated survivor back into the round (Second Chance).
+function RoleService.Revive(player: Player): boolean
+	if roles[player] ~= "Survivor" or alive[player] then
+		return false
+	end
+	alive[player] = true
+	player:SetAttribute(Attributes.Alive, true)
+	return true
 end
 
 function RoleService.ResetAll()

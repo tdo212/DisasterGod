@@ -2,6 +2,7 @@
 -- MapService: builds / clears the active arena and runs the sudden-death rising fluid.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local TweenService = game:GetService("TweenService")
 
@@ -12,6 +13,10 @@ local World = ServerScriptService.Server.World
 local Builders: { [string]: any } = {
 	FractureBay = require(World.FractureBay),
 	MagmaCore = require(World.MagmaCore),
+	NeoShibuya = require(World.NeoShibuya),
+	SunscorchedMirage = require(World.SunscorchedMirage),
+	OutpostZero = require(World.OutpostZero),
+	StarlightBoardwalk = require(World.StarlightBoardwalk),
 }
 
 local DestructionService = require(script.Parent.DestructionService)
@@ -56,6 +61,13 @@ function MapService.GetCurrent(): Types.MapInfo?
 end
 
 function MapService.NextMapName(): string
+	-- Studio testing: set workspace attribute ForceMap = "<MapName>" to pin the next map
+	if RunService:IsStudio() then
+		local forced = workspace:GetAttribute("ForceMap")
+		if typeof(forced) == "string" and Builders[forced] then
+			return forced
+		end
+	end
 	local rotation = Config.World.MapRotation
 	rotationIndex = rotationIndex % #rotation + 1
 	return rotation[rotationIndex]

@@ -92,6 +92,7 @@ local function collapseAbove(building: Model, level: number, from: Vector3?): nu
 		end
 	end
 	local count = 0
+	local fallDir = building:GetAttribute("FallDirection") :: Vector3?
 	for _, parts in byLevel do
 		local root = parts[1]
 		for i, part in parts do
@@ -111,6 +112,12 @@ local function collapseAbove(building: Model, level: number, from: Vector3?): nu
 		pcall(function()
 			root:SetNetworkOwner(nil)
 		end)
+		if fallDir then
+			-- directed fall: shove the whole assembly and tip it over toward fallDir
+			root.AssemblyLinearVelocity = fallDir * DC.DirectedFallSpeed
+			root.AssemblyAngularVelocity = Vector3.yAxis:Cross(fallDir) * DC.DirectedTipSpin
+			continue
+		end
 		-- nudge the slab so it shears off instead of dropping straight down
 		if from then
 			local away = root.Position - from

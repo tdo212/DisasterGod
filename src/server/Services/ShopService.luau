@@ -60,6 +60,13 @@ local function use(player: Player, def: Types.GearDefinition)
 	end
 end
 
+-- One of every gear item (Survival Kit / Welcome Pack).
+function ShopService.GrantKit(player: Player)
+	for _, def in Config.Gear do
+		PlayerDataService.AddGear(player, def.Id, 1)
+	end
+end
+
 function ShopService.Init()
 	Remotes.get("BuyGear").OnServerEvent:Connect(function(player, id)
 		if typeof(id) ~= "string" then

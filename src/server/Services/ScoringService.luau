@@ -48,9 +48,9 @@ end
 
 -- Pay coins and show a floating score tick.
 function ScoringService.Award(player: Player, amount: number, text: string, color: Color3?)
-	PlayerDataService.AddCoins(player, amount)
-	record(player).Earned += amount
-	popup:FireClient(player, string.format("%s +%d", text, amount), color or GOLD)
+	local paid = PlayerDataService.EarnCoins(player, amount)
+	record(player).Earned += paid
+	popup:FireClient(player, string.format("%s +%d", text, paid), color or GOLD)
 end
 
 function ScoringService.Notify(player: Player, text: string, color: Color3?)
@@ -130,24 +130,28 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			end
 			local destruction = math.floor(r.Destroyed * S.GodDestructionCoinsPerPart)
 			if destruction > 0 then
-				PlayerDataService.AddCoins(p, destruction)
+				destruction = PlayerDataService.EarnCoins(p, destruction)
 				r.Earned += destruction
 				table.insert(lines[p], { Text = string.format("Destruction (%d parts)", r.Destroyed), Amount = destruction })
 			end
 		elseif RoleService.IsAliveSurvivor(p) then
 			r.Survived = true
 			local streak = PlayerDataService.RecordRound(p, true)
-			local bonus = S.SurvivalCoins + S.StreakBonusPerRound * math.max(0, streak - 1)
-			PlayerDataService.AddCoins(p, bonus)
+			local bonus = PlayerDataService.EarnCoins(p, S.SurvivalCoins + S.StreakBonusPerRound * math.max(0, streak - 1))
 			PlayerDataService.RecordWin(p)
 			r.Earned += bonus
 			table.insert(lines[p], { Text = if streak > 1 then string.format("Survived (streak %d)", streak) else "Survived", Amount = bonus })
 		else
 			PlayerDataService.RecordRound(p, false)
 		end
-		PlayerDataService.AddCoins(p, S.ParticipationCoins)
-		r.Earned += S.ParticipationCoins
-		table.insert(lines[p], { Text = "Participation", Amount = S.ParticipationCoins })
+		local participation = PlayerDataService.EarnCoins(p, S.ParticipationCoins)
+		r.Earned += participation
+		table.insert(lines[p], { Text = "Participation", Amount = participation })
+		if p:GetAttribute(Config.Attributes.PassPrefix .. "VIP") == true then
+			local vip = PlayerDataService.EarnCoins(p, Config.Monetization.VipBonusCoinsPerRound)
+			r.Earned += vip
+			table.insert(lines[p], { Text = "VIP bonus", Amount = vip })
+		end
 	end
 
 	-- podium: top 3 by coins earned this round
