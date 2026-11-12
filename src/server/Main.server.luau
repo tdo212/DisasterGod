@@ -9,6 +9,7 @@ end
 
 local order = {
 	"PlayerDataService",
+	"AudioService",
 	"RoleService",
 	"EnvironmentService",
 	"DestructionService",

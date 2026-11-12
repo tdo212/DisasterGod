@@ -98,10 +98,19 @@ local function quadrants(model: Model)
 	ground.Name = "Ground"
 	ground.Parent = model
 	for _, s in { Vector3.new(1, 0, 1), Vector3.new(-1, 0, 1), Vector3.new(1, 0, -1), Vector3.new(-1, 0, -1) } do
-		Builder.block(ground, "Quadrant", Vector3.new(s.X * 50, 0, s.Z * 50), Vector3.new(70, 12, 70), BASALT, Enum.Material.Basalt)
-		Builder.block(ground, "QuadrantTop", Vector3.new(s.X * 50, 6.1, s.Z * 50), Vector3.new(66, 0.2, 66), BASALT_LIGHT, Enum.Material.Slate)
-		Builder.block(ground, "Outcrop", Vector3.new(s.X * 88, -1, s.Z * 40), Vector3.new(10, 10, 30), BASALT, Enum.Material.Basalt)
-		Builder.block(ground, "Outcrop", Vector3.new(s.X * 40, -1, s.Z * 88), Vector3.new(30, 10, 10), BASALT, Enum.Material.Basalt)
+		Builder.block(ground, "Quadrant", Vector3.new(s.X * 51, 0, s.Z * 51), Vector3.new(90, 12, 90), BASALT, Enum.Material.Basalt)
+		Builder.block(ground, "QuadrantTop", Vector3.new(s.X * 51, 6.1, s.Z * 51), Vector3.new(86, 0.2, 86), BASALT_LIGHT, Enum.Material.Slate)
+		Builder.block(ground, "Outcrop", Vector3.new(s.X * 100, -1, s.Z * 40), Vector3.new(10, 10, 30), BASALT, Enum.Material.Basalt)
+		Builder.block(ground, "Outcrop", Vector3.new(s.X * 40, -1, s.Z * 100), Vector3.new(30, 10, 10), BASALT, Enum.Material.Basalt)
+	end
+	-- central plaza under the hub + rock land bridges over the narrow lava channels:
+	-- the whole station is one walkable platform
+	Builder.block(ground, "HubPlaza", Vector3.new(0, 0, 0), Vector3.new(34, 12, 34), BASALT, Enum.Material.Basalt)
+	Builder.block(ground, "HubPlazaTop", Vector3.new(0, 6.1, 0), Vector3.new(32, 0.2, 32), BASALT_LIGHT, Enum.Material.Slate)
+	for _, b in { Vector3.new(0, 0, 60), Vector3.new(0, 0, -60), Vector3.new(60, 0, 0), Vector3.new(-60, 0, 0) } do
+		local size = if b.X == 0 then Vector3.new(16, 12, 18) else Vector3.new(18, 12, 16)
+		Builder.block(ground, "LandBridge", b, size, BASALT, Enum.Material.Basalt)
+		Builder.block(ground, "LandBridgeTop", b + Vector3.new(0, 6.1, 0), size - Vector3.new(2, 11.8, 2), BASALT_LIGHT, Enum.Material.Slate)
 	end
 	-- glowing lava vents on the quadrant floors (decorative hot spots)
 	for _, p in { Vector3.new(30, 6.15, 70), Vector3.new(-72, 6.15, -28), Vector3.new(72, 6.15, -75) } do

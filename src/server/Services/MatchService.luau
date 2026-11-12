@@ -273,6 +273,7 @@ local function intermission(): (boolean, string)
 
 	local info = MapService.Build(mapName)
 	ReplicatedStorage:SetAttribute(Attributes.MapName, info.DisplayName)
+	ReplicatedStorage:SetAttribute(Attributes.MapKey, info.Name)
 	EnvironmentService.ApplyPreset(info.Lighting, 3)
 	RoleService.UpdateChances()
 

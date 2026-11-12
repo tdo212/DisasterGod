@@ -103,21 +103,23 @@ local function balcony(model: Model, L: Vector3)
 	b.Name = "Balcony"
 	b.Parent = model
 	Builder.block(b, "Deck", L + Vector3.new(0, -1, 72), Vector3.new(96, 2, 24), MARBLE, Enum.Material.Marble)
-	local rail = Builder.block(b, "GlassRail", L + Vector3.new(0, 2.5, 84), Vector3.new(96, 5, 0.6), GLASS, Enum.Material.Glass)
-	rail.Transparency = 0.55
-	Builder.block(b, "RailGlow", L + Vector3.new(0, 5.2, 84), Vector3.new(96, 0.4, 1), Color3.fromRGB(80, 240, 255), Enum.Material.Neon)
+	local rail = Builder.block(b, "GlassRail", L + Vector3.new(0, 1.6, 84), Vector3.new(96, 3.2, 0.6), GLASS, Enum.Material.Glass)
+	rail.Transparency = 0.75
+	Builder.block(b, "RailGlow", L + Vector3.new(0, 3.4, 84), Vector3.new(96, 0.4, 1), Color3.fromRGB(80, 240, 255), Enum.Material.Neon)
 	for _, x in { -48, 48 } do
-		local side = Builder.block(b, "GlassRail", L + Vector3.new(x, 2.5, 72), Vector3.new(0.6, 5, 24), GLASS, Enum.Material.Glass)
-		side.Transparency = 0.55
+		local side = Builder.block(b, "GlassRail", L + Vector3.new(x, 1.6, 72), Vector3.new(0.6, 3.2, 24), GLASS, Enum.Material.Glass)
+		side.Transparency = 0.75
 	end
 	-- telescopes
 	for _, x in { -28, 0, 28 } do
 		Builder.cylinder(b, "ScopeBase", L + Vector3.new(x, 1.5, 80), 3, 1, Color3.fromRGB(60, 65, 80), Enum.Material.Metal)
+		local eye = L + Vector3.new(x, 3.4, 80)
 		Builder.part(b, {
 			Name = "Scope",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(4, 1.4, 1.4),
-			CFrame = CFrame.new(L + Vector3.new(x, 3.4, 80)) * CFrame.Angles(0, math.rad(90), math.rad(-20)),
+			-- cylinder axis is X; rotate so it points along the look direction (toward the arena, slightly down)
+			CFrame = CFrame.lookAt(eye, eye + Vector3.new(0, -0.35, 1)) * CFrame.Angles(0, math.rad(90), 0),
 			Color = Color3.fromRGB(210, 215, 230),
 			Material = Enum.Material.Metal,
 		})
@@ -153,7 +155,7 @@ local function podium(model: Model, L: Vector3): { BasePart }
 		local anchor = Builder.part(p, {
 			Name = "PodiumAnchor" .. i,
 			Size = Vector3.new(1, 1, 1),
-			CFrame = CFrame.new(L + Vector3.new(x, 1 + h + 5, 14)),
+			CFrame = CFrame.new(L + Vector3.new(x, 1 + h + 3.5, 14)),
 			Color = Color3.new(1, 1, 1),
 			Transparency = 1,
 			CanCollide = false,
@@ -230,15 +232,12 @@ local function obby(model: Model, L: Vector3): BasePart
 	Builder.sign(start, Enum.NormalId.Top, "OBBY", Color3.new(1, 1, 1))
 	-- return bridge from the finish back onto the island
 	local f = finish :: BasePart
-	local a = f.Position + Vector3.new(-5, 0, 0)
-	local b = L + Vector3.new(70, 0, 54)
-	Builder.part(o, {
-		Name = "ReturnSlide",
-		Size = Vector3.new(4, 1, (b - a).Magnitude),
-		CFrame = CFrame.lookAt((a + b) / 2, b),
-		Color = Color3.fromRGB(80, 220, 255),
-		Material = Enum.Material.Neon,
-	})
+	-- gentle neon ramp from the finish pad's west edge back down onto the island
+	local rise = (f.Position.Y + 0.5) - L.Y
+	local length = rise * 2.2
+	local highX = f.Position.X - 5
+	local center = Vector3.new(highX - length / 2, L.Y + rise / 2, f.Position.Z)
+	Builder.ramp(o, "ReturnRamp", CFrame.lookAt(center, center + Vector3.new(-1, 0, 0)), Vector3.new(6, rise, length), Color3.fromRGB(80, 220, 255), Enum.Material.Neon)
 	return f
 end
 

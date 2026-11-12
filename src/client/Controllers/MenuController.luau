@@ -27,6 +27,7 @@ local MenuController = {}
 
 local started = false
 local gui: ScreenGui
+local layer: Frame -- viewport-scaled root for all UI content
 local shop: any -- Components.WindowHandle
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
@@ -311,7 +312,7 @@ local function buildSpecialsPage(content: Frame)
 end
 
 local function buildShop()
-	shop = Components.window(gui, "Shop", UDim2.fromOffset(780, 470))
+	shop = Components.window(layer, "Shop", UDim2.fromOffset(780, 470))
 	local content = shop.Content
 
 	local tabs = Instance.new("Frame")
@@ -394,6 +395,7 @@ function MenuController.Start()
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
 
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
@@ -401,7 +403,7 @@ function MenuController.Start()
 	sidebar.Size = UDim2.fromOffset(96, 430)
 	sidebar.Position = UDim2.new(0, 16, 0.5, -20)
 	sidebar.AnchorPoint = Vector2.new(0, 0.5)
-	sidebar.Parent = gui
+	sidebar.Parent = layer
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 18)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder

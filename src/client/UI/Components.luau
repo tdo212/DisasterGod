@@ -4,6 +4,7 @@
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(script.Parent:WaitForChild("Theme") :: ModuleScript)
+local Sound = require(script.Parent:WaitForChild("Sound") :: ModuleScript)
 
 local C = Theme.Colors
 
@@ -160,6 +161,9 @@ function Components.button(props: ButtonProps): TextButton
 	button.MouseButton1Up:Connect(function()
 		Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
 	end)
+	button.Activated:Connect(function()
+		Sound.play("Click", 0.8, 0.95 + math.random() * 0.1)
+	end)
 	if props.OnClick then
 		button.Activated:Connect(props.OnClick)
 	end
@@ -246,6 +250,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 			return
 		end
 		open = false
+		Sound.play("Click", 0.6, 0.8)
 		local t = Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.85 })
 		t.Completed:Once(function()
 			if not open then
@@ -273,6 +278,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Content = content,
 		Open = function()
 			open = true
+			Sound.play("Open", 0.5, 1.2)
 			root.Visible = true
 			scale.Scale = 0.7
 			Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
@@ -320,6 +326,9 @@ function Components.tile(parent: Instance, icon: string, caption: string, color:
 
 	local scale = Instance.new("UIScale")
 	scale.Parent = tile
+	tile.Activated:Connect(function()
+		Sound.play("Tab", 0.8)
+	end)
 	tile.MouseEnter:Connect(function()
 		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.08 })
 	end)
@@ -327,6 +336,32 @@ function Components.tile(parent: Instance, icon: string, caption: string, color:
 		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
 	end)
 	return tile
+end
+
+-- Full-screen layer that scales all HUD content to the viewport (phones / small windows).
+-- Parent UI to the returned frame instead of the ScreenGui.
+function Components.scaledRoot(gui: ScreenGui): Frame
+	local root = Instance.new("Frame")
+	root.Name = "ScaledRoot"
+	root.BackgroundTransparency = 1
+	root.BorderSizePixel = 0
+	root.Active = false
+	root.Parent = gui
+	local scale = Instance.new("UIScale")
+	scale.Parent = root
+	local function update()
+		local camera = workspace.CurrentCamera
+		local size = if camera then camera.ViewportSize else Vector2.new(1280, 760)
+		local s = math.clamp(math.min(size.X / 1280, size.Y / 760), 0.5, 1.15)
+		scale.Scale = s
+		root.Size = UDim2.fromScale(1 / s, 1 / s)
+	end
+	update()
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
+	end
+	return root
 end
 
 return Components

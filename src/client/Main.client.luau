@@ -10,6 +10,7 @@ pcall(function()
 end)
 
 local order = {
+	"AudioController",
 	"EffectsController",
 	"HUDController",
 	"SurvivorController",

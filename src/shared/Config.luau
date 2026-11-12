@@ -263,6 +263,72 @@ local Config = {
 		ReceiptHistory = 50, -- purchase ids remembered per profile for idempotency
 	},
 
+	-- Licensed audio (APM Music / Pro Sound Effects / Distrokid + verified-loading community SFX).
+	-- Numbers are asset ids; strings are built-in rbxasset paths.
+	Audio = {
+		Music = {
+			Lobby = 9045802707, -- "Some Happy for Ya" (APM)
+			Round = 9045941481, -- "Mission Danger" (APM)
+			SuddenDeath = 9044584220, -- "Evil Overlord (B)" (APM)
+		},
+		Stings = {
+			RoundStart = 9043151109, -- "Get Up And Go - Hit" (APM)
+			GodChosen = 9045702179, -- "Roll With The Punches" (APM)
+			Win = 1840076509, -- "Through the Roof (sting)" (APM)
+			Lose = 1841391669, -- "Wipsy La La Sting 3" (APM)
+		},
+		Ambience = {
+			Lobby = 9112749076, -- Birds Park (PSE)
+			FractureBay = 9120621792, -- Waves Rolling (PSE)
+			NeoShibuya = 9112757705, -- City Ambience night (PSE)
+			MagmaCore = 9112823552, -- Lava Rumble (PSE)
+			SunscorchedMirage = 9125742262, -- airy desert wind (PSE)
+			OutpostZero = 81404060588532, -- Howling Wind
+			StarlightBoardwalk = 9118695887, -- Roller Coaster crowd (PSE)
+		} :: { [string]: number },
+		AmbienceLayer = {
+			StarlightBoardwalk = 9117143228, -- Ocean Surf (PSE)
+			OutpostZero = 9120621792, -- Waves Rolling (PSE)
+		} :: { [string]: number },
+		Ui = {
+			Click = "rbxasset://sounds/clickfast.wav",
+			Tab = "rbxasset://sounds/button.wav",
+			Open = 9119467553, -- short whoosh (PSE)
+			Coin = 93529351909119,
+			Purchase = 91609406292294,
+			Tick = 93396079703045,
+			Tock = 71549972318782,
+			Banner = 9119468100, -- spirit pass-by whoosh (PSE)
+			Error = "rbxasset://sounds/electronicpingshort.wav",
+		} :: { [string]: number | string },
+		Disaster = {
+			Warning = 125227661736774,
+			Lightning = 93403424380357,
+			Thunder = 95410087861011,
+			MeteorFall = 9119467553,
+			MeteorImpact = 7157159568,
+			Explosion = 125127520917980,
+			Tornado = 9125443744, -- swirling rumble loop (PSE)
+			Gust = 9119468100,
+			Rumble = 9113221477, -- avalanche rumble (PSE)
+			Collapse = 9120479801, -- wall crash (PSE)
+			Debris = 9114221795, -- earthquake debris (PSE)
+			Glass = 132535085898211,
+			SuddenDeathAlarm = 125227661736774,
+		} :: { [string]: number },
+		Volume = {
+			Music = 0.3,
+			Ambience = 0.45,
+			Ui = 0.6,
+			Disaster = 1,
+		},
+		CrossfadeSeconds = 2.5,
+		CountdownTicks = 5, -- intermission seconds that tick
+		CollapseSoundCooldown = 0.4,
+		GlassSoundCooldown = 0.25,
+		RollOffMaxDistance = 700,
+	},
+
 	Hazards = {
 		QuicksandDamagePerSecond = 8,
 		QuicksandWalkSpeed = 7,
@@ -278,7 +344,7 @@ local Config = {
 	World = {
 		ArenaCenter = Vector3.new(0, 0, 0),
 		ArenaRadius = 175,
-		LobbyOrigin = Vector3.new(0, 260, -340),
+		LobbyOrigin = Vector3.new(0, 150, -232), -- close + low enough that the balcony overlooks the arena
 		GodPerch = Vector3.new(0, 150, 0),
 		MapRotation = { "FractureBay", "NeoShibuya", "MagmaCore", "SunscorchedMirage", "OutpostZero", "StarlightBoardwalk" },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
@@ -302,6 +368,7 @@ local Config = {
 		PhaseDuration = "PhaseDuration", -- ReplicatedStorage
 		RoundNumber = "RoundNumber", -- ReplicatedStorage
 		MapName = "MapName", -- ReplicatedStorage
+		MapKey = "MapKey", -- ReplicatedStorage (builder name, drives ambience)
 		AliveCount = "AliveCount", -- ReplicatedStorage
 		GodName = "GodName", -- ReplicatedStorage
 		CastingOpen = "CastingOpen", -- ReplicatedStorage

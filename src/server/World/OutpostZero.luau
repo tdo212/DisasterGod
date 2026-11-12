@@ -1,8 +1,8 @@
 --!strict
--- Arena 5: Outpost Zero. A fracturing arctic glacier: safety-orange and cobalt research
--- containers on thin steel stilts (snap them and the module drops onto the ice), grated
--- walkways between container roofs, an ice bridge to the comms-tower island and
--- breakable ice floes. Ice is slippery: knockback is doubled here.
+-- Arena 5: Outpost Zero. One large fracturing glacier shelf: safety-orange and cobalt
+-- research containers on thin steel stilts (snap them and the module drops onto the ice),
+-- grated walkways between container roofs, a raised comms-tower plateau and breakable ice
+-- slabs along the shelf edge. Ice is slippery: knockback is doubled here.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -28,9 +28,13 @@ local function glacier(model: Model)
 	local ground = Instance.new("Folder")
 	ground.Name = "Ground"
 	ground.Parent = model
-	-- main shelf
-	Builder.block(ground, "Shelf", Vector3.new(-42, 0, -5), Vector3.new(92, 10, 72), ICE, Enum.Material.Ice)
-	Builder.block(ground, "ShelfSkirt", Vector3.new(-42, -2, -5), Vector3.new(96, 6, 76), ICE_DEEP, Enum.Material.Glacier)
+	-- one continuous glacier shelf covering the whole play area
+	Builder.block(ground, "Shelf", Vector3.new(-12, 0, -2), Vector3.new(216, 10, 156), ICE, Enum.Material.Ice)
+	Builder.block(ground, "ShelfSkirt", Vector3.new(-12, -2, -2), Vector3.new(222, 6, 162), ICE_DEEP, Enum.Material.Glacier)
+	-- pressure ridges for cover
+	for _, r in { { Vector3.new(-5, 6.5, 40), Vector3.new(26, 3, 5) }, { Vector3.new(30, 6.5, -45), Vector3.new(6, 3, 22) }, { Vector3.new(-90, 6.5, -50), Vector3.new(18, 3, 5) } } do
+		Builder.block(ground, "Ridge", r[1], r[2], ICE_DEEP, Enum.Material.Glacier)
+	end
 	for _, patch in {
 		{ Vector3.new(-60, SHELF_Y + 0.15, -25), Vector3.new(30, 0.3, 22) },
 		{ Vector3.new(-25, SHELF_Y + 0.15, 20), Vector3.new(26, 0.3, 18) },
@@ -38,14 +42,13 @@ local function glacier(model: Model)
 	} do
 		Builder.block(ground, "Snow", patch[1], patch[2], SNOW, Enum.Material.Snow)
 	end
-	-- comms island (round)
-	local island = Builder.cylinder(ground, "Island", Vector3.new(58, 0, 12), 14, 48, ICE, Enum.Material.Ice)
-	island.Name = "Island"
-	Builder.cylinder(ground, "IslandSnow", Vector3.new(58, 7.15, 12), 0.3, 44, SNOW, Enum.Material.Snow)
-	Builder.cylinder(ground, "IslandSkirt", Vector3.new(58, -2, 12), 8, 52, ICE_DEEP, Enum.Material.Glacier)
-	-- south dock shelf
-	Builder.block(ground, "DockShelf", Vector3.new(8, -1, -52), Vector3.new(42, 8, 26), ICE, Enum.Material.Ice)
-	Builder.block(ground, "DockSnow", Vector3.new(8, 3.15, -52), Vector3.new(40, 0.3, 24), SNOW, Enum.Material.Snow)
+	-- raised comms plateau on the shelf (top y = 10) with ramps up from the ice
+	Builder.cylinder(ground, "Plateau", Vector3.new(58, 7.5, 12), 5, 48, ICE, Enum.Material.Ice)
+	Builder.cylinder(ground, "PlateauSnow", Vector3.new(58, 10.15, 12), 0.3, 44, SNOW, Enum.Material.Snow)
+	for _, d in { Vector3.new(-1, 0, 0), Vector3.new(0, 0, -1) } do
+		local rc = Vector3.new(58, 7.5, 12) + d * 30
+		Builder.ramp(ground, "PlateauRamp", CFrame.lookAt(rc, rc + d), Vector3.new(10, 5, 14), ICE_DEEP, Enum.Material.Glacier)
+	end
 	-- decorative icebergs further out
 	local rng = Random.new(5)
 	for _ = 1, 14 do
@@ -57,19 +60,17 @@ local function glacier(model: Model)
 	end
 end
 
--- Breakable floating ice floes (step stones over the water).
+-- Breakable ice slabs fused to the shelf edge (they snap off into the sea).
 local function floes(model: Model)
 	for _, p in {
-		Vector3.new(-95, 0, 30),
-		Vector3.new(-100, 0, -20),
-		Vector3.new(-30, 0, 45),
-		Vector3.new(15, 0, 40),
-		Vector3.new(25, 0, -20),
-		Vector3.new(40, 0, -40),
-		Vector3.new(-60, 0, -55),
-		Vector3.new(90, 0, -15),
-		Vector3.new(95, 0, 35),
-		Vector3.new(-15, 0, -60),
+		Vector3.new(-126, 3.5, 30),
+		Vector3.new(-126, 3.5, -30),
+		Vector3.new(102, 3.5, -40),
+		Vector3.new(102, 3.5, 50),
+		Vector3.new(-60, 3.5, 82),
+		Vector3.new(20, 3.5, 82),
+		Vector3.new(-80, 3.5, -86),
+		Vector3.new(40, 3.5, -86),
 	} do
 		local floe = Builder.building(model, "Floe")
 		local slab = Builder.block(floe, "Floe", p + Vector3.new(0, -0.5, 0), Vector3.new(12, 4, 10), ICE, Enum.Material.Ice)
@@ -107,7 +108,7 @@ local function container(model: Model, center: Vector3, color: Color3, label: st
 end
 
 local function commsTower(model: Model)
-	local base = Vector3.new(58, 7.3, 12)
+	local base = Vector3.new(58, 10.3, 12)
 	local tower = Builder.building(model, "CommsTower")
 	local top = Builder.latticeTower(model, tower, base, 40, 8, STEEL)
 	-- red bracing bands
@@ -136,7 +137,7 @@ local function commsTower(model: Model)
 	-- fence around the island top
 	for i = 0, 11 do
 		local a = i * math.pi / 6
-		local post = Builder.block(model, "FencePost", Vector3.new(58 + math.cos(a) * 20, 8.8, 12 + math.sin(a) * 20), Vector3.new(0.6, 3, 0.6), STEEL, Enum.Material.Metal)
+		local post = Builder.block(model, "FencePost", Vector3.new(58 + math.cos(a) * 21, 11.8, 12 + math.sin(a) * 21), Vector3.new(0.6, 3, 0.6), STEEL, Enum.Material.Metal)
 		post.CanCollide = true
 	end
 end
@@ -144,16 +145,16 @@ end
 local function dockArea(model: Model)
 	local dock = Builder.building(model, "Dock")
 	for i = 0, 3 do
-		local z = -68 - i * 7
+		local z = -84 - i * 7
 		for _, x in { 2, 14 } do
-			local post = Builder.block(dock, "Post", Vector3.new(x, -1.5, z), Vector3.new(1.2, 8, 1.2), WOOD, Enum.Material.Wood)
+			local post = Builder.block(dock, "Post", Vector3.new(x, 0.5, z), Vector3.new(1.2, 9, 1.2), WOOD, Enum.Material.Wood)
 			Builder.structural(post, 1, true, 50)
 		end
-		local deck = Builder.block(dock, "Deck", Vector3.new(8, 2.9, z), Vector3.new(14, 0.8, 7), Color3.fromRGB(165, 120, 80), Enum.Material.WoodPlanks)
+		local deck = Builder.block(dock, "Deck", Vector3.new(8, 4.9, z), Vector3.new(14, 0.8, 7), Color3.fromRGB(165, 120, 80), Enum.Material.WoodPlanks)
 		Builder.structural(deck, 2, false, 45)
 	end
-	Builder.crates(model, Vector3.new(-6, 3.3, -50), 4)
-	for _, p in { Vector3.new(20, 3.3, -46), Vector3.new(23, 3.3, -48), Vector3.new(21, 3.3, -52) } do
+	Builder.crates(model, Vector3.new(-6, 5.3, -60), 4)
+	for _, p in { Vector3.new(20, 5.3, -56), Vector3.new(23, 5.3, -58), Vector3.new(21, 5.3, -62) } do
 		local b = Builder.building(model, "FuelBarrel")
 		local barrel = Builder.cylinder(b, "Barrel", p + Vector3.new(0, 1.8, 0), 3.6, 2.6, COBALT, Enum.Material.Metal)
 		Builder.structural(barrel, 1, true, 40)
@@ -165,14 +166,14 @@ local function dockArea(model: Model)
 			Name = "Pipe",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(12, 1.6, 1.6),
-			CFrame = CFrame.new(Vector3.new(4 + i * 0.5, 4.3 + i * 1.6, -40)),
+			CFrame = CFrame.new(Vector3.new(4 + i * 0.5, 6.3 + i * 1.6, -50)),
 			Color = Color3.fromRGB(190, 195, 205),
 			Material = Enum.Material.Metal,
 		})
 		Builder.structural(pipe, 1, true, 80)
 	end
 	for _, x in { -2, 18 } do
-		local barrier = Builder.block(model, "Barrier", Vector3.new(x, 4.3, -62), Vector3.new(5, 1.4, 0.6), YELLOW, Enum.Material.SmoothPlastic)
+		local barrier = Builder.block(model, "Barrier", Vector3.new(x, 5.7, -74), Vector3.new(5, 1.4, 0.6), YELLOW, Enum.Material.SmoothPlastic)
 		Builder.structural(barrier, 1, true, 30)
 	end
 end
@@ -206,8 +207,6 @@ function OutpostZero.build(parent: Instance): Types.MapInfo
 		Builder.ramp(model, "Stairs", CFrame.lookAt(rc, rc + outward), Vector3.new(5, rise, rise * 1.4), grate, Enum.Material.DiamondPlate)
 	end
 
-	-- ice bridge from the shelf to the comms island
-	Builder.bridge(model, "IceBridge", Vector3.new(3, SHELF_Y - 0.2, 6), Vector3.new(35, 6.8, 10), 8, ICE, Enum.Material.Ice, Color3.fromRGB(150, 240, 255), ICE_DEEP, 70)
 
 	commsTower(model)
 	dockArea(model)
@@ -228,10 +227,10 @@ function OutpostZero.build(parent: Instance): Types.MapInfo
 		Vector3.new(-75, SHELF_Y + 3, 30),
 		Vector3.new(-66, roofY + 3, -20),
 		Vector3.new(-30, roofY + 3, 8),
-		Vector3.new(50, 10, 0),
-		Vector3.new(66, 10, 22),
-		Vector3.new(8, 7, -50),
-		Vector3.new(20, 7, -56),
+		Vector3.new(50, 13, 0),
+		Vector3.new(66, 13, 22),
+		Vector3.new(8, 8, -50),
+		Vector3.new(20, 8, -40),
 		Vector3.new(-45, SHELF_Y + 3, -35),
 	} do
 		table.insert(spawns, CFrame.new(p))

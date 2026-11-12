@@ -13,6 +13,7 @@ local UI = script.Parent.Parent:WaitForChild("UI")
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
 local Store = require(UI:WaitForChild("Store") :: ModuleScript)
+local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local C = Theme.Colors
@@ -22,6 +23,7 @@ local HUDController = {}
 
 local started = false
 local gui: ScreenGui
+local layer: Frame -- viewport-scaled root; all HUD content parents here
 local shopOpener: ((string?) -> ())? = nil
 
 -- MenuController registers how to open the shop (avoids a require cycle).
@@ -61,7 +63,7 @@ local function buildRoundBar()
 		Color = C.Panel,
 		Transparency = 0.08,
 		Radius = Theme.Radius.Medium,
-		Parent = gui,
+		Parent = layer,
 	})
 	local title = Components.label({
 		Name = "Title",
@@ -96,7 +98,7 @@ local function buildRoundBar()
 	pills.Size = UDim2.fromOffset(520, 30)
 	pills.Position = UDim2.new(0.5, 0, 0, 78)
 	pills.AnchorPoint = Vector2.new(0.5, 0)
-	pills.Parent = gui
+	pills.Parent = layer
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -181,7 +183,7 @@ local function buildCoins()
 	frame.Size = UDim2.fromOffset(260, 60)
 	frame.Position = UDim2.new(0, 16, 1, -16)
 	frame.AnchorPoint = Vector2.new(0, 1)
-	frame.Parent = gui
+	frame.Parent = layer
 	Components.label({
 		Name = "Icon",
 		Text = "💰",
@@ -234,21 +236,23 @@ end
 -- God chance card (right side) — the "one more round" hook
 
 local function buildGodChance()
-	local card = Instance.new("Frame")
+	local card = Instance.new("TextButton")
 	card.Name = "GodChance"
-	card.Size = UDim2.fromOffset(170, 170)
+	card.Text = ""
+	card.AutoButtonColor = false
+	card.Size = UDim2.fromOffset(176, 214)
 	card.Position = UDim2.new(1, -16, 0.5, -40)
 	card.AnchorPoint = Vector2.new(1, 0.5)
 	card.BackgroundColor3 = Color3.new(1, 1, 1)
 	Components.corner(card, Theme.Radius.Large)
 	Components.stroke(card, Theme.Stroke.Heavy)
 	Components.gradient(card, C.PurpleLight, C.Purple)
-	card.Parent = gui
+	card.Parent = layer
 
 	Components.label({ Name = "Caption", Text = "Next round", TextSize = 18, Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 8), Parent = card })
 	Components.label({ Name = "Headline", Text = "Be the GOD", TextSize = 24, Color = C.Pink, Size = UDim2.new(1, 0, 0, 28), Position = UDim2.fromOffset(0, 30), Parent = card })
 	Components.label({ Name = "Face", Text = "😈", TextSize = 46, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 52), Position = UDim2.fromOffset(0, 58), Parent = card })
-	local pct = Components.label({ Name = "Percent", Text = "0%", TextSize = 34, Color = C.Gold, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.new(0, 0, 1, -48), StrokeThickness = Theme.Stroke.Heavy, Parent = card })
+	local pct = Components.label({ Name = "Percent", Text = "0%", TextSize = 34, Color = C.Gold, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 112), StrokeThickness = Theme.Stroke.Heavy, Parent = card })
 	local scale = Instance.new("UIScale")
 	scale.Parent = card
 
@@ -268,27 +272,37 @@ local function buildGodChance()
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 	refresh()
 
-	-- Robux shortcut: guarantee God next round
+	-- the whole card is the Robux shortcut: tap to guarantee God next round
 	local god = Config.Monetization.Products.GodNextRound
-	local guarantee = Components.button({
-		Name = "Guarantee",
-		Text = Store.robux(god.Price) .. " GUARANTEE",
-		TextSize = 16,
-		Size = UDim2.fromOffset(160, 34),
-		Position = UDim2.new(0.5, 0, 1, 8),
-		AnchorPoint = Vector2.new(0.5, 0),
+	local pill = Components.panel({
+		Name = "Price",
+		Size = UDim2.new(1, -20, 0, 40),
+		Position = UDim2.new(0.5, 0, 1, -10),
+		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Green,
-		ColorLight = C.GreenLight,
+		Radius = Theme.Radius.Pill,
 		Parent = card,
-		OnClick = function()
-			if player:GetAttribute(Attributes.GodQueued) ~= true then
-				Store.promptProduct("GodNextRound")
-			end
-		end,
 	})
+	Components.gradient(pill, C.GreenLight, C.Green)
+	pill.BackgroundColor3 = Color3.new(1, 1, 1)
+	local pillText = Components.label({ Name = "Text", Text = "", TextSize = 20, Size = UDim2.fromScale(1, 1), Parent = pill })
+	card.MouseEnter:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.06 })
+	end)
+	card.MouseLeave:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
+	end)
+	card.Activated:Connect(function()
+		if player:GetAttribute(Attributes.GodQueued) == true then
+			Sound.play("Error", 0.6)
+			return
+		end
+		Sound.play("Click", 0.9)
+		Store.promptProduct("GodNextRound")
+	end)
 	local function refreshGuarantee()
 		local queued = player:GetAttribute(Attributes.GodQueued) == true
-		Components.setText(guarantee, if queued then "QUEUED ✔" else Store.robux(god.Price) .. " GUARANTEE")
+		pillText.Text = if queued then "QUEUED ✔" else "TAP · " .. Store.robux(god.Price)
 	end
 	player:GetAttributeChangedSignal(Attributes.GodQueued):Connect(refreshGuarantee)
 	refreshGuarantee()
@@ -310,7 +324,7 @@ local function buildWelcomeOffer()
 	Components.corner(offer, Theme.Radius.Large)
 	Components.stroke(offer, Theme.Stroke.Heavy)
 	Components.gradient(offer, C.OrangeLight, C.Orange)
-	offer.Parent = gui
+	offer.Parent = layer
 	Components.label({ Name = "Title", Text = "Welcome Pack", TextSize = 20, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = offer })
 	Components.label({ Name = "Icon", Text = def.Icon, TextSize = 30, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 28), Parent = offer })
 	Components.label({
@@ -379,7 +393,7 @@ local function buildReviveOffer()
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Pink,
 		ColorLight = Color3.fromRGB(255, 150, 190),
-		Parent = gui,
+		Parent = layer,
 		OnClick = function()
 			Store.promptProduct("Revive")
 		end,
@@ -415,6 +429,16 @@ end
 local popupLane = 0
 
 function HUDController.Popup(text: string, color: Color3?)
+	local upper = string.upper(text)
+	if string.find(upper, "BOUGHT", 1, true) or string.find(upper, "UNLOCKED", 1, true) or string.find(upper, "THANK", 1, true) or string.find(upper, "CLAIMED", 1, true) then
+		Sound.play("Purchase", 0.9)
+	elseif string.find(text, "+", 1, true) then
+		Sound.play("Coin", 0.8, 0.95 + math.random() * 0.15)
+	elseif string.find(upper, "NOT ENOUGH", 1, true) or string.find(upper, "ONLY", 1, true) then
+		Sound.play("Error", 0.7)
+	else
+		Sound.play("Open", 0.4, 1.3)
+	end
 	popupLane = (popupLane + 1) % 4
 	local label = Components.label({
 		Name = "Popup",
@@ -425,7 +449,7 @@ function HUDController.Popup(text: string, color: Color3?)
 		Position = UDim2.new(0.5, 120, 0.42, popupLane * 36),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		StrokeThickness = Theme.Stroke.Heavy,
-		Parent = gui,
+		Parent = layer,
 	})
 	label.ZIndex = 20
 	local scale = Instance.new("UIScale")
@@ -461,7 +485,7 @@ local function buildBanner()
 	bannerFrame.Position = UDim2.fromScale(0.5, 0.28)
 	bannerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	bannerFrame.Visible = false
-	bannerFrame.Parent = gui
+	bannerFrame.Parent = layer
 	bannerTitle = Components.label({ Name = "Title", Text = "", TextSize = 58, Size = UDim2.new(1, 0, 0, 64), StrokeThickness = 5, Parent = bannerFrame })
 	bannerSub = Components.label({ Name = "Subtitle", Text = "", TextSize = 24, Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 68), Parent = bannerFrame })
 	bannerScale = Instance.new("UIScale")
@@ -471,6 +495,7 @@ end
 function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 	bannerToken += 1
 	local token = bannerToken
+	Sound.play("Banner", 0.8)
 	bannerTitle.Text = title
 	bannerTitle.TextColor3 = color or C.Text
 	bannerSub.Text = subtitle or ""
@@ -507,7 +532,7 @@ end
 -- round summary
 
 local function showSummary(summary: any)
-	local window = Components.window(gui, "Round Over", UDim2.fromOffset(520, 430))
+	local window = Components.window(layer, "Round Over", UDim2.fromOffset(520, 430))
 	local content = window.Content
 	local headline = if summary.Role == "DisasterGod" then "GOD ROUND COMPLETE" elseif summary.Survived then "YOU SURVIVED!" else "ELIMINATED"
 	local headColor = if summary.Role == "DisasterGod" then C.PurpleLight elseif summary.Survived then C.GreenLight else C.RedLight
@@ -567,6 +592,7 @@ function HUDController.Start()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.IgnoreGuiInset = false
 	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
 
 	buildRoundBar()
 	buildCoins()

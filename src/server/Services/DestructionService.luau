@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local AudioService = require(script.Parent.AudioService)
 
 local DC = Config.Destruction
 
@@ -172,6 +173,7 @@ local function checkStability(building: Model, from: Vector3?): number
 		end
 	end
 	if count > 0 then
+		AudioService.playAt("Collapse", cf.Position, 2.4, 0.8 + math.random() * 0.3, Config.Audio.CollapseSoundCooldown)
 		collapsed:Fire(building, cf.Position, size)
 	end
 	return count
@@ -182,6 +184,9 @@ local function breakPart(part: BasePart, from: Vector3?): boolean
 		return false
 	end
 	release(part, from, DC.BreakImpulse)
+	if part.Material == Enum.Material.Glass then
+		AudioService.playAt("Glass", part.Position, 1.4, 0.9 + math.random() * 0.3, Config.Audio.GlassSoundCooldown)
+	end
 	if part:GetAttribute("Volatile") == true then
 		local pos = part.Position
 		task.delay(0.35, function()

@@ -48,6 +48,10 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 - UI code lives under `src/client/` (controllers build or drive UI).
 - Use the shared design tokens in `src/client/UI/Theme.luau` (colors, font, radii, strokes, `TweenInfo` presets) and the builders in `UI/Components.luau` (label, button, panel, window, tile) instead of ad-hoc values.
 - Set `UIListLayout.SortOrder = LayoutOrder` explicitly; the default sorts by name.
+- Each controller's ScreenGui gets `layer = Components.scaledRoot(gui)`; parent all content to `layer` (not `gui`) so the UI scales with the viewport.
+
+## Audio
+- All sound IDs and volumes live in `Config.Audio`. World/disaster sounds go through `AudioService` (server, positional); UI sounds through `UI/Sound.luau`; music and ambience through `AudioController`.
 
 ## Pre-push validation
 1. Run Play Solo in Studio and confirm **zero errors** in Output (`get_console_output`).

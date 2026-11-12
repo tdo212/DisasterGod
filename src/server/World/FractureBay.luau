@@ -32,6 +32,9 @@ local function terrain(model: Model)
 	Builder.block(ground, "WestSandLip", Vector3.new(-80, -0.5, 95), Vector3.new(90, 3, 20), SAND, Enum.Material.Sand)
 	Builder.block(ground, "EastSand", Vector3.new(85, 0, 0), Vector3.new(110, 4, 170), SAND, Enum.Material.Sand)
 	Builder.block(ground, "EastSandLip", Vector3.new(95, -0.5, -92), Vector3.new(70, 3, 16), SAND, Enum.Material.Sand)
+	-- shallow sand bars join the two land masses at ground level (the island is one walkable area)
+	Builder.block(ground, "SandBar", Vector3.new(12, -0.5, -45), Vector3.new(44, 4, 44), SAND, Enum.Material.Sand)
+	Builder.block(ground, "SandBarNorth", Vector3.new(12, -0.5, 70), Vector3.new(44, 4, 26), SAND, Enum.Material.Sand)
 	for _, patch in {
 		{ Vector3.new(-110, 2.1, 50), Vector3.new(30, 0.4, 40) },
 		{ Vector3.new(-60, 2.1, 70), Vector3.new(40, 0.4, 20) },

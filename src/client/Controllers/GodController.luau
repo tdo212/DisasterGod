@@ -27,6 +27,7 @@ local started = false
 local active = false
 local selected = 1
 local gui: ScreenGui
+local layer: Frame -- viewport-scaled root for all UI content
 local slots: { { Frame: TextButton, Cooldown: Frame, CooldownText: TextLabel, Icon: TextLabel, Stroke: UIStroke, Scale: UIScale } } = {}
 local energyFill: Frame
 local energyText: TextLabel
@@ -68,6 +69,7 @@ local function buildGui()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Enabled = false
 	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
 
 	local dock = Components.panel({
 		Name = "Hotbar",
@@ -77,7 +79,7 @@ local function buildGui()
 		Color = C.Panel,
 		Transparency = 0.15,
 		Radius = Theme.Radius.Large,
-		Parent = gui,
+		Parent = layer,
 	})
 
 	for i, def in Abilities do
@@ -149,7 +151,7 @@ local function buildGui()
 		Size = UDim2.fromOffset(500, 30),
 		Position = UDim2.new(0.5, 0, 1, -182),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Parent = gui,
+		Parent = layer,
 	})
 	Components.label({
 		Name = "Hint",
@@ -159,7 +161,7 @@ local function buildGui()
 		Size = UDim2.fromOffset(700, 20),
 		Position = UDim2.new(0.5, 0, 1, -206),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Parent = gui,
+		Parent = layer,
 	})
 	select(1)
 end

@@ -24,8 +24,7 @@ type Pool = { Energy: number, Ready: { [string]: number } }
 local Attributes = Config.Attributes
 local Chaos = Config.Chaos
 
-local SOUND_WARN = "rbxasset://sounds/electronicpingshort.wav"
-local SOUND_IMPACT = "rbxasset://sounds/collide.wav"
+local AudioService = require(script.Parent.AudioService)
 
 local RED = Color3.fromRGB(255, 50, 50)
 local ORANGE = Color3.fromRGB(255, 140, 30)
@@ -77,16 +76,9 @@ local function fxPart(props: { [string]: any }): Part
 	return p
 end
 
-local function sound(id: string, at: Vector3, volume: number, speed: number?)
-	local holder = fxPart({ Size = Vector3.one, CFrame = CFrame.new(at), Transparency = 1 })
-	local s = Instance.new("Sound")
-	s.SoundId = id
-	s.Volume = volume
-	s.PlaybackSpeed = speed or 1
-	s.RollOffMaxDistance = 400
-	s.Parent = holder
-	s:Play()
-	Debris:AddItem(holder, 4)
+-- Positional one-shot from Config.Audio.Disaster (key), e.g. "Thunder".
+local function sound(key: string, at: Vector3, volume: number, speed: number?)
+	AudioService.playAt(key, at, volume, speed)
 end
 
 local function shakeAll(intensity: number, duration: number, center: Vector3?)
@@ -167,7 +159,7 @@ local function ringTelegraph(center: Vector3, radius: number, duration: number, 
 	TweenService:Create(outer, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play()
 	Debris:AddItem(outer, duration + 0.05)
 	Debris:AddItem(inner, duration + 0.05)
-	sound(SOUND_WARN, center, 1.2)
+	sound("Warning", center, 0.7)
 end
 
 local function lineTelegraph(cframe: CFrame, length: number, width: number, duration: number)
@@ -189,7 +181,8 @@ local function lineTelegraph(cframe: CFrame, length: number, width: number, dura
 	TweenService:Create(outer, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.15 }):Play()
 	Debris:AddItem(outer, duration + 0.05)
 	Debris:AddItem(inner, duration + 0.05)
-	sound(SOUND_WARN, cframe.Position, 1.5, 0.7)
+	sound("Warning", cframe.Position, 1, 0.8)
+	sound("Rumble", cframe.Position, 1.6)
 end
 
 ---------------------------------------------------------------------------
@@ -220,7 +213,8 @@ local function lightning(def: Ability, ground: Vector3, caster: Player?)
 	light.Parent = flash
 	TweenService:Create(flash, TweenInfo.new(0.4), { Transparency = 1 }):Play()
 	Debris:AddItem(flash, 0.45)
-	sound(SOUND_IMPACT, ground, 2, 0.6)
+	sound("Lightning", ground, 2.2)
+	sound("Thunder", ground, 1.6, 0.9 + math.random() * 0.2)
 	shakeAll(0.5, 0.3, ground)
 	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
 	blast(ground, def.Radius, def.PlayerDamage, caster, 30)
@@ -229,7 +223,7 @@ end
 local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
 	ringTelegraph(ground, def.Radius, def.WarningTime, Color3.fromRGB(220, 240, 255))
 	task.wait(def.WarningTime)
-	sound(SOUND_IMPACT, ground, 1.5, 1.8)
+	sound("Gust", ground, 2.4, 0.8)
 	for i = 1, 10 do
 		local r = math.floor(def.Radius)
 		local offset = Vector3.new(math.random(-r, r), math.random(2, 12), math.random(-r, r))
@@ -283,6 +277,7 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 			fire.Size = 12
 			fire.Heat = 20
 			fire.Parent = rock
+			AudioService.attach("MeteorFall", rock, 2.2, false, 0.7)
 			local tween = TweenService:Create(rock, TweenInfo.new(0.9, Enum.EasingStyle.Linear), { CFrame = CFrame.new(point) })
 			tween:Play()
 			tween.Completed:Wait()
@@ -293,6 +288,7 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 			boom.BlastPressure = 0
 			boom.DestroyJointRadiusPercent = 0
 			boom.Parent = workspace
+			sound("MeteorImpact", point, 2.2, 0.85 + math.random() * 0.3)
 			shakeAll(0.8, 0.4, point)
 			creditDestruction(caster, DestructionService.DamageArea(point, impact, def.StructureDamage))
 			blast(point, impact, def.PlayerDamage, caster, 45)
@@ -326,6 +322,7 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		p.Parent = funnel
 		table.insert(rings, { Part = p, Height = i * 6.5 })
 	end
+	AudioService.attach("Tornado", rings[2].Part, 3, true)
 
 	local pos = ground
 	local heading = dir
@@ -421,7 +418,8 @@ local function faultCleave(def: Ability, ground: Vector3, dir: Vector3, caster: 
 	shakeAll(0.15, def.WarningTime, ground)
 	task.wait(def.WarningTime)
 
-	sound(SOUND_IMPACT, ground, 3, 0.35)
+	sound("Collapse", ground, 3, 0.75)
+	sound("Debris", ground, 2.2)
 	shakeAll(1.4, 0.9, ground)
 	-- glowing crack + heaved rock chunks along the line
 	local crack = fxPart({ Name = "Crack", Size = Vector3.new(2, 0.6, length), CFrame = cf + Vector3.new(0, 0.2, 0), Color = Color3.fromRGB(255, 110, 30) })
@@ -690,6 +688,7 @@ function DisasterService.Init()
 
 	DestructionService.VolatileBurst:Connect(function(pos: Vector3, radius: number)
 		shakeAll(0.9, 0.5, pos)
+		sound("Explosion", pos, 2.6)
 		blast(pos, radius, Config.Destruction.VolatilePlayerDamage, state.God, 50)
 	end)
 

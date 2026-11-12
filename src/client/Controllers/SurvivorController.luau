@@ -28,6 +28,7 @@ local started = false
 local dashReadyAt = 0
 local lastMantle = 0
 local gui: ScreenGui
+local layer: Frame -- viewport-scaled root for all UI content
 local dashButton: TextButton
 local dashCooldown: Frame
 local gearBar: Frame
@@ -164,6 +165,7 @@ local function buildGui()
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
 
 	dashButton = Components.button({
 		Name = "Dash",
@@ -174,7 +176,7 @@ local function buildGui()
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Blue,
 		ColorLight = C.BlueLight,
-		Parent = gui,
+		Parent = layer,
 		OnClick = dash,
 	})
 	dashCooldown = Instance.new("Frame")
@@ -195,7 +197,7 @@ local function buildGui()
 	gearBar.Size = UDim2.fromOffset(#Config.Gear * 84, 84)
 	gearBar.Position = UDim2.new(0.5, 0, 1, -16)
 	gearBar.AnchorPoint = Vector2.new(0.5, 1)
-	gearBar.Parent = gui
+	gearBar.Parent = layer
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center

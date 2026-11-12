@@ -51,20 +51,27 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 
 ## World
 ### Sky Sanctuary (lobby)
-A floating grass island beside the arena at (0, 260, -340). It has a glass observation balcony facing the arena, rainbow paths, a winners podium with light beams, the gear shop stall (proximity prompt), a coin leaderboard, and a 12-pad neon obby (+15 coins, 20 s cooldown). Falling off returns you to spawn.
+A floating grass island beside the arena at (0, 150, -232), low and close enough that the glass balcony overlooks the arena. It has low glass rails, telescopes aimed at the arena, rainbow paths, a winners podium with light beams (name tags appear only once there is a winner), the gear shop stall (proximity prompt), a top-8 coin leaderboard, and a 12-pad neon obby (+15 coins, 20 s cooldown) with a walkable neon ramp back down from the finish. Falling off returns you to spawn.
 
-Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lighting preset, sudden-death fluid and knockback multiplier.
+Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
-| Fracture Bay | Sunny beach | Glass resort on exposed pillars pancakes down; suspension bridge; lighthouse; harbor office, beach huts, water tower and lifeguard tower | Water to Y 20 |
-| Neo-Shibuya Skyline | Neon night | Four rooftops over an abyss linked by glass skybridges; hologram billboards topple across the gaps as makeshift planks; glass rooftop pavilions | Toxic smog to Y 52 |
-| Magma Core Station | Volcanic | Catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; vents burn | Lava to Y 14 |
+| Fracture Bay | Sunny beach | Sand bars connect both shores across the channel; glass resort on exposed pillars pancakes down; suspension bridge; lighthouse; harbor office, beach huts, water tower and lifeguard tower | Water to Y 20 |
+| Neo-Shibuya Skyline | Neon night | Four towers on a walkable street grid, each with a long ramp to its roof; glass skybridges link the rooftops; hologram billboards topple; kiosks, cars and vending machines for cover | Toxic smog to Y 16 |
+| Magma Core Station | Volcanic | Four rock quadrants split by narrow lava channels, joined by land bridges and a central hub plaza; catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; vents burn | Lava to Y 14 |
 | Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); quicksand pits slow and hurt | Sand to Y 12 |
-| Outpost Zero | Arctic | Research containers drop when their stilts snap; breakable ice floes; ice bridge to the comms-tower island; **2x knockback** on slippery ice | Freezing water to Y 9 |
+| Outpost Zero | Arctic | Research containers drop when their stilts snap; one large ice shelf with pressure ridges and a ramped comms plateau; breakable edge floes; **2x knockback** on slippery ice | Freezing water to Y 9 |
 | Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball; climbable coaster trestles; circus tent | Tide to Y 12 |
 
 **Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map.
+
+### Audio
+- **Music** (`Config.Audio.Music`): calm lobby track, tense round track, boss track in sudden death. `AudioController` crossfades between them.
+- **Ambience** (`Config.Audio.Ambience` / `AmbienceLayer`): birds in the lobby, plus a per-map bed in the arena (waves, city, lava, wind, desert, carnival), picked from the replicated `MapKey` attribute.
+- **Round cues:** countdown ticks with rising pitch in the last 5 s of intermission, tocks before casting opens, ticks in the last 5 s of the round, a round-start hit, a God stinger, a sudden-death alarm, and win/lose stingers.
+- **UI** (`UI/Sound.luau`): every Components button, tab and window plays a click, tab or open sound; popups play coin, purchase or error sounds.
+- **Disasters** (`AudioService`, server): positional, replicated sounds for telegraphs, lightning and thunder, meteors, tornado loops, gusts, quakes, collapses, glass breaks and explosions.
 
 ### Destruction model
 Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel). Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris despawns after ~14 s or when it sinks.
@@ -95,6 +102,6 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | God Priority | R$299 | God Chance grows twice as fast |
 | Quick Dash | R$99 | Dash cooldown halved |
 
-**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The sidebar has a Passes shortcut. The HUD shows a guarantee button under the God Chance card, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
+**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The sidebar has a Passes shortcut. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
 
 All numbers live in `src/shared/Config.luau`.

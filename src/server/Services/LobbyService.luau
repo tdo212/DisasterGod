@@ -52,9 +52,11 @@ end
 local function makeBillboard(anchor: BasePart): TextLabel
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "PodiumName"
-	gui.Size = UDim2.fromOffset(240, 60)
+	-- sized in studs so the three names never overlap, hidden until there's a winner
+	gui.Size = UDim2.new(7.5, 0, 2.6, 0)
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = 220
+	gui.MaxDistance = 160
+	gui.Enabled = false
 	gui.Parent = anchor
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
@@ -71,12 +73,15 @@ local function makeBillboard(anchor: BasePart): TextLabel
 end
 
 local podiumLabels: { TextLabel } = {}
-local leaderboardLabel: TextLabel
+local leaderboardRows: { TextLabel } = {}
+local LEADERBOARD_ROWS = 8
 
 function LobbyService.SetPodium(entries: { { Name: string, Earned: number } })
 	for i, label in podiumLabels do
 		local entry = entries[i]
-		label.Text = if entry then string.format("%s\n+%d", entry.Name, entry.Earned) else "—"
+		label.Text = if entry then string.format("%s\n+%d", entry.Name, entry.Earned) else ""
+		local gui = label.Parent :: BillboardGui
+		gui.Enabled = entry ~= nil
 	end
 end
 
@@ -91,11 +96,10 @@ local function refreshLeaderboard()
 	table.sort(rows, function(a, b)
 		return a.Coins > b.Coins
 	end)
-	local lines = { "TOP SURVIVORS" }
-	for i = 1, math.min(8, #rows) do
-		table.insert(lines, string.format("%d. %s  $%d  (best %d)", i, rows[i].Name, rows[i].Coins, rows[i].Streak))
+	for i, label in leaderboardRows do
+		local row = rows[i]
+		label.Text = if row then string.format("%d. %s   $%s   best %d", i, row.Name, tostring(row.Coins), row.Streak) else ""
 	end
-	leaderboardLabel.Text = table.concat(lines, "\n")
 end
 
 local function ghostPing(position: Vector3)
@@ -157,16 +161,28 @@ function LobbyService.Init()
 	boardGui.PixelsPerStud = 30
 	boardGui.LightInfluence = 0
 	boardGui.Parent = info.Leaderboard
-	leaderboardLabel = Instance.new("TextLabel")
-	leaderboardLabel.BackgroundTransparency = 1
-	leaderboardLabel.Size = UDim2.new(1, -40, 1, -30)
-	leaderboardLabel.Position = UDim2.fromOffset(20, 15)
-	leaderboardLabel.Font = Enum.Font.FredokaOne
-	leaderboardLabel.TextSize = 30
-	leaderboardLabel.TextColor3 = Color3.new(1, 1, 1)
-	leaderboardLabel.TextXAlignment = Enum.TextXAlignment.Left
-	leaderboardLabel.TextYAlignment = Enum.TextYAlignment.Top
-	leaderboardLabel.Parent = boardGui
+	-- readable board: a big header + one scaled text row per entry
+	local function boardLabel(text: string, y: number, h: number, color: Color3): TextLabel
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.new(1, -40, h, 0)
+		label.Position = UDim2.new(0, 20, y, 0)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.TextColor3 = color
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Text = text
+		label.Parent = boardGui
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 2
+		stroke.Parent = label
+		return label
+	end
+	local header = boardLabel("🏆 TOP SURVIVORS", 0.03, 0.16, Color3.fromRGB(255, 210, 60))
+	header.TextXAlignment = Enum.TextXAlignment.Center
+	for i = 1, LEADERBOARD_ROWS do
+		table.insert(leaderboardRows, boardLabel("", 0.2 + (i - 1) * 0.098, 0.088, Color3.new(1, 1, 1)))
+	end
 
 	info.ObbyFinish.Touched:Connect(function(hit)
 		local character = hit.Parent

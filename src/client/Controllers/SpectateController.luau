@@ -24,6 +24,7 @@ local SpectateController = {}
 local started = false
 local active = false
 local gui: ScreenGui
+local layer: Frame -- viewport-scaled root for all UI content
 local hint: TextLabel
 local inputConn: RBXScriptConnection? = nil
 local nextPing = 0
@@ -103,6 +104,7 @@ function SpectateController.Start()
 	gui.Enabled = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
 
 	hint = Components.label({
 		Name = "Hint",
@@ -112,7 +114,7 @@ function SpectateController.Start()
 		Size = UDim2.fromOffset(760, 30),
 		Position = UDim2.new(0.5, 0, 1, -110),
 		AnchorPoint = Vector2.new(0.5, 1),
-		Parent = gui,
+		Parent = layer,
 	})
 	Components.button({
 		Name = "Exit",
@@ -123,7 +125,7 @@ function SpectateController.Start()
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Purple,
 		ColorLight = C.PurpleLight,
-		Parent = gui,
+		Parent = layer,
 		OnClick = SpectateController.Exit,
 	})
 
