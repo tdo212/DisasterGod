@@ -1,0 +1,266 @@
+--!strict
+-- SurvivorController: expressive mobility (dash + ledge mantle) and the gear bar.
+
+local ContextActionService = game:GetService("ContextActionService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
+local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
+
+local ClientRoot = script.Parent.Parent
+local Theme = require(ClientRoot:WaitForChild("UI"):WaitForChild("Theme") :: ModuleScript)
+local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Components") :: ModuleScript)
+local OrbitCamera = require(ClientRoot:WaitForChild("Util"):WaitForChild("OrbitCamera") :: ModuleScript)
+
+local Attributes = Config.Attributes
+local Mobility = Config.Mobility
+local C = Theme.Colors
+local player = Players.LocalPlayer
+
+local SurvivorController = {}
+
+local started = false
+local dashReadyAt = 0
+local lastMantle = 0
+local gui: ScreenGui
+local dashButton: TextButton
+local dashCooldown: Frame
+local gearBar: Frame
+local gearButtons: { [string]: TextButton } = {}
+
+local GEAR_KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three }
+
+local function parts(): (BasePart?, Humanoid?)
+	local character = player.Character
+	if not character then
+		return nil, nil
+	end
+	return character:FindFirstChild("HumanoidRootPart") :: BasePart?, character:FindFirstChildOfClass("Humanoid")
+end
+
+local function canMove(): boolean
+	-- no dashing while flying an orbit camera (God view or spectating)
+	return player:GetAttribute(Attributes.Role) ~= "DisasterGod" and not OrbitCamera.IsEnabled()
+end
+
+---------------------------------------------------------------------------
+-- dash
+
+local function dash()
+	if not canMove() then
+		return
+	end
+	local now = os.clock()
+	if now < dashReadyAt then
+		return
+	end
+	local hrp, humanoid = parts()
+	if not (hrp and humanoid) or humanoid.Health <= 0 or hrp.Anchored then
+		return
+	end
+	dashReadyAt = now + Mobility.DashCooldown
+	local dir = humanoid.MoveDirection
+	if dir.Magnitude < 0.1 then
+		dir = hrp.CFrame.LookVector
+	end
+	dir = Vector3.new(dir.X, 0, dir.Z).Unit
+
+	local camera = workspace.CurrentCamera
+	if camera then
+		local fov = camera.FieldOfView
+		TweenService:Create(camera, TweenInfo.new(0.08), { FieldOfView = fov + Mobility.DashFovKick }):Play()
+		task.delay(Mobility.DashDuration, function()
+			TweenService:Create(camera, TweenInfo.new(0.3), { FieldOfView = fov }):Play()
+		end)
+	end
+
+	local trailA = Instance.new("Attachment")
+	trailA.Position = Vector3.new(0, 1, 0)
+	trailA.Parent = hrp
+	local trailB = Instance.new("Attachment")
+	trailB.Position = Vector3.new(0, -1, 0)
+	trailB.Parent = hrp
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = trailA
+	trail.Attachment1 = trailB
+	trail.Lifetime = 0.25
+	trail.Color = ColorSequence.new(C.Cyan)
+	trail.Transparency = NumberSequence.new(0.2, 1)
+	trail.Parent = hrp
+
+	local elapsed = 0
+	local conn: RBXScriptConnection
+	conn = RunService.Heartbeat:Connect(function(dt)
+		elapsed += dt
+		if elapsed >= Mobility.DashDuration or not hrp.Parent then
+			conn:Disconnect()
+			return
+		end
+		local v = hrp.AssemblyLinearVelocity
+		hrp.AssemblyLinearVelocity = dir * Mobility.DashSpeed + Vector3.new(0, math.max(v.Y, 2), 0)
+	end)
+	task.delay(0.5, function()
+		trail:Destroy()
+		trailA:Destroy()
+		trailB:Destroy()
+	end)
+	dashCooldown.Size = UDim2.fromScale(1, 1)
+	Components.tween(dashCooldown, TweenInfo.new(Mobility.DashCooldown, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(1, 0) })
+end
+
+---------------------------------------------------------------------------
+-- ledge mantle: jump while airborne next to a ledge to haul yourself up
+
+local function tryMantle()
+	if not canMove() or os.clock() - lastMantle < 0.5 then
+		return
+	end
+	local hrp, humanoid = parts()
+	if not (hrp and humanoid) then
+		return
+	end
+	local stateType = humanoid:GetState()
+	if stateType ~= Enum.HumanoidStateType.Freefall and stateType ~= Enum.HumanoidStateType.Jumping then
+		return
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character :: Model }
+	local forward = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z).Unit
+	local wall = workspace:Raycast(hrp.Position, forward * Mobility.MantleReach, params)
+	if not wall then
+		return
+	end
+	local high = workspace:Raycast(hrp.Position + Vector3.new(0, Mobility.MantleHeight, 0), forward * Mobility.MantleReach, params)
+	if high then
+		return -- wall is too tall: no ledge in reach
+	end
+	lastMantle = os.clock()
+	hrp.AssemblyLinearVelocity = Vector3.new(0, Mobility.MantleBoost, 0) + forward * 12
+end
+
+---------------------------------------------------------------------------
+-- UI
+
+local function buildGui()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "SurvivorHUD"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	dashButton = Components.button({
+		Name = "Dash",
+		Text = "DASH [Q]",
+		TextSize = 20,
+		Size = UDim2.fromOffset(120, 54),
+		Position = UDim2.new(1, -16, 1, -16),
+		AnchorPoint = Vector2.new(1, 1),
+		Color = C.Blue,
+		ColorLight = C.BlueLight,
+		Parent = gui,
+		OnClick = dash,
+	})
+	dashCooldown = Instance.new("Frame")
+	dashCooldown.Name = "Cooldown"
+	dashCooldown.BackgroundColor3 = Color3.new(0, 0, 0)
+	dashCooldown.BackgroundTransparency = 0.45
+	dashCooldown.BorderSizePixel = 0
+	dashCooldown.AnchorPoint = Vector2.new(0, 1)
+	dashCooldown.Position = UDim2.fromScale(0, 1)
+	dashCooldown.Size = UDim2.fromScale(1, 0)
+	dashCooldown.ZIndex = 2
+	Components.corner(dashCooldown)
+	dashCooldown.Parent = dashButton
+
+	gearBar = Instance.new("Frame")
+	gearBar.Name = "GearBar"
+	gearBar.BackgroundTransparency = 1
+	gearBar.Size = UDim2.fromOffset(#Config.Gear * 84, 84)
+	gearBar.Position = UDim2.new(0.5, 0, 1, -16)
+	gearBar.AnchorPoint = Vector2.new(0.5, 1)
+	gearBar.Parent = gui
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.Padding = UDim.new(0, 10)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = gearBar
+
+	for i, def in Config.Gear do
+		local b = Instance.new("TextButton")
+		b.Name = def.Id
+		b.Text = ""
+		b.AutoButtonColor = false
+		b.LayoutOrder = i
+		b.Size = UDim2.fromOffset(72, 72)
+		b.BackgroundColor3 = Color3.new(1, 1, 1)
+		Components.corner(b, Theme.Radius.Medium)
+		Components.stroke(b, Theme.Stroke.Heavy)
+		Components.gradient(b, def.Color:Lerp(Color3.new(1, 1, 1), 0.35), def.Color)
+		b.Parent = gearBar
+		Components.label({ Name = "Icon", Text = def.Icon, TextSize = 34, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = b })
+		Components.label({ Name = "Key", Text = def.Key, TextSize = 16, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = b })
+		local count = Components.label({ Name = "Count", Text = "x0", TextSize = 18, Size = UDim2.fromOffset(40, 20), Position = UDim2.new(1, -4, 1, -2), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = b })
+		local function refresh()
+			local n = player:GetAttribute(Attributes.GearPrefix .. def.Id) :: number? or 0
+			count.Text = "x" .. tostring(n)
+			b.BackgroundTransparency = if n > 0 then 0 else 0.5
+		end
+		player:GetAttributeChangedSignal(Attributes.GearPrefix .. def.Id):Connect(refresh)
+		refresh()
+		b.Activated:Connect(function()
+			Remotes.get("UseGear"):FireServer(def.Id)
+		end)
+		gearButtons[def.Id] = b
+	end
+end
+
+local function refreshVisibility()
+	local role = player:GetAttribute(Attributes.Role)
+	local alive = player:GetAttribute(Attributes.Alive) == true
+	local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
+	dashButton.Visible = role ~= "DisasterGod"
+	gearBar.Visible = role == "Survivor" and alive and phase == "Active"
+end
+
+function SurvivorController.Start()
+	if started then
+		return
+	end
+	started = true
+	buildGui()
+
+	ContextActionService:BindAction("DisasterGodDash", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			dash()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.Q, Enum.KeyCode.ButtonX)
+
+	UserInputService.JumpRequest:Connect(tryMantle)
+
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if processed or not gearBar.Visible then
+			return
+		end
+		for i, key in GEAR_KEYS do
+			local def = Config.Gear[i]
+			if def and input.KeyCode == key then
+				Remotes.get("UseGear"):FireServer(def.Id)
+			end
+		end
+	end)
+
+	player:GetAttributeChangedSignal(Attributes.Role):Connect(refreshVisibility)
+	player:GetAttributeChangedSignal(Attributes.Alive):Connect(refreshVisibility)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refreshVisibility)
+	refreshVisibility()
+end
+
+return SurvivorController
