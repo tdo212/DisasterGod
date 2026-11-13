@@ -1,6 +1,6 @@
 --!strict
 -- MatchService: the round loop.
---   Intermission (map builds + God-chance ticker) -> Active (Prep -> Escalation ->
+--   Intermission (lobby map vote, then the map builds) -> Active (Prep -> Escalation ->
 --   Sudden Death) -> RoundEnd (payouts, podium) -> back to Intermission.
 -- Also owns character setup, eliminations, hazard floors and the solo role toggle.
 
@@ -12,13 +12,19 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
 
+local AudioService = require(script.Parent.AudioService)
+local DestructionService = require(script.Parent.DestructionService)
 local DisasterService = require(script.Parent.DisasterService)
 local EnvironmentService = require(script.Parent.EnvironmentService)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local LobbyService = require(script.Parent.LobbyService)
 local MapService = require(script.Parent.MapService)
+local PlayerDataService = require(script.Parent.PlayerDataService)
+local RagdollService = require(script.Parent.RagdollService)
 local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
 local ShopService = require(script.Parent.ShopService)
+local VoteService = require(script.Parent.VoteService)
 
 type RoundPhase = Types.RoundPhase
 type SubPhase = Types.SubPhase
@@ -37,6 +43,9 @@ local state = {
 local participants: { [Player]: boolean } = {}
 local survivorsAssigned = false
 local started = false
+local siren: Sound? = nil
+
+local GOD_HINT = "Pick a disaster, then click or tap the arena to unleash it"
 
 local phaseChanged = Instance.new("BindableEvent")
 MatchService.PhaseChanged = phaseChanged.Event -- (phase, duration)
@@ -159,7 +168,19 @@ local function onCharacterAdded(player: Player, character: Model)
 	humanoid.WalkSpeed = Config.Player.WalkSpeed
 	humanoid.MaxHealth = Config.Player.MaxHealth
 	humanoid.Health = Config.Player.MaxHealth
+	-- bodies stay in one piece and flop as ragdolls instead of falling apart
+	humanoid.BreakJointsOnDeath = false
+	local function group(d: Instance)
+		if d:IsA("BasePart") then
+			d.CollisionGroup = DestructionService.CharacterGroup
+		end
+	end
+	for _, d in character:GetDescendants() do
+		group(d)
+	end
+	character.DescendantAdded:Connect(group)
 	humanoid.Died:Connect(function()
+		RagdollService.OnDeath(player, character)
 		onDied(player)
 	end)
 	-- respawned mid-round in a role that lives outside the lobby
@@ -188,7 +209,7 @@ local function onSoloSwap(player: Player, role: Types.PlayerRole)
 		DisasterService.SetGod(player)
 		ReplicatedStorage:SetAttribute(Attributes.GodName, player.DisplayName)
 		task.spawn(perch, player)
-		banner:FireClient(player, "YOU ARE THE DISASTER GOD", "Aim with the mouse, 1-5 to pick, click to unleash", GOD_PURPLE)
+		banner:FireClient(player, "YOU ARE THE DISASTER GOD", GOD_HINT, GOD_PURPLE)
 	else
 		unperch(player)
 		RoleService.SetRole(player, "Survivor")
@@ -263,13 +284,25 @@ end
 -- the loop
 
 local function intermission(): (boolean, string)
-	local mapName = MapService.NextMapName()
-	ReplicatedStorage:SetAttribute(Attributes.MapName, "Building…")
 	setPhase("Intermission", M.IntermissionDuration)
 	setSubPhase("None")
 	EnvironmentService.SetMood("Calm")
 	ReplicatedStorage:SetAttribute(Attributes.GodName, "")
 	updateAlive()
+
+	-- players vote on the lobby pads first; the winner is built for the rest of the countdown
+	local mapName: string
+	if VoteService.Begin() then
+		ReplicatedStorage:SetAttribute(Attributes.MapName, "Vote on the lobby pads!")
+		local voteEnds = M.IntermissionDuration - Config.Voting.Duration
+		while state.TimeRemaining > voteEnds do
+			tick()
+		end
+		mapName = VoteService.Finish()
+	else
+		mapName = MapService.NextMapName()
+	end
+	ReplicatedStorage:SetAttribute(Attributes.MapName, "Building…")
 
 	local info = MapService.Build(mapName)
 	ReplicatedStorage:SetAttribute(Attributes.MapName, info.DisplayName)
@@ -294,7 +327,7 @@ local function assignRoles(): Player?
 		if p == god then
 			RoleService.SetRole(p, "DisasterGod")
 			task.spawn(perch, p)
-			banner:FireClient(p, "YOU ARE THE DISASTER GOD", "Aim with the mouse, 1-5 to pick, click to unleash", GOD_PURPLE)
+			banner:FireClient(p, "YOU ARE THE DISASTER GOD", GOD_HINT, GOD_PURPLE)
 		else
 			index += 1
 			survivorsAssigned = true
@@ -333,14 +366,17 @@ local function active(god: Player?)
 			DisasterService.SetSuddenDeath(true)
 			MapService.StartFluid(M.SuddenDeathDuration)
 			EnvironmentService.SetMood("SuddenDeath", 3)
+			siren = AudioService.playGlobal("Siren", Config.Audio.SirenVolume, true)
 			local info = MapService.GetCurrent()
 			local fluidName = if info then info.FluidName else "WATER"
 			banner:FireAllClients("SUDDEN DEATH", fluidName .. " IS RISING — GET TO HIGH GROUND!", RED)
 		end
 		updateAlive()
-		if survivorsAssigned and #RoleService.GetAliveSurvivors() == 0 then
+		local aliveCount = #RoleService.GetAliveSurvivors()
+		if survivorsAssigned and aliveCount == 0 then
 			break -- everyone is out: skip straight to the podium
 		end
+		DisasterService.SetHunterPulse(aliveCount == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
 	end
 end
 
@@ -349,6 +385,10 @@ local function roundEnd(mapName: string)
 	DisasterService.EndRound()
 	ShopService.SetRoundActive(false)
 	LobbyService.SetGhostPingsOpen(false)
+	if siren then
+		siren:Destroy()
+		siren = nil
+	end
 
 	local list = {}
 	local survivedSet: { [Player]: boolean } = {}
@@ -369,6 +409,7 @@ local function roundEnd(mapName: string)
 		LobbyService.SetPodium(podium)
 	end
 	RoleService.AdvancePity(list, god, survivedSet)
+	LeaderboardService.RecordAll(list)
 
 	setPhase("RoundEnd", M.RoundEndDuration)
 	setSubPhase("None")
@@ -445,6 +486,11 @@ function MatchService.Init()
 		task.defer(updateAlive)
 	end)
 	RoleService.SoloSwapRequested:Connect(onSoloSwap)
+	Remotes.get("TutorialSeen").OnServerEvent:Connect(function(player, kind)
+		if kind == "God" or kind == "Survivor" then
+			PlayerDataService.MarkTutorial(player, kind)
+		end
+	end)
 
 	local accum = 0
 	RunService.Heartbeat:Connect(function(dt)

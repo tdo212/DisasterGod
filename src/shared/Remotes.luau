@@ -14,6 +14,11 @@ local NAMES = {
 	"Banner", -- S->C (title, subtitle, color)
 	"ClientEffect", -- S->C (kind, ...)
 	"RoundSummary", -- S->C (summary)
+	"SpinRequest", -- C->S ()
+	"SpinResult", -- S->C (rewardIndex, text)
+	"KitAction", -- C->S ("Buy" | "Equip", kitId)
+	"QuestClaim", -- C->S (questId)
+	"TutorialSeen", -- C->S (kind)
 }
 
 local Remotes = {}

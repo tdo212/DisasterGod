@@ -8,8 +8,10 @@
 -- slabs, unanchored and left to physics.
 
 local Debris = game:GetService("Debris")
+local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local AudioService = require(script.Parent.AudioService)
@@ -17,6 +19,10 @@ local AudioService = require(script.Parent.AudioService)
 local DC = Config.Destruction
 
 local DestructionService = {}
+
+-- Characters are put in this group (MatchService) so fading debris can pass through them.
+DestructionService.CharacterGroup = "Characters"
+local FADING_GROUP = "DebrisFading"
 
 local collapsed = Instance.new("BindableEvent")
 -- (building: Model, center: Vector3, size: Vector3)
@@ -45,9 +51,24 @@ local function isIntact(part: BasePart): boolean
 	return part:GetAttribute("Structural") == true and part:GetAttribute("Broken") ~= true
 end
 
+-- End of a chunk's life: it stops colliding with players (so rubble can't trap anyone),
+-- then shrinks and fades out instead of popping.
+local function fade(part: BasePart)
+	if not part.Parent then
+		return
+	end
+	part.CollisionGroup = FADING_GROUP
+	part.CastShadow = false
+	TweenService:Create(part, TweenInfo.new(DC.DebrisFadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Transparency = 1,
+		Size = part.Size * DC.DebrisFadeScale,
+	}):Play()
+	Debris:AddItem(part, DC.DebrisFadeTime + 0.1)
+end
+
 local function trackDebris(part: BasePart)
 	table.insert(debrisList, part)
-	Debris:AddItem(part, DC.DebrisLifetime + math.random() * 4)
+	task.delay(DC.DebrisLifetime + math.random() * DC.DebrisLifetimeJitter, fade, part)
 	while #debrisList > DC.MaxDebris do
 		local oldest = table.remove(debrisList, 1)
 		if oldest and oldest.Parent then
@@ -154,6 +175,13 @@ local function checkStability(building: Model, from: Vector3?): number
 		end
 	end
 	if failing == nil then
+		-- damaged but still standing: groan as a warning to anyone inside
+		for l, t in total do
+			if (intact[l] or 0) < t then
+				AudioService.playAt("Creak", building:GetPivot().Position, 1.8, 0.9 + math.random() * 0.3, DC.CreakCooldown)
+				break
+			end
+		end
 		return 0
 	end
 	local cf, size = building:GetBoundingBox()
@@ -257,6 +285,11 @@ function DestructionService.GetDebrisNear(center: Vector3, radius: number): { Ba
 end
 
 function DestructionService.Init()
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup(DestructionService.CharacterGroup)
+		PhysicsService:RegisterCollisionGroup(FADING_GROUP)
+		PhysicsService:CollisionGroupSetCollidable(DestructionService.CharacterGroup, FADING_GROUP, false)
+	end)
 	local accum = 0
 	RunService.Heartbeat:Connect(function(dt)
 		accum += dt

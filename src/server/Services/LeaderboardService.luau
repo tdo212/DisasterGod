@@ -1,0 +1,325 @@
+--!strict
+-- LeaderboardService: lobby leaderboards built from the workspace template model
+-- (Config.Leaderboards.Template, RenanMSV's "TimePlayedLeaderboard").
+--   * The template itself keeps its own script and stays the Time Played board.
+--   * Each entry in Config.Leaderboards.Boards gets a clone of the template with that
+--     script removed; this service fills it from an OrderedDataStore (live servers) or
+--     from the players in the server (Studio).
+
+local DataStoreService = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local PlayerDataService = require(script.Parent.PlayerDataService)
+
+local L = Config.Leaderboards
+local ROWS = 10
+local STORE_PREFIX = "DisasterGodBoard_v1_"
+-- instances the template's own script adds or needs; clones must not carry them
+local TEMPLATE_ONLY = { "TimePlayedClass", "TimePlayedLeaderboardBE-SR", "ThumbnailCamera" }
+local TEMPLATE_TAG = "TopTimePlayedLeaderboard_Board_Tag"
+local TEMPLATE_MAIN_ATTRIBUTE = "TopTimePlayedLeaderboard_IsMainBoard"
+local TEST_THUMBNAIL = "rbxassetid://1146888101"
+
+type Row = { UserId: number, Value: number }
+type Board = { Model: Model, Stat: string, Unit: string, Store: OrderedDataStore?, Rig: any }
+
+local LeaderboardService = {}
+
+local boards: { Board } = {}
+local written: { [Player]: { [string]: number } } = {}
+local nameCache: { [number]: string } = {}
+local thumbCache: { [number]: string } = {}
+
+local function formatNumber(n: number): string
+	local s = tostring(math.floor(n))
+	local formatted = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return if formatted:sub(1, 1) == "," then formatted:sub(2) else formatted
+end
+
+-- Stand the model on `slot` (a ground point whose LookVector is the way the board faces).
+local function place(model: Model, slot: CFrame)
+	local pivot = model:GetPivot()
+	local cf, size = model:GetBoundingBox()
+	local center = pivot:PointToObjectSpace(cf.Position)
+	local bottom = center.Y - size.Y / 2
+	model:PivotTo(slot * CFrame.new(-center.X, -bottom, -center.Z))
+end
+
+local function nameOf(userId: number): string
+	if userId <= 0 then
+		return "Studio Test Profile"
+	end
+	local cached = nameCache[userId]
+	if cached then
+		return cached
+	end
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		nameCache[userId] = player.Name
+		return player.Name
+	end
+	local ok, name = pcall(function()
+		return Players:GetNameFromUserIdAsync(userId)
+	end)
+	if ok then
+		nameCache[userId] = name
+		return name
+	end
+	return "Unknown"
+end
+
+local function thumbOf(userId: number): string
+	if userId <= 0 then
+		return TEST_THUMBNAIL
+	end
+	local cached = thumbCache[userId]
+	if cached then
+		return cached
+	end
+	local ok, image = pcall(function()
+		return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+	end)
+	if ok then
+		thumbCache[userId] = image
+		return image
+	end
+	return TEST_THUMBNAIL
+end
+
+local function fetch(board: Board): { Row }
+	local rows: { Row } = {}
+	local store = board.Store
+	if store then
+		local ok, err = pcall(function()
+			local page = store:GetSortedAsync(false, ROWS):GetCurrentPage()
+			for _, entry in page do
+				local userId = tonumber(entry.key)
+				if userId and typeof(entry.value) == "number" then
+					table.insert(rows, { UserId = userId, Value = entry.value })
+				end
+			end
+		end)
+		if not ok then
+			warn("[Leaderboard] fetch failed for", board.Stat, err)
+		end
+		return rows
+	end
+	for _, player in Players:GetPlayers() do
+		local profile = PlayerDataService.Get(player)
+		local value = profile and (profile :: any)[board.Stat]
+		if typeof(value) == "number" and value > 0 then
+			table.insert(rows, { UserId = player.UserId, Value = value })
+		end
+	end
+	table.sort(rows, function(a, b)
+		return a.Value > b.Value
+	end)
+	while #rows > ROWS do
+		table.remove(rows)
+	end
+	return rows
+end
+
+local function render(board: Board, rows: { Row })
+	local scoreBlock = (board.Model :: any).ScoreBlock
+	local gui = scoreBlock.Leaderboard
+	local empty = #rows == 0
+	gui.Enabled = not empty
+	scoreBlock.NoDataFound.Enabled = empty
+	scoreBlock.NoDataFound.Warning.Visible = empty
+	scoreBlock.NoAPIServices.Warning.Visible = false
+	scoreBlock.WaitingSync.Warning.Visible = false
+	for i = 1, ROWS do
+		local row = rows[i]
+		local name, score, photo = gui.Names["Name" .. i], gui.Score["Score" .. i], gui.Photos["Photo" .. i]
+		name.Visible = row ~= nil
+		score.Visible = row ~= nil
+		photo.Visible = row ~= nil
+		if row then
+			name.Text = nameOf(row.UserId)
+			score.Text = string.format("%s %s", formatNumber(row.Value), board.Unit)
+			photo.Image = thumbOf(row.UserId)
+		end
+	end
+	-- mirror onto the back face, like the template does
+	local old = scoreBlock:FindFirstChild("_backside")
+	if old then
+		old:Destroy()
+	end
+	local back = gui:Clone()
+	back.Name = "_backside"
+	back.Face = Enum.NormalId.Back
+	back.Parent = scoreBlock
+	local first = rows[1]
+	if first and board.Rig then
+		task.spawn(pcall, board.Rig.SetRigHumanoidDescription, if first.UserId > 0 then first.UserId else 1, true)
+	end
+end
+
+local function refresh(board: Board)
+	local ok, err = pcall(function()
+		render(board, fetch(board))
+	end)
+	if not ok then
+		warn("[Leaderboard] render failed for", board.Stat, err)
+	end
+end
+
+local function setTimer(board: Board, seconds: number)
+	local timer = (board.Model :: any).UpdateBoardTimer.Timer:FindFirstChildOfClass("TextLabel")
+	if timer then
+		timer.Text = string.format("Updating the board in %d seconds", seconds)
+	end
+end
+
+local function titlePlate(clone: Model, title: string)
+	local text3d = clone:FindFirstChild("ThreeDTextObject")
+	local box = text3d and text3d:FindFirstChild("ThreeDTextBoundingBox") :: BasePart?
+	if not (text3d and box) then
+		return
+	end
+	local plate = Instance.new("Part")
+	plate.Name = "Title"
+	plate.Anchored = true
+	plate.CanCollide = false
+	plate.Size = Vector3.new(box.Size.X + 1, box.Size.Y + 0.9, box.Size.Z)
+	plate.CFrame = box.CFrame
+	plate.Color = Color3.fromRGB(27, 42, 53)
+	plate.Material = Enum.Material.SmoothPlastic
+	plate.Parent = clone
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0
+		gui.Parent = plate
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Text = title
+		label.Parent = gui
+	end
+	text3d:Destroy()
+end
+
+local function makeClone(template: Model, def: { Stat: string, Title: string, Unit: string }): Board
+	local clone = template:Clone()
+	clone.Name = def.Stat .. "Leaderboard"
+	for _, name in TEMPLATE_ONLY do
+		local child = clone:FindFirstChild(name)
+		if child then
+			child:Destroy()
+		end
+	end
+	clone:RemoveTag(TEMPLATE_TAG)
+	clone:SetAttribute(TEMPLATE_MAIN_ATTRIBUTE, nil)
+	titlePlate(clone, def.Title)
+	clone.Parent = template.Parent
+
+	local store: OrderedDataStore? = nil
+	if PlayerDataService.UsesDataStores() then
+		local ok, result = pcall(function()
+			return DataStoreService:GetOrderedDataStore(STORE_PREFIX .. def.Stat)
+		end)
+		if ok then
+			store = result
+		end
+	end
+	local rig = nil
+	local avatar = clone:FindFirstChild("First Place Avatar")
+	local module = avatar and avatar:FindFirstChild("PlayAnimationInRig")
+	if module and module:IsA("ModuleScript") then
+		local ok, result = pcall(require, module)
+		if ok and typeof(result) == "table" and result.SetRigHumanoidDescription then
+			rig = result
+		end
+	end
+	return { Model = clone, Stat = def.Stat, Unit = def.Unit, Store = store, Rig = rig }
+end
+
+-- Save one player's board stats (round end). Only values that changed are written.
+function LeaderboardService.Record(player: Player)
+	local profile = PlayerDataService.Get(player)
+	if not profile then
+		return
+	end
+	local cache = written[player]
+	if not cache then
+		cache = {}
+		written[player] = cache
+	end
+	for _, board in boards do
+		local store = board.Store
+		local value = (profile :: any)[board.Stat]
+		if store and typeof(value) == "number" and value > 0 and cache[board.Stat] ~= value then
+			cache[board.Stat] = value
+			task.spawn(pcall, function()
+				store:SetAsync(tostring(player.UserId), math.floor(value))
+			end)
+		end
+	end
+end
+
+function LeaderboardService.RecordAll(players: { Player })
+	for _, player in players do
+		if player.Parent then
+			LeaderboardService.Record(player)
+		end
+	end
+end
+
+-- Stand the boards on the lobby slots. Slot 1 is the template (Time Played).
+function LeaderboardService.Setup(slots: { CFrame })
+	local template = workspace:FindFirstChild(L.Template)
+	if not (template and template:IsA("Model")) then
+		warn("[Leaderboard] workspace." .. L.Template .. " is missing; lobby leaderboards are disabled")
+		return
+	end
+	-- clone before anything moves so every copy starts from the same layout
+	for _, def in L.Boards do
+		local ok, result = pcall(makeClone, template, def)
+		if ok then
+			table.insert(boards, result)
+		else
+			warn("[Leaderboard] could not build", def.Stat, result)
+		end
+	end
+	if slots[1] then
+		place(template, slots[1])
+	end
+	for i, board in boards do
+		local slot = slots[i + 1]
+		if slot then
+			place(board.Model, slot)
+		end
+	end
+
+	Players.PlayerRemoving:Connect(function(player)
+		written[player] = nil
+	end)
+	task.spawn(function()
+		local remaining = 0
+		while true do
+			if remaining <= 0 then
+				remaining = L.RefreshSeconds
+				for _, board in boards do
+					task.spawn(refresh, board)
+				end
+			end
+			for _, board in boards do
+				setTimer(board, remaining)
+			end
+			task.wait(1)
+			remaining -= 1
+		end
+	end)
+end
+
+return LeaderboardService

@@ -16,6 +16,8 @@ local order = {
 	"SurvivorController",
 	"GodController",
 	"SpectateController",
+	"SpinController",
+	"QuestController",
 	"MenuController",
 }
 

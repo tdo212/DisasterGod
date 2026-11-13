@@ -1,6 +1,6 @@
 --!strict
--- EffectsController: server-requested juice on the local player —
--- knockback, camera shake, low-gravity balloon, speed boost FOV.
+-- EffectsController: server-requested juice on the local player — knockback, ragdoll
+-- tumbles, camera shake with an impact punch, low-gravity balloon, speed boost FOV.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +17,8 @@ local EffectsController = {}
 
 local shake = 0
 local started = false
+local ragdolled = false
+local punching = false
 
 local function rootAndHumanoid(): (BasePart?, Humanoid?)
 	local character = player.Character
@@ -35,6 +37,40 @@ function EffectsController.Shake(intensity: number, _duration: number, center: V
 		scale = math.clamp(1 - d / 260, 0.1, 1)
 	end
 	shake = math.min(2, shake + intensity * scale)
+	-- heavy hits also punch the field of view for a beat (the "hitstop" feel)
+	if camera and not punching and intensity * scale >= Config.Juice.ImpactThreshold then
+		punching = true
+		local fov = camera.FieldOfView
+		camera.FieldOfView = fov - Config.Juice.ImpactFovKick
+		local tween = TweenService:Create(camera, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { FieldOfView = fov })
+		tween:Play()
+		tween.Completed:Once(function()
+			punching = false
+		end)
+	end
+end
+
+-- The server swaps the joints for ball sockets; the owning client has to put the
+-- Humanoid into the Physics state for the body to actually flop.
+local function setRagdoll(on: boolean)
+	local hrp, humanoid = rootAndHumanoid()
+	ragdolled = on
+	if not humanoid then
+		return
+	end
+	if on then
+		humanoid.AutoRotate = false
+		humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		if hrp then
+			local spin = Config.Ragdoll.Spin
+			hrp.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * spin
+		end
+	else
+		humanoid.AutoRotate = true
+		if humanoid.Health > 0 then
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+	end
 end
 
 local function knockback(velocity: Vector3)
@@ -42,7 +78,9 @@ local function knockback(velocity: Vector3)
 	if not (hrp and humanoid) or humanoid.Health <= 0 then
 		return
 	end
-	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	if not ragdolled then
+		humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+	end
 	hrp.AssemblyLinearVelocity = hrp.AssemblyLinearVelocity * 0.3 + velocity
 end
 
@@ -111,6 +149,8 @@ function EffectsController.Start()
 	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any)
 		if kind == "Knockback" and typeof(a) == "Vector3" then
 			knockback(a)
+		elseif kind == "Ragdoll" and typeof(a) == "boolean" then
+			setRagdoll(a)
 		elseif kind == "Shake" and typeof(a) == "number" then
 			EffectsController.Shake(a, if typeof(b) == "number" then b else 0.3, if typeof(c) == "Vector3" then c else nil)
 		elseif kind == "LowGravity" and typeof(a) == "number" then
@@ -118,6 +158,10 @@ function EffectsController.Start()
 		elseif kind == "Boost" and typeof(a) == "number" then
 			boost(a)
 		end
+	end)
+
+	player.CharacterAdded:Connect(function()
+		ragdolled = false
 	end)
 
 	-- applied after the camera scripts so it works for both custom and orbit cameras

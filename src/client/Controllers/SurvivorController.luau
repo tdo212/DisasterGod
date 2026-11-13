@@ -1,5 +1,6 @@
 --!strict
 -- SurvivorController: expressive mobility (dash + ledge mantle) and the gear bar.
+-- On touch devices the dash button sits beside the jump button, sized to match it.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -63,6 +64,9 @@ local function dash()
 	local hrp, humanoid = parts()
 	if not (hrp and humanoid) or humanoid.Health <= 0 or hrp.Anchored then
 		return
+	end
+	if player:GetAttribute(Attributes.Ragdolled) == true then
+		return -- tumbling from a hit
 	end
 	local cooldown = Mobility.DashCooldown
 	if player:GetAttribute(Attributes.PassPrefix .. "QuickDash") == true then
@@ -159,6 +163,31 @@ end
 ---------------------------------------------------------------------------
 -- UI
 
+local TOUCH_DASH_SIZE = 84
+local TOUCH_DASH_GAP = 14
+
+-- Keep the touch dash button glued to the left of Roblox's jump button, at its size.
+local function followJumpButton()
+	local touchGui = player:WaitForChild("PlayerGui"):WaitForChild("TouchGui", 10)
+	local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+	local jump = frame and frame:FindFirstChild("JumpButton")
+	if not (jump and jump:IsA("GuiObject")) then
+		return
+	end
+	local function apply()
+		if jump.AbsoluteSize.X < 1 then
+			return
+		end
+		local size = jump.AbsoluteSize.X * 0.9
+		dashButton.Size = UDim2.fromOffset(size, size)
+		dashButton.AnchorPoint = Vector2.new(1, 0.5)
+		dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y + jump.AbsoluteSize.Y / 2)
+	end
+	apply()
+	jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply)
+	jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+end
+
 local function buildGui()
 	gui = Instance.new("ScreenGui")
 	gui.Name = "SurvivorHUD"
@@ -167,18 +196,23 @@ local function buildGui()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
+	local touch = Components.isTouch()
 	dashButton = Components.button({
 		Name = "Dash",
-		Text = "DASH [Q]",
+		Text = if touch then "DASH" else "DASH [Q]",
 		TextSize = 20,
-		Size = UDim2.fromOffset(120, 54),
-		Position = UDim2.new(1, -16, 1, -16),
+		-- touch: real pixels beside the jump button (not in the scaled layer)
+		Size = if touch then UDim2.fromOffset(TOUCH_DASH_SIZE, TOUCH_DASH_SIZE) else UDim2.fromOffset(124, 56),
+		Position = if touch then UDim2.new(1, -130, 1, -30) else UDim2.new(1, -16, 1, -16),
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Blue,
 		ColorLight = C.BlueLight,
-		Parent = layer,
+		Parent = if touch then gui else layer,
 		OnClick = dash,
 	})
+	if touch then
+		task.spawn(followJumpButton)
+	end
 	dashCooldown = Instance.new("Frame")
 	dashCooldown.Name = "Cooldown"
 	dashCooldown.BackgroundColor3 = Color3.new(0, 0, 0)

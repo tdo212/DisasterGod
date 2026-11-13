@@ -1,8 +1,11 @@
 --!strict
 -- Scriptable overhead orbit camera used by the Disaster God and spectators.
--- WASD/arrows pan, Q/E rotate, mouse wheel zooms, right-drag rotates.
+--   Keyboard / mouse: WASD or arrows pan, Q/E rotate, wheel zooms, right-drag tilts.
+--   Touch: one-finger drag pans, pinch zooms, two-finger twist rotates.
+-- While it is on, the on-screen thumbstick / jump button are hidden.
 
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -24,6 +27,8 @@ local connections: { RBXScriptConnection } = {}
 
 local BIND = "DisasterGodOrbit"
 local SINK = "DisasterGodOrbitSink"
+local TOUCH_PAN_FACTOR = 1.3 -- studs of pan per screen-height of drag, per stud of zoom
+local TOUCH_RESTORE_RECHECK = 1.5 -- seconds after leaving the camera
 
 local function keyAxis(positive: { Enum.KeyCode }, negative: { Enum.KeyCode }): number
 	local v = 0
@@ -42,6 +47,17 @@ local function keyAxis(positive: { Enum.KeyCode }, negative: { Enum.KeyCode }): 
 	return v
 end
 
+local function flatAxes(): (Vector3, Vector3)
+	return Vector3.new(-math.sin(yaw), 0, -math.cos(yaw)), Vector3.new(math.cos(yaw), 0, -math.sin(yaw))
+end
+
+local function clampFocus()
+	local limit = Config.World.ArenaRadius
+	if focus.Magnitude > limit then
+		focus = focus.Unit * limit
+	end
+end
+
 local function step(dt: number)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -52,14 +68,10 @@ local function step(dt: number)
 		local right = keyAxis({ Enum.KeyCode.D, Enum.KeyCode.Right }, { Enum.KeyCode.A, Enum.KeyCode.Left })
 		local rotate = keyAxis({ Enum.KeyCode.E }, { Enum.KeyCode.Q })
 		yaw -= rotate * CamCfg.GodRotateSpeed * dt
-		local flatForward = Vector3.new(-math.sin(yaw), 0, -math.cos(yaw))
-		local flatRight = Vector3.new(math.cos(yaw), 0, -math.sin(yaw))
+		local flatForward, flatRight = flatAxes()
 		local speed = CamCfg.GodPanSpeed * (zoom / CamCfg.GodStartZoom)
 		focus += (flatForward * forward + flatRight * right) * speed * dt
-		local limit = Config.World.ArenaRadius
-		if focus.Magnitude > limit then
-			focus = focus.Unit * limit
-		end
+		clampFocus()
 	end
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = CFrame.new(focus) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(-pitch, 0, 0) * CFrame.new(0, 0, zoom)
@@ -72,6 +84,72 @@ end
 
 function OrbitCamera.GetLookDirection(): Vector3
 	return Vector3.new(-math.sin(yaw), 0, -math.cos(yaw))
+end
+
+local function connectTouch()
+	local lastPan = Vector2.zero
+	local lastPinch = 1
+	local lastRotation = 0
+	table.insert(connections, UserInputService.TouchPan:Connect(function(touches, total, _velocity, state, processed)
+		if state == Enum.UserInputState.Begin then
+			lastPan = total
+			return
+		end
+		local delta = total - lastPan
+		lastPan = total
+		if processed or #touches ~= 1 then
+			return
+		end
+		local camera = workspace.CurrentCamera
+		local height = if camera then math.max(1, camera.ViewportSize.Y) else 720
+		local flatForward, flatRight = flatAxes()
+		-- dragging moves the world under the finger
+		local k = zoom * TOUCH_PAN_FACTOR / height
+		focus += (flatForward * delta.Y - flatRight * delta.X) * k
+		clampFocus()
+	end))
+	table.insert(connections, UserInputService.TouchPinch:Connect(function(_touches, scale, _velocity, state, processed)
+		if state == Enum.UserInputState.Begin then
+			lastPinch = scale
+			return
+		end
+		if not processed and lastPinch > 0 then
+			zoom = math.clamp(zoom / (scale / lastPinch), CamCfg.GodMinZoom, CamCfg.GodMaxZoom)
+		end
+		lastPinch = scale
+	end))
+	table.insert(connections, UserInputService.TouchRotate:Connect(function(_touches, rotation, _velocity, state, processed)
+		if state == Enum.UserInputState.Begin then
+			lastRotation = rotation
+			return
+		end
+		if not processed then
+			yaw -= rotation - lastRotation
+		end
+		lastRotation = rotation
+	end))
+end
+
+-- Bring the thumbstick / jump button back. The default control module can miss the
+-- change while the character is respawning, so check once more after things settle.
+local function restoreTouchControls()
+	pcall(function()
+		GuiService.TouchControlsEnabled = true
+	end)
+	task.delay(TOUCH_RESTORE_RECHECK, function()
+		if enabled then
+			return
+		end
+		local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+		local touchGui = playerGui and playerGui:FindFirstChild("TouchGui")
+		if touchGui and touchGui:IsA("ScreenGui") and not touchGui.Enabled then
+			pcall(function()
+				GuiService.TouchControlsEnabled = false
+				task.wait(0.1)
+				GuiService.TouchControlsEnabled = true
+			end)
+		end
+	end)
 end
 
 function OrbitCamera.Enable(startFocus: Vector3?)
@@ -87,6 +165,10 @@ function OrbitCamera.Enable(startFocus: Vector3?)
 	ContextActionService:BindActionAtPriority(SINK, function()
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right, Enum.KeyCode.Space)
+	-- the thumbstick would fight the drag-to-pan gesture
+	pcall(function()
+		GuiService.TouchControlsEnabled = false
+	end)
 
 	table.insert(connections, UserInputService.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -106,6 +188,7 @@ function OrbitCamera.Enable(startFocus: Vector3?)
 			pitch = math.clamp(pitch + input.Delta.Y * 0.004, math.rad(25), math.rad(85))
 		end
 	end))
+	connectTouch()
 end
 
 function OrbitCamera.Disable()
@@ -116,6 +199,7 @@ function OrbitCamera.Disable()
 	rmbDown = false
 	RunService:UnbindFromRenderStep(BIND)
 	ContextActionService:UnbindAction(SINK)
+	restoreTouchControls()
 	for _, c in connections do
 		c:Disconnect()
 	end
@@ -132,12 +216,14 @@ function OrbitCamera.Disable()
 end
 
 -- World point under a screen position (arena geometry, else the y=0 plane).
-function OrbitCamera.ScreenToWorld(screen: Vector2, exclude: { Instance }?): Vector3?
+-- `insetRelative` is true for InputObject / touch positions, which are measured from
+-- under the top bar; false for GetMouseLocation and viewport coordinates.
+function OrbitCamera.ScreenToWorld(screen: Vector2, insetRelative: boolean?): Vector3?
 	local camera = workspace.CurrentCamera
 	if not camera then
 		return nil
 	end
-	local ray = camera:ViewportPointToRay(screen.X, screen.Y)
+	local ray = if insetRelative then camera:ScreenPointToRay(screen.X, screen.Y) else camera:ViewportPointToRay(screen.X, screen.Y)
 	local arena = workspace:FindFirstChild("Arena")
 	if arena then
 		local params = RaycastParams.new()

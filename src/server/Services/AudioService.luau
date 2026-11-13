@@ -15,6 +15,7 @@ local AudioService = {}
 local group: SoundGroup? = nil
 local holderFolder: Folder? = nil
 local lastPlayed: { [string]: number } = {}
+local GLOBAL_SOUND_LIFETIME = 40
 
 local function soundGroup(): SoundGroup
 	if not group then
@@ -90,6 +91,21 @@ function AudioService.playAt(key: string, position: Vector3, volume: number?, sp
 	s.Parent = holder
 	s:Play()
 	Debris:AddItem(holder, 12)
+end
+
+-- Non-positional sound everyone hears at the same volume (sirens). Looped sounds are
+-- returned so the caller can destroy them.
+function AudioService.playGlobal(key: string, volume: number?, looped: boolean?): Sound?
+	local s = makeSound(key, volume or 1, 1, looped)
+	if not s then
+		return nil
+	end
+	s.Parent = holders()
+	s:Play()
+	if not looped then
+		Debris:AddItem(s, GLOBAL_SOUND_LIFETIME)
+	end
+	return s
 end
 
 -- Sound attached to a part (follows it). Looped sounds stop when the part is destroyed.

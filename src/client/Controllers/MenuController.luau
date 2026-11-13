@@ -1,7 +1,8 @@
 --!strict
--- MenuController: left sidebar tiles (Shop, Passes, Spectate, solo role toggle) and the
--- tabbed Shop window — Gear (coins), Coins (Robux packs), Passes, Specials. The lobby
--- shop stall's proximity prompt opens it too.
+-- MenuController: the two-column tile menu (Shop, Spin, Quests, Passes, Spectate, solo
+-- role toggle) and the tabbed Shop window — Gear (coins), God Kits (coins), Coins (Robux
+-- packs), Passes, Specials. Lobby proximity prompts (shop stall, quest board, prize wheel,
+-- pass pedestals) open the matching UI.
 
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -17,6 +18,8 @@ local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Component
 local Store = require(ClientRoot:WaitForChild("UI"):WaitForChild("Store") :: ModuleScript)
 local SpectateController = require(script.Parent:WaitForChild("SpectateController") :: ModuleScript)
 local HUDController = require(script.Parent:WaitForChild("HUDController") :: ModuleScript)
+local SpinController = require(script.Parent:WaitForChild("SpinController") :: ModuleScript)
+local QuestController = require(script.Parent:WaitForChild("QuestController") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local M = Config.Monetization
@@ -31,7 +34,8 @@ local layer: Frame -- viewport-scaled root for all UI content
 local shop: any -- Components.WindowHandle
 local pages: { [string]: Frame } = {}
 local tabButtons: { [string]: TextButton } = {}
-local TAB_ORDER = { "Gear", "Coins", "Passes", "Specials" }
+local TAB_ORDER = { "Gear", "Kits", "Coins", "Passes", "Specials" }
+local TAB_TITLES: { [string]: string } = { Kits = "God Kits" }
 
 local BADGE_COLORS: { [string]: { Color3 } } = {
 	["Good Value"] = { C.BlueLight, C.Blue },
@@ -39,6 +43,11 @@ local BADGE_COLORS: { [string]: { Color3 } } = {
 	["Most Value"] = { C.Pink, C.Purple },
 	["Starter Deal"] = { C.GreenLight, C.Green },
 }
+
+local abilityIcons: { [string]: string } = {}
+for _, def in Config.Disasters.Abilities do
+	abilityIcons[def.Id] = def.Icon
+end
 
 ---------------------------------------------------------------------------
 -- card building
@@ -66,6 +75,7 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 	Components.corner(frame, Theme.Radius.Large)
 	Components.stroke(frame, Theme.Stroke.Heavy)
 	Components.gradient(frame, spec.Top, spec.Bottom)
+	Components.studs(frame, nil, Theme.Radius.Large)
 	frame.Parent = parent
 
 	if spec.Badge and spec.Badge ~= "" then
@@ -76,7 +86,7 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 		badge.Position = UDim2.new(0.5, 0, 0, 8)
 		badge.AnchorPoint = Vector2.new(0.5, 0)
 		badge.BackgroundColor3 = Color3.new(1, 1, 1)
-		Components.corner(badge, Theme.Radius.Pill)
+		Components.corner(badge, Theme.Radius.Small)
 		Components.stroke(badge, Theme.Stroke.Thick)
 		Components.gradient(badge, colors[1], colors[2], 0)
 		badge.Parent = frame
@@ -86,10 +96,10 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 	Components.label({ Name = "Title", Text = spec.Title, TextSize = 20, Size = UDim2.new(1, -10, 0, 26), Position = UDim2.fromOffset(5, 112), Parent = frame })
 	local pill = Components.panel({
 		Name = "Info",
-		Size = UDim2.new(1, -20, 0, 44),
+		Size = UDim2.new(1, -20, 0, 48),
 		Position = UDim2.new(0.5, 0, 0, 142),
 		AnchorPoint = Vector2.new(0.5, 0),
-		Color = Color3.fromRGB(25, 30, 40),
+		Color = Color3.fromRGB(20, 26, 36),
 		Transparency = 0.35,
 		Radius = Theme.Radius.Medium,
 		Parent = frame,
@@ -100,7 +110,7 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 		Name = "Buy",
 		Text = spec.Button,
 		TextSize = 24,
-		Size = UDim2.new(1, -20, 0, 50),
+		Size = UDim2.new(1, -20, 0, 52),
 		Position = UDim2.new(0.5, 0, 1, -10),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = spec.ButtonColor or C.Green,
@@ -115,8 +125,8 @@ local function grid(parent: Frame, name: string): Frame
 	local page = Instance.new("Frame")
 	page.Name = name
 	page.BackgroundTransparency = 1
-	page.Size = UDim2.new(1, 0, 1, -96)
-	page.Position = UDim2.fromOffset(0, 60)
+	page.Size = UDim2.new(1, 0, 1, -92)
+	page.Position = UDim2.fromOffset(0, 56)
 	page.Visible = false
 	page.Parent = parent
 	local layout = Instance.new("UIListLayout")
@@ -139,17 +149,14 @@ local function selectTab(name: string)
 		if stroke then
 			stroke.Color = if tab == name then C.Gold else C.Outline
 		end
-		local scale = button:FindFirstChildOfClass("UIScale")
-		if scale then
-			scale.Scale = if tab == name then 1.06 else 1
-		end
 	end
 end
 
 local function setOwnedLook(button: TextButton, owned: boolean)
-	local gradient = button:FindFirstChildOfClass("UIGradient")
-	if gradient then
-		gradient.Color = if owned then ColorSequence.new(C.TextDim, C.PanelLight) else ColorSequence.new(C.GreenLight, C.Green)
+	if owned then
+		Components.setColors(button, C.GreyLight, C.Grey, true)
+	else
+		Components.setColors(button, C.GreenLight, C.Green, true)
 	end
 end
 
@@ -180,6 +187,49 @@ local function buildGearPage(content: Frame)
 	end
 end
 
+-- God loadouts: buy with coins, then equip. The equipped kit is your hotbar as God.
+local function buildKitsPage(content: Frame)
+	local page = grid(content, "Kits")
+	for i, kit in Config.Kits do
+		local list = {}
+		for _, id in kit.Abilities do
+			table.insert(list, abilityIcons[id] or "?")
+		end
+		local _, button = card(page, {
+			Order = i,
+			Top = kit.Color:Lerp(Color3.new(1, 1, 1), 0.45),
+			Bottom = kit.Color,
+			Icon = kit.Icon,
+			Title = kit.Name,
+			Subtitle = table.concat(list, " ") .. "\n" .. kit.Description,
+			Button = "",
+			OnClick = function()
+				local owned = player:GetAttribute(Attributes.KitPrefix .. kit.Id) == true
+				if not owned then
+					Remotes.get("KitAction"):FireServer("Buy", kit.Id)
+				elseif player:GetAttribute(Attributes.Kit) ~= kit.Id then
+					Remotes.get("KitAction"):FireServer("Equip", kit.Id)
+				end
+			end,
+		})
+		local function refresh()
+			local owned = player:GetAttribute(Attributes.KitPrefix .. kit.Id) == true
+			local equipped = player:GetAttribute(Attributes.Kit) == kit.Id
+			Components.setText(button, if equipped then "EQUIPPED ✔" elseif owned then "EQUIP" else "💰 " .. HUDController.FormatNumber(kit.Price))
+			if equipped then
+				Components.setColors(button, C.GreyLight, C.Grey, true)
+			elseif owned then
+				Components.setColors(button, C.BlueLight, C.Blue, true)
+			else
+				Components.setColors(button, C.GreenLight, C.Green, true)
+			end
+		end
+		player:GetAttributeChangedSignal(Attributes.KitPrefix .. kit.Id):Connect(refresh)
+		player:GetAttributeChangedSignal(Attributes.Kit):Connect(refresh)
+		refresh()
+	end
+end
+
 local function buildCoinsPage(content: Frame)
 	local page = grid(content, "Coins")
 	for i, key in { "CoinsSmall", "CoinsMedium", "CoinsLarge", "CoinsHuge" } do
@@ -193,6 +243,8 @@ local function buildCoinsPage(content: Frame)
 			Subtitle = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " coins",
 			Badge = def.Badge,
 			Button = Store.robux(def.Price),
+			ButtonColor = C.Blue,
+			ButtonLight = C.BlueLight,
 			OnClick = function()
 				Store.promptProduct(key)
 			end,
@@ -294,7 +346,7 @@ local function buildSpecialsPage(content: Frame)
 	local revive = M.Products.Revive
 	card(page, {
 		Order = 4,
-		Top = Color3.fromRGB(255, 150, 190),
+		Top = C.PinkLight,
 		Bottom = C.Pink,
 		Icon = revive.Icon,
 		Title = revive.Name,
@@ -324,10 +376,11 @@ local function buildShop()
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 12)
+	layout.Padding = UDim.new(0, 10)
 	layout.Parent = tabs
 	local tabColors = {
 		Gear = { C.BlueLight, C.Blue },
+		Kits = { C.PinkLight, C.Pink },
 		Coins = { C.GreenLight, C.Green },
 		Passes = { C.PurpleLight, C.Purple },
 		Specials = { C.OrangeLight, C.Orange },
@@ -335,9 +388,9 @@ local function buildShop()
 	for i, name in TAB_ORDER do
 		local b = Components.button({
 			Name = name,
-			Text = name,
-			TextSize = 22,
-			Size = UDim2.fromOffset(150, 42),
+			Text = TAB_TITLES[name] or name,
+			TextSize = 21,
+			Size = UDim2.fromOffset(138, 42),
 			Color = tabColors[name][2],
 			ColorLight = tabColors[name][1],
 			Parent = tabs,
@@ -350,6 +403,7 @@ local function buildShop()
 	end
 
 	buildGearPage(content)
+	buildKitsPage(content)
 	buildCoinsPage(content)
 	buildPassesPage(content)
 	buildSpecialsPage(content)
@@ -394,38 +448,63 @@ function MenuController.Start()
 	gui.Name = "Menu"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = 2
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
+	-- two-column tile grid: left-centre on desktop, tucked top-left on touch so it
+	-- stays clear of the thumbstick
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
 	sidebar.BackgroundTransparency = 1
-	sidebar.Size = UDim2.fromOffset(96, 430)
-	sidebar.Position = UDim2.new(0, 16, 0.5, -20)
-	sidebar.AnchorPoint = Vector2.new(0, 0.5)
+	sidebar.Size = UDim2.fromOffset(160, 250)
+	if Components.isTouch() then
+		sidebar.Position = UDim2.fromOffset(12, 6)
+	else
+		sidebar.Position = UDim2.new(0, 16, 0.5, -20)
+		sidebar.AnchorPoint = Vector2.new(0, 0.5)
+	end
 	sidebar.Parent = layer
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 18)
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.fromOffset(74, 74)
+	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.FillDirectionMaxCells = 2
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = sidebar
 
 	buildShop()
-	HUDController.SetShopOpener(MenuController.OpenShop)
 
 	local shopTile = Components.tile(sidebar, "🛒", "Shop", C.Red, 1)
 	shopTile.Activated:Connect(function()
 		MenuController.OpenShop()
 	end)
 
-	local passTile = Components.tile(sidebar, "👑", "Passes", C.Gold, 2)
+	local spinTile = Components.tile(sidebar, "🎡", "Spin", C.Pink, 2)
+	spinTile.Activated:Connect(SpinController.Toggle)
+	local function refreshSpinBadge()
+		local n = player:GetAttribute(Attributes.Spins) :: number? or 0
+		Components.setBadge(spinTile, if n > 0 then tostring(n) else nil)
+	end
+	player:GetAttributeChangedSignal(Attributes.Spins):Connect(refreshSpinBadge)
+	refreshSpinBadge()
+
+	local questTile = Components.tile(sidebar, "📜", "Quests", C.Orange, 3)
+	questTile.Activated:Connect(QuestController.Toggle)
+	local function refreshQuestBadge()
+		Components.setBadge(questTile, if QuestController.ClaimableCount() > 0 then "!" else nil)
+	end
+	QuestController.Changed:Connect(refreshQuestBadge)
+	refreshQuestBadge()
+
+	local passTile = Components.tile(sidebar, "👑", "Passes", C.Gold, 4)
 	passTile.Activated:Connect(function()
 		MenuController.OpenShop("Passes")
 	end)
 
-	local spectateTile = Components.tile(sidebar, "👁️", "Spectate", C.Blue, 3)
+	local spectateTile = Components.tile(sidebar, "👁️", "Spectate", C.Blue, 5)
 	spectateTile.Activated:Connect(SpectateController.Toggle)
 
-	local roleTile = Components.tile(sidebar, "😈", "Play God", C.Purple, 4)
+	local roleTile = Components.tile(sidebar, "😈", "Play God", C.Purple, 6)
 	local function refreshRoleTile()
 		local solo = #Players:GetPlayers() == 1 and Config.Match.AllowSoloRoleToggle
 		roleTile.Visible = solo
@@ -448,11 +527,13 @@ function MenuController.Start()
 	end)
 	refreshRoleTile()
 
-	-- hide the sidebar while flying the God camera
+	-- hide the menu while flying the God camera (the solo tester keeps the role toggle)
 	local function refreshSidebar()
-		sidebar.Visible = player:GetAttribute(Attributes.Role) ~= "DisasterGod" or ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active"
-		if Config.Match.AllowSoloRoleToggle and #Players:GetPlayers() == 1 then
-			sidebar.Visible = true -- solo tester can always flip roles
+		local flying = player:GetAttribute(Attributes.Role) == "DisasterGod" and ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active"
+		local solo = Config.Match.AllowSoloRoleToggle and #Players:GetPlayers() == 1
+		sidebar.Visible = not flying or solo
+		for _, tile in { shopTile, spinTile, questTile, passTile, spectateTile } do
+			tile.Visible = not flying
 		end
 	end
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refreshSidebar)
@@ -462,6 +543,19 @@ function MenuController.Start()
 	ProximityPromptService.PromptTriggered:Connect(function(prompt)
 		if prompt.Name == "ShopPrompt" then
 			MenuController.OpenShop()
+		elseif prompt.Name == "QuestPrompt" then
+			QuestController.Toggle()
+		elseif prompt.Name == "SpinPrompt" then
+			SpinController.Open()
+		elseif prompt.Name == "PassPrompt" then
+			local key = prompt:GetAttribute("PassKey")
+			if typeof(key) == "string" then
+				if Store.ownsPass(key) then
+					HUDController.Popup("YOU ALREADY OWN THIS PASS", C.GreenLight)
+				else
+					Store.promptPass(key)
+				end
+			end
 		end
 	end)
 end

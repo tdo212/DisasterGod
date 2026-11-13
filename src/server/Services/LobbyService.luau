@@ -1,6 +1,7 @@
 --!strict
 -- LobbyService: builds the Sky Sanctuary and runs its activities — obby rewards,
--- winners podium, coin leaderboard, fall resets and ghost "haunt" pings.
+-- winners podium, fall resets and ghost "haunt" pings. Hands the vote pads to
+-- VoteService and the leaderboard slots to LeaderboardService.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -12,10 +13,12 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Lobby = require(ServerScriptService.Server.World.Lobby)
 
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
-local PlayerDataService = require(script.Parent.PlayerDataService)
+local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
+local VoteService = require(script.Parent.VoteService)
 
 local LobbyService = {}
 
@@ -73,8 +76,6 @@ local function makeBillboard(anchor: BasePart): TextLabel
 end
 
 local podiumLabels: { TextLabel } = {}
-local leaderboardRows: { TextLabel } = {}
-local LEADERBOARD_ROWS = 8
 
 function LobbyService.SetPodium(entries: { { Name: string, Earned: number } })
 	for i, label in podiumLabels do
@@ -82,23 +83,6 @@ function LobbyService.SetPodium(entries: { { Name: string, Earned: number } })
 		label.Text = if entry then string.format("%s\n+%d", entry.Name, entry.Earned) else ""
 		local gui = label.Parent :: BillboardGui
 		gui.Enabled = entry ~= nil
-	end
-end
-
-local function refreshLeaderboard()
-	local rows = {}
-	for _, p in Players:GetPlayers() do
-		local profile = PlayerDataService.Get(p)
-		if profile then
-			table.insert(rows, { Name = p.DisplayName, Coins = profile.Coins, Streak = profile.BestStreak })
-		end
-	end
-	table.sort(rows, function(a, b)
-		return a.Coins > b.Coins
-	end)
-	for i, label in leaderboardRows do
-		local row = rows[i]
-		label.Text = if row then string.format("%d. %s   $%s   best %d", i, row.Name, tostring(row.Coins), row.Streak) else ""
 	end
 end
 
@@ -155,34 +139,8 @@ function LobbyService.Init()
 		table.insert(podiumLabels, makeBillboard(anchor))
 	end
 
-	local boardGui = Instance.new("SurfaceGui")
-	boardGui.Face = Enum.NormalId.Back
-	boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	boardGui.PixelsPerStud = 30
-	boardGui.LightInfluence = 0
-	boardGui.Parent = info.Leaderboard
-	-- readable board: a big header + one scaled text row per entry
-	local function boardLabel(text: string, y: number, h: number, color: Color3): TextLabel
-		local label = Instance.new("TextLabel")
-		label.BackgroundTransparency = 1
-		label.Size = UDim2.new(1, -40, h, 0)
-		label.Position = UDim2.new(0, 20, y, 0)
-		label.Font = Enum.Font.FredokaOne
-		label.TextScaled = true
-		label.TextColor3 = color
-		label.TextXAlignment = Enum.TextXAlignment.Left
-		label.Text = text
-		label.Parent = boardGui
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2
-		stroke.Parent = label
-		return label
-	end
-	local header = boardLabel("🏆 TOP SURVIVORS", 0.03, 0.16, Color3.fromRGB(255, 210, 60))
-	header.TextXAlignment = Enum.TextXAlignment.Center
-	for i = 1, LEADERBOARD_ROWS do
-		table.insert(leaderboardRows, boardLabel("", 0.2 + (i - 1) * 0.098, 0.088, Color3.new(1, 1, 1)))
-	end
+	VoteService.SetPads(info.VotePads)
+	LeaderboardService.Setup(info.BoardSlots)
 
 	info.ObbyFinish.Touched:Connect(function(hit)
 		local character = hit.Parent
@@ -196,6 +154,7 @@ function LobbyService.Init()
 		end
 		obbyCooldown[player] = now + Config.Scoring.ObbyCooldown
 		ScoringService.Award(player, Config.Scoring.ObbyCoins, "OBBY CLEAR", Color3.fromRGB(120, 255, 140))
+		QuestService.Progress(player, "Obby", 1)
 	end)
 
 	Remotes.get("GhostPing").OnServerEvent:Connect(function(player, position)
@@ -224,7 +183,6 @@ function LobbyService.Init()
 	-- fall reset: anyone not playing in the arena who drops off the island returns to spawn
 	local resetY = Config.World.LobbyOrigin.Y - Config.Player.LobbyFallResetDepth
 	task.spawn(function()
-		local boardTimer = 0
 		while true do
 			task.wait(0.5)
 			for _, player in Players:GetPlayers() do
@@ -237,14 +195,8 @@ function LobbyService.Init()
 					LobbyService.TeleportToLobby(player)
 				end
 			end
-			boardTimer += 0.5
-			if boardTimer >= 5 then
-				boardTimer = 0
-				refreshLeaderboard()
-			end
 		end
 	end)
-	refreshLeaderboard()
 end
 
 return LobbyService

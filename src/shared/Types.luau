@@ -48,7 +48,44 @@ export type ProductDefinition = {
 	Price: number, -- Robux
 	Icon: string,
 	Coins: number?,
+	Spins: number?,
 	Badge: string, -- "Good Value" etc., "" for none
+}
+
+export type KitDefinition = {
+	Id: string,
+	Name: string,
+	Icon: string,
+	Description: string,
+	Price: number, -- coins; 0 = free
+	Color: Color3,
+	Abilities: { string },
+}
+
+export type SpinReward = {
+	Id: string,
+	Label: string,
+	Icon: string,
+	Kind: "Coins" | "Kit" | "God",
+	Amount: number,
+	Weight: number,
+	Color: Color3,
+}
+
+export type QuestDefinition = {
+	Id: string,
+	Text: string,
+	Stat: string, -- progress counter this quest listens to
+	Goal: number,
+	Reward: number, -- coins
+}
+
+export type QuestProfile = {
+	Day: number,
+	Progress: { [string]: number }, -- by stat
+	Claimed: { [string]: boolean }, -- by quest id
+	Streak: number,
+	LastAllDoneDay: number,
 }
 
 export type PassDefinition = {
@@ -82,6 +119,14 @@ export type PlayerProfile = {
 	Streak: number,
 	BestStreak: number,
 	RoundsSurvived: number,
+	RoundsPlayed: number,
+	GodKills: number,
+	Spins: number,
+	FreeSpinAt: number, -- unix time the next free spin lands (0 = not started)
+	Kit: string, -- equipped God kit
+	Kits: { [string]: boolean }, -- owned kits
+	Tutorials: { [string]: boolean }, -- role cards already shown
+	Quests: QuestProfile,
 	Gear: { [string]: number },
 	WelcomeClaimed: boolean,
 	Receipts: { string }, -- recent purchase ids (idempotent ProcessReceipt)

@@ -1,6 +1,7 @@
 --!strict
--- HUDController: round bar + timer, survivors/God pills, coins, God-chance card,
--- floating score popups, big banners and the round summary window.
+-- HUDController: round bar (map tab on top, timer text, bar only while a round runs),
+-- survivors/God pills, coins, God-chance card, offers, floating score popups, big
+-- banners, first-time role cards and the round summary window.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +17,7 @@ local Store = require(UI:WaitForChild("Store") :: ModuleScript)
 local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
 
 local Attributes = Config.Attributes
+local M = Config.Match
 local C = Theme.Colors
 local player = Players.LocalPlayer
 
@@ -24,12 +26,7 @@ local HUDController = {}
 local started = false
 local gui: ScreenGui
 local layer: Frame -- viewport-scaled root; all HUD content parents here
-local shopOpener: ((string?) -> ())? = nil
-
--- MenuController registers how to open the shop (avoids a require cycle).
-function HUDController.SetShopOpener(fn: (string?) -> ())
-	shopOpener = fn
-end
+local touch = false
 
 local function offersVisible(): boolean
 	local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
@@ -51,121 +48,156 @@ function HUDController.FormatNumber(n: number): string
 	return formatted
 end
 
+function HUDController.GetLayer(): Frame
+	return layer
+end
+
 ---------------------------------------------------------------------------
--- round bar (top centre)
+-- round bar (top centre): map tab above, timer text, bar only during a round
+
+local BAR_TEXT_ONLY = 48
+local BAR_WITH_TRACK = 68
 
 local function buildRoundBar()
-	local bar = Components.panel({
-		Name = "RoundBar",
-		Size = UDim2.fromOffset(420, 64),
-		Position = UDim2.new(0.5, 0, 0, 8),
+	local holder = Instance.new("Frame")
+	holder.Name = "RoundBar"
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.fromOffset(430, 130)
+	holder.Position = UDim2.new(0.5, 0, 0, 2)
+	holder.AnchorPoint = Vector2.new(0.5, 0)
+	holder.Parent = layer
+
+	-- the map name rides on top of the bar as a tab
+	local mapTab = Components.panel({
+		Name = "MapTab",
+		Size = UDim2.fromOffset(250, 28),
+		Position = UDim2.fromScale(0.5, 0),
 		AnchorPoint = Vector2.new(0.5, 0),
+		Color = C.Blue,
+		Radius = Theme.Radius.Small,
+		Parent = holder,
+	})
+	mapTab.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.gradient(mapTab, C.BlueLight, C.Blue, 90, true)
+	Components.studs(mapTab, nil, Theme.Radius.Small)
+	mapTab.ZIndex = 2
+	local mapText = Components.label({ Name = "Text", Text = "", TextSize = 17, Size = UDim2.new(1, -8, 1, -3), Position = UDim2.fromOffset(4, 0), Parent = mapTab })
+	mapText.TextTruncate = Enum.TextTruncate.AtEnd
+
+	local bar = Components.panel({
+		Name = "Bar",
+		Size = UDim2.new(1, 0, 0, BAR_TEXT_ONLY),
+		Position = UDim2.fromOffset(0, 24),
 		Color = C.Panel,
-		Transparency = 0.08,
+		Transparency = 0.05,
 		Radius = Theme.Radius.Medium,
-		Parent = layer,
+		Studs = true,
+		Parent = holder,
 	})
 	local title = Components.label({
 		Name = "Title",
 		Text = "Waiting for players…",
 		TextSize = 26,
-		Size = UDim2.new(1, -20, 0, 30),
-		Position = UDim2.fromOffset(10, 4),
+		Size = UDim2.new(1, -20, 0, 32),
+		Position = UDim2.fromOffset(10, 9),
 		Parent = bar,
 	})
-	local track = Instance.new("Frame")
-	track.Name = "Track"
-	track.Size = UDim2.new(1, -40, 0, 14)
-	track.Position = UDim2.new(0, 20, 1, -22)
-	track.BackgroundColor3 = C.Slot
-	track.BorderSizePixel = 0
-	Components.corner(track, Theme.Radius.Pill)
-	Components.stroke(track, Theme.Stroke.Thin)
-	track.Parent = bar
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.fromScale(1, 1)
-	fill.BackgroundColor3 = Color3.new(1, 1, 1)
-	fill.BorderSizePixel = 0
-	Components.corner(fill, Theme.Radius.Pill)
-	local gradient = Components.gradient(fill, C.GreenLight, C.Green)
-	fill.Parent = track
+	title.RichText = true
+	local track, setFill, gradient = Components.progress(bar, UDim2.new(1, -36, 0, 14), UDim2.fromOffset(18, 45), C.GreenLight, C.Green)
 
 	-- info pills under the bar
 	local pills = Instance.new("Frame")
 	pills.Name = "Pills"
 	pills.BackgroundTransparency = 1
-	pills.Size = UDim2.fromOffset(520, 30)
-	pills.Position = UDim2.new(0.5, 0, 0, 78)
+	pills.Size = UDim2.fromOffset(560, 26)
+	pills.Position = UDim2.new(0.5, 0, 0, 24 + BAR_TEXT_ONLY + 6)
 	pills.AnchorPoint = Vector2.new(0.5, 0)
-	pills.Parent = layer
+	pills.Parent = holder
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.Padding = UDim.new(0, 10)
+	layout.Padding = UDim.new(0, 12)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = pills
 	local pillCount = 0
 	local function pill(name: string): TextLabel
 		pillCount += 1
-		local label = Components.label({
-			Name = name,
-			Text = "",
-			TextSize = 20,
-			Size = UDim2.fromOffset(0, 26),
-			Parent = pills,
-		})
+		local label = Components.label({ Name = name, Text = "", TextSize = 19, Size = UDim2.fromOffset(0, 24), Parent = pills })
 		label.AutomaticSize = Enum.AutomaticSize.X
 		label.LayoutOrder = pillCount
 		return label
 	end
-	local mapPill = pill("Map")
 	local alivePill = pill("Alive")
 	local godPill = pill("God")
 	local rolePill = pill("Role")
+
+	local showingTrack: boolean? = nil
+	local function setTrack(show: boolean)
+		if showingTrack == show then
+			return
+		end
+		showingTrack = show
+		track.Visible = show
+		local height = if show then BAR_WITH_TRACK else BAR_TEXT_ONLY
+		Components.tween(bar, Theme.Tweens.Fade, { Size = UDim2.new(1, 0, 0, height) })
+		Components.tween(pills, Theme.Tweens.Fade, { Position = UDim2.new(0.5, 0, 0, 24 + height + 6) })
+	end
 
 	local function refresh()
 		local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
 		local sub = ReplicatedStorage:GetAttribute(Attributes.SubPhase)
 		local t = ReplicatedStorage:GetAttribute(Attributes.TimeRemaining) :: number? or 0
-		local duration = ReplicatedStorage:GetAttribute(Attributes.PhaseDuration) :: number? or 1
 		local map = ReplicatedStorage:GetAttribute(Attributes.MapName) :: string? or ""
 		local alive = ReplicatedStorage:GetAttribute(Attributes.AliveCount) :: number? or 0
 		local god = ReplicatedStorage:GetAttribute(Attributes.GodName) :: string? or ""
 		local role = player:GetAttribute(Attributes.Role) :: string? or "Spectator"
 
 		local top, bottom = C.GreenLight, C.Green
+		local fraction: number? = nil -- nil = no bar (text is enough)
 		if phase == "Intermission" then
-			title.Text = string.format("Round starts in <font color=\"#FFD23C\">%ds</font>", t)
+			if ReplicatedStorage:GetAttribute(Attributes.VoteOpen) == true then
+				local left = t - (M.IntermissionDuration - Config.Voting.Duration)
+				title.Text = string.format("🗳️ Map vote closes in <font color=\"#FFD23C\">%ds</font>", math.max(0, left))
+			else
+				title.Text = string.format("Round starts in <font color=\"#FFD23C\">%ds</font>", t)
+			end
 		elseif phase == "Active" then
+			local suddenAt = M.SuddenDeathDuration
 			if sub == "Prep" then
-				local untilCast = t - (Config.Match.RoundDuration - Config.Match.PrepDuration)
-				title.Text = string.format("SCATTER! Disasters in <font color=\"#FFD23C\">%ds</font>", math.max(0, untilCast))
+				local untilCast = math.max(0, t - (M.RoundDuration - M.PrepDuration))
+				title.Text = string.format("SCATTER! Disasters in <font color=\"#FFD23C\">%ds</font>", untilCast)
 				top, bottom = C.BlueLight, C.Blue
+				fraction = untilCast / M.PrepDuration
 			elseif sub == "SuddenDeath" then
 				title.Text = "SUDDEN DEATH  " .. formatTime(t)
 				top, bottom = C.RedLight, C.Red
+				fraction = t / suddenAt
 			else
 				title.Text = "SURVIVE  " .. formatTime(t)
 				top, bottom = C.OrangeLight, C.Orange
+				fraction = (t - suddenAt) / math.max(1, M.RoundDuration - M.PrepDuration - suddenAt)
 			end
 		elseif phase == "RoundEnd" then
-			title.Text = "ROUND OVER"
-			top, bottom = C.PurpleLight, C.Purple
+			title.Text = string.format("ROUND OVER · next in <font color=\"#FFD23C\">%ds</font>", t)
+		else
+			title.Text = "Waiting for players…"
 		end
-		gradient.Color = ColorSequence.new(top, bottom)
-		Components.tween(fill, Theme.Tweens.Fade, { Size = UDim2.fromScale(math.clamp(t / math.max(1, duration), 0, 1), 1) })
+		setTrack(fraction ~= nil)
+		if fraction then
+			gradient.Color = Components.gloss(top, bottom, true)
+			setFill(fraction)
+		end
 
-		mapPill.Text = if map ~= "" then "🗺️ " .. map else ""
+		mapTab.Visible = map ~= ""
+		mapText.Text = "🗺️ " .. map
 		alivePill.Text = if phase == "Active" then "🏃 Survivors " .. tostring(alive) else ""
 		godPill.Text = if phase == "Active" and god ~= "" then "😈 " .. god else ""
 		local roleText = if role == "DisasterGod" then "DISASTER GOD" elseif role == "Survivor" then (if player:GetAttribute(Attributes.Alive) then "SURVIVOR" else "ELIMINATED") else "SPECTATOR"
 		rolePill.Text = "⭐ " .. roleText
 		rolePill.TextColor3 = if role == "DisasterGod" then C.PurpleLight elseif role == "Survivor" then C.GreenLight else C.TextDim
 	end
-	title.RichText = true
 
-	for _, attr in { Attributes.RoundPhase, Attributes.SubPhase, Attributes.TimeRemaining, Attributes.MapName, Attributes.AliveCount, Attributes.GodName } do
+	for _, attr in { Attributes.RoundPhase, Attributes.SubPhase, Attributes.TimeRemaining, Attributes.MapName, Attributes.AliveCount, Attributes.GodName, Attributes.VoteOpen } do
 		ReplicatedStorage:GetAttributeChangedSignal(attr):Connect(refresh)
 	end
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
@@ -174,30 +206,28 @@ local function buildRoundBar()
 end
 
 ---------------------------------------------------------------------------
--- coins (bottom left) + streak
+-- coins + streak (bottom left; top right on touch so the thumbstick stays clear)
 
 local function buildCoins()
 	local frame = Instance.new("Frame")
 	frame.Name = "Wallet"
 	frame.BackgroundTransparency = 1
-	frame.Size = UDim2.fromOffset(260, 60)
-	frame.Position = UDim2.new(0, 16, 1, -16)
-	frame.AnchorPoint = Vector2.new(0, 1)
+	frame.Size = UDim2.fromOffset(if touch then 190 else 250, 56)
+	if touch then
+		frame.Position = UDim2.new(1, -12, 0, 2)
+		frame.AnchorPoint = Vector2.new(1, 0)
+	else
+		frame.Position = UDim2.new(0, 16, 1, -14)
+		frame.AnchorPoint = Vector2.new(0, 1)
+	end
 	frame.Parent = layer
-	Components.label({
-		Name = "Icon",
-		Text = "💰",
-		TextSize = 42,
-		Size = UDim2.fromOffset(50, 56),
-		StrokeThickness = 0,
-		Parent = frame,
-	})
+	Components.label({ Name = "Icon", Text = "💰", TextSize = 38, Size = UDim2.fromOffset(46, 52), StrokeThickness = 0, Parent = frame })
 	local amount = Components.label({
 		Name = "Amount",
 		Text = "$0",
-		TextSize = 44,
-		Size = UDim2.new(1, -56, 0, 56),
-		Position = UDim2.fromOffset(56, 0),
+		TextSize = 40,
+		Size = UDim2.new(1, -52, 0, 52),
+		Position = UDim2.fromOffset(52, 0),
 		Color = C.Gold,
 		XAlign = Enum.TextXAlignment.Left,
 		StrokeThickness = Theme.Stroke.Heavy,
@@ -206,11 +236,11 @@ local function buildCoins()
 	local streak = Components.label({
 		Name = "Streak",
 		Text = "",
-		TextSize = 22,
-		Size = UDim2.fromOffset(220, 26),
-		Position = UDim2.fromOffset(4, -24),
+		TextSize = if touch then 17 else 20,
+		Size = UDim2.fromOffset(240, 24),
+		Position = if touch then UDim2.new(1, -240, 0, 52) else UDim2.fromOffset(4, -24),
 		Color = C.OrangeLight,
-		XAlign = Enum.TextXAlignment.Left,
+		XAlign = if touch then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left,
 		Parent = frame,
 	})
 	local scale = Instance.new("UIScale")
@@ -233,28 +263,34 @@ local function buildCoins()
 end
 
 ---------------------------------------------------------------------------
--- God chance card (right side) — the "one more round" hook
+-- God chance card (right side) — the "one more round" hook; the whole card buys God
 
 local function buildGodChance()
 	local card = Instance.new("TextButton")
 	card.Name = "GodChance"
 	card.Text = ""
 	card.AutoButtonColor = false
-	card.Size = UDim2.fromOffset(176, 214)
-	card.Position = UDim2.new(1, -16, 0.5, -40)
-	card.AnchorPoint = Vector2.new(1, 0.5)
 	card.BackgroundColor3 = Color3.new(1, 1, 1)
+	if touch then
+		card.Size = UDim2.fromOffset(164, 196)
+		card.Position = UDim2.new(1, -12, 0, 84)
+		card.AnchorPoint = Vector2.new(1, 0)
+	else
+		card.Size = UDim2.fromOffset(176, 214)
+		card.Position = UDim2.new(1, -16, 0.5, -40)
+		card.AnchorPoint = Vector2.new(1, 0.5)
+	end
 	Components.corner(card, Theme.Radius.Large)
 	Components.stroke(card, Theme.Stroke.Heavy)
-	Components.gradient(card, C.PurpleLight, C.Purple)
+	Components.gradient(card, C.PurpleLight, C.Purple, 90, true)
+	Components.studs(card, nil, Theme.Radius.Large)
 	card.Parent = layer
 
-	Components.label({ Name = "Caption", Text = "Next round", TextSize = 18, Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 8), Parent = card })
-	Components.label({ Name = "Headline", Text = "Be the GOD", TextSize = 24, Color = C.Pink, Size = UDim2.new(1, 0, 0, 28), Position = UDim2.fromOffset(0, 30), Parent = card })
-	Components.label({ Name = "Face", Text = "😈", TextSize = 46, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 52), Position = UDim2.fromOffset(0, 58), Parent = card })
-	local pct = Components.label({ Name = "Percent", Text = "0%", TextSize = 34, Color = C.Gold, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 112), StrokeThickness = Theme.Stroke.Heavy, Parent = card })
-	local scale = Instance.new("UIScale")
-	scale.Parent = card
+	Components.label({ Name = "Caption", Text = "Next round", TextSize = 17, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 6), Parent = card })
+	Components.label({ Name = "Headline", Text = "Be the GOD", TextSize = 24, Color = C.PinkLight, Size = UDim2.new(1, 0, 0, 28), Position = UDim2.fromOffset(0, 26), Parent = card })
+	Components.label({ Name = "Face", Text = "😈", TextSize = 42, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 46), Position = UDim2.fromOffset(0, 54), Parent = card })
+	local pct = Components.label({ Name = "Percent", Text = "0%", TextSize = 32, Color = C.Gold, Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 100), StrokeThickness = Theme.Stroke.Heavy, Parent = card })
+	local scale = Components.pressable(card)
 
 	local last = -1
 	local function refresh()
@@ -272,26 +308,20 @@ local function buildGodChance()
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 	refresh()
 
-	-- the whole card is the Robux shortcut: tap to guarantee God next round
 	local god = Config.Monetization.Products.GodNextRound
 	local pill = Components.panel({
 		Name = "Price",
 		Size = UDim2.new(1, -20, 0, 40),
-		Position = UDim2.new(0.5, 0, 1, -10),
+		Position = UDim2.new(0.5, 0, 1, -16),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Green,
-		Radius = Theme.Radius.Pill,
+		Radius = Theme.Radius.Medium,
 		Parent = card,
 	})
-	Components.gradient(pill, C.GreenLight, C.Green)
 	pill.BackgroundColor3 = Color3.new(1, 1, 1)
-	local pillText = Components.label({ Name = "Text", Text = "", TextSize = 20, Size = UDim2.fromScale(1, 1), Parent = pill })
-	card.MouseEnter:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.06 })
-	end)
-	card.MouseLeave:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
-	end)
+	Components.gradient(pill, C.GreenLight, C.Green, 90, true)
+	Components.studs(pill)
+	local pillText = Components.label({ Name = "Text", Text = "", TextSize = 20, Size = UDim2.new(1, 0, 1, -4), Parent = pill })
 	card.Activated:Connect(function()
 		if player:GetAttribute(Attributes.GodQueued) == true then
 			Sound.play("Error", 0.6)
@@ -309,7 +339,8 @@ local function buildGodChance()
 end
 
 ---------------------------------------------------------------------------
--- Welcome Pack offer (right side, under the God card) + Second Chance revive offer
+-- Welcome Pack offer (under the God card) — only after the first finished round,
+-- once the player knows the loop
 
 local function buildWelcomeOffer()
 	local def = Config.Monetization.Products.WelcomePack
@@ -317,23 +348,28 @@ local function buildWelcomeOffer()
 	offer.Name = "WelcomePack"
 	offer.Text = ""
 	offer.AutoButtonColor = false
-	offer.Size = UDim2.fromOffset(170, 132)
-	offer.Position = UDim2.new(1, -16, 0.5, 112)
-	offer.AnchorPoint = Vector2.new(1, 0)
 	offer.BackgroundColor3 = Color3.new(1, 1, 1)
+	if touch then
+		offer.Size = UDim2.fromOffset(164, 112)
+		offer.Position = UDim2.new(1, -12, 0, 288)
+	else
+		offer.Size = UDim2.fromOffset(176, 126)
+		offer.Position = UDim2.new(1, -16, 0.5, 76)
+	end
+	offer.AnchorPoint = Vector2.new(1, 0)
 	Components.corner(offer, Theme.Radius.Large)
 	Components.stroke(offer, Theme.Stroke.Heavy)
-	Components.gradient(offer, C.OrangeLight, C.Orange)
+	Components.gradient(offer, C.OrangeLight, C.Orange, 90, true)
+	Components.studs(offer, nil, Theme.Radius.Large)
 	offer.Parent = layer
-	Components.label({ Name = "Title", Text = "Welcome Pack", TextSize = 20, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = offer })
-	Components.label({ Name = "Icon", Text = def.Icon, TextSize = 30, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 28), Parent = offer })
+	Components.label({ Name = "Title", Text = def.Icon .. " Welcome Pack", TextSize = 19, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = offer })
 	Components.label({
 		Name = "Coins",
-		Text = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " Coins",
-		TextSize = 20,
-		Color = C.Gold,
+		Text = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " Coins + Kit",
+		TextSize = 18,
+		Color = C.GoldLight,
 		Size = UDim2.new(1, 0, 0, 24),
-		Position = UDim2.fromOffset(0, 62),
+		Position = UDim2.fromOffset(0, 32),
 		Parent = offer,
 	})
 	local was = Components.label({
@@ -341,8 +377,8 @@ local function buildWelcomeOffer()
 		Text = Store.robux(Config.Monetization.WelcomePackListPrice),
 		TextSize = 16,
 		Color = C.RedLight,
-		Size = UDim2.fromOffset(60, 22),
-		Position = UDim2.new(0, 10, 1, -32),
+		Size = UDim2.fromOffset(64, 22),
+		Position = UDim2.new(0, 8, 1, -42),
 		Parent = offer,
 	})
 	local strike = Instance.new("Frame")
@@ -354,29 +390,26 @@ local function buildWelcomeOffer()
 	strike.Parent = was
 	local price = Components.panel({
 		Name = "Price",
-		Size = UDim2.fromOffset(84, 30),
-		Position = UDim2.new(1, -8, 1, -6),
+		Size = UDim2.fromOffset(88, 32),
+		Position = UDim2.new(1, -8, 1, -14),
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Green,
-		Radius = Theme.Radius.Pill,
+		Radius = Theme.Radius.Medium,
 		Parent = offer,
 	})
-	Components.label({ Name = "Text", Text = Store.robux(def.Price), TextSize = 18, Size = UDim2.fromScale(1, 1), Parent = price })
-	local scale = Instance.new("UIScale")
-	scale.Parent = offer
-	offer.MouseEnter:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.05 })
-	end)
-	offer.MouseLeave:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
-	end)
+	price.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.gradient(price, C.GreenLight, C.Green, 90, true)
+	Components.label({ Name = "Text", Text = Store.robux(def.Price), TextSize = 18, Size = UDim2.new(1, 0, 1, -3), Parent = price })
+	Components.pressable(offer, 1.05)
 	offer.Activated:Connect(function()
 		Store.promptProduct("WelcomePack")
 	end)
 	local function refresh()
-		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and offersVisible()
+		local played = player:GetAttribute(Attributes.RoundsPlayed) :: number? or 0
+		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and played >= 1 and offersVisible()
 	end
 	player:GetAttributeChangedSignal(Attributes.WelcomeClaimed):Connect(refresh)
+	player:GetAttributeChangedSignal(Attributes.RoundsPlayed):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 	refresh()
@@ -392,7 +425,7 @@ local function buildReviveOffer()
 		Position = UDim2.new(0.5, 0, 1, -120),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Pink,
-		ColorLight = Color3.fromRGB(255, 150, 190),
+		ColorLight = C.PinkLight,
 		Parent = layer,
 		OnClick = function()
 			Store.promptProduct("Revive")
@@ -430,7 +463,7 @@ local popupLane = 0
 
 function HUDController.Popup(text: string, color: Color3?)
 	local upper = string.upper(text)
-	if string.find(upper, "BOUGHT", 1, true) or string.find(upper, "UNLOCKED", 1, true) or string.find(upper, "THANK", 1, true) or string.find(upper, "CLAIMED", 1, true) then
+	if string.find(upper, "BOUGHT", 1, true) or string.find(upper, "UNLOCKED", 1, true) or string.find(upper, "THANK", 1, true) or string.find(upper, "CLAIMED", 1, true) or string.find(upper, "WHEEL WIN", 1, true) then
 		Sound.play("Purchase", 0.9)
 	elseif string.find(text, "+", 1, true) then
 		Sound.play("Coin", 0.8, 0.95 + math.random() * 0.15)
@@ -443,10 +476,10 @@ function HUDController.Popup(text: string, color: Color3?)
 	local label = Components.label({
 		Name = "Popup",
 		Text = text,
-		TextSize = 32,
+		TextSize = 30,
 		Color = color or C.Gold,
-		Size = UDim2.fromOffset(420, 40),
-		Position = UDim2.new(0.5, 120, 0.42, popupLane * 36),
+		Size = UDim2.fromOffset(520, 38),
+		Position = UDim2.new(0.5, 0, 0.4, popupLane * 34),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		StrokeThickness = Theme.Stroke.Heavy,
 		Parent = layer,
@@ -482,12 +515,12 @@ local function buildBanner()
 	bannerFrame.Name = "Banner"
 	bannerFrame.BackgroundTransparency = 1
 	bannerFrame.Size = UDim2.fromOffset(800, 110)
-	bannerFrame.Position = UDim2.fromScale(0.5, 0.28)
+	bannerFrame.Position = UDim2.fromScale(0.5, 0.32)
 	bannerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	bannerFrame.Visible = false
 	bannerFrame.Parent = layer
-	bannerTitle = Components.label({ Name = "Title", Text = "", TextSize = 58, Size = UDim2.new(1, 0, 0, 64), StrokeThickness = 5, Parent = bannerFrame })
-	bannerSub = Components.label({ Name = "Subtitle", Text = "", TextSize = 24, Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 68), Parent = bannerFrame })
+	bannerTitle = Components.label({ Name = "Title", Text = "", TextSize = 56, Size = UDim2.new(1, 0, 0, 64), StrokeThickness = 5, Parent = bannerFrame })
+	bannerSub = Components.label({ Name = "Subtitle", Text = "", TextSize = 23, Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 66), Parent = bannerFrame })
 	bannerScale = Instance.new("UIScale")
 	bannerScale.Parent = bannerFrame
 end
@@ -529,10 +562,125 @@ function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 end
 
 ---------------------------------------------------------------------------
+-- first-time role cards: three bullets, shown once per role
+
+type RoleCard = { Title: string, Color: Color3, Light: Color3, Bullets: { string } }
+
+local function roleCards(): { [string]: RoleCard }
+	return {
+		God = {
+			Title = "😈 YOU ARE THE DISASTER GOD",
+			Color = C.Purple,
+			Light = C.PurpleLight,
+			Bullets = if touch
+				then { "👆 Drag to fly · pinch to zoom", "🎯 Pick a disaster, then tap the arena", "🏚️ Break supports to collapse buildings" }
+				else { "🕹️ WASD to fly · scroll to zoom", "🎯 Keys 1-5 pick · click to cast", "🏚️ Break supports to collapse buildings" },
+		},
+		Survivor = {
+			Title = "🏃 SURVIVE THE DISASTERS",
+			Color = C.Green,
+			Light = C.GreenLight,
+			Bullets = {
+				"🔴 Red zones mean a disaster is about to hit",
+				if touch then "💨 Tap DASH to dodge out of danger" else "💨 Press Q to DASH out of danger",
+				"⛰️ Sudden Death: get to high ground!",
+			},
+		},
+	}
+end
+
+local cardShown: { [string]: boolean } = {}
+local openCard: Frame? = nil
+
+local function showRoleCard(kind: string)
+	local spec = roleCards()[kind]
+	if not spec or cardShown[kind] then
+		return
+	end
+	cardShown[kind] = true
+	if openCard then
+		openCard:Destroy()
+	end
+	local card = Components.panel({
+		Name = "RoleCard",
+		Size = UDim2.fromOffset(500, 250),
+		Position = UDim2.fromScale(0.5, 0.45),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Color = C.Window,
+		Transparency = 0.05,
+		Radius = Theme.Radius.Large,
+		Studs = true,
+		Parent = layer,
+	})
+	card.ZIndex = 15
+	openCard = card
+	local header = Components.panel({ Name = "Header", Size = UDim2.new(1, 0, 0, 52), Color = spec.Color, Radius = Theme.Radius.Large, Parent = card })
+	header.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.gradient(header, spec.Light, spec.Color, 90, true)
+	Components.studs(header, nil, Theme.Radius.Large)
+	Components.label({ Name = "Title", Text = spec.Title, TextSize = 27, Size = UDim2.new(1, 0, 1, -5), Parent = header })
+	for i, bullet in spec.Bullets do
+		Components.label({
+			Name = "Bullet" .. i,
+			Text = bullet,
+			TextSize = 23,
+			XAlign = Enum.TextXAlignment.Left,
+			Size = UDim2.new(1, -40, 0, 30),
+			Position = UDim2.fromOffset(24, 64 + (i - 1) * 38),
+			Parent = card,
+		})
+	end
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.6
+	scale.Parent = card
+	Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+	local function dismiss()
+		if card.Parent then
+			card:Destroy()
+		end
+		if openCard == card then
+			openCard = nil
+		end
+	end
+	Components.button({
+		Name = "GotIt",
+		Text = "GOT IT!",
+		TextSize = 24,
+		Size = UDim2.fromOffset(190, 50),
+		Position = UDim2.new(0.5, 0, 1, -12),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Parent = card,
+		OnClick = dismiss,
+	})
+	Remotes.get("TutorialSeen"):FireServer(kind)
+	task.delay(Config.Onboarding.CardSeconds, dismiss)
+end
+
+local function roleKind(): string?
+	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
+		return nil
+	end
+	local role = player:GetAttribute(Attributes.Role)
+	return if role == "DisasterGod" then "God" elseif role == "Survivor" then "Survivor" else nil
+end
+
+local function evaluateRoleCard()
+	local kind = roleKind()
+	if kind and not cardShown[kind] and player:GetAttribute(Attributes.TutorialPrefix .. kind) ~= true then
+		-- wait for the round-start banner to clear, then show the card if the role still holds
+		task.delay(Config.Onboarding.CardDelay, function()
+			if roleKind() == kind then
+				showRoleCard(kind)
+			end
+		end)
+	end
+end
+
+---------------------------------------------------------------------------
 -- round summary
 
 local function showSummary(summary: any)
-	local window = Components.window(layer, "Round Over", UDim2.fromOffset(520, 430))
+	local window = Components.window(layer, "Round Over", UDim2.fromOffset(520, 420))
 	local content = window.Content
 	local headline = if summary.Role == "DisasterGod" then "GOD ROUND COMPLETE" elseif summary.Survived then "YOU SURVIVED!" else "ELIMINATED"
 	local headColor = if summary.Role == "DisasterGod" then C.PurpleLight elseif summary.Survived then C.GreenLight else C.RedLight
@@ -566,7 +714,7 @@ local function showSummary(summary: any)
 		Parent = content,
 	})
 	window.Open()
-	task.delay(Config.Match.RoundEndDuration - 0.5, function()
+	task.delay(M.RoundEndDuration - 0.5, function()
 		window.Close()
 		task.delay(0.5, function()
 			window.Root:Destroy()
@@ -585,12 +733,14 @@ function HUDController.Start()
 		return
 	end
 	started = true
+	touch = Components.isTouch()
 
 	gui = Instance.new("ScreenGui")
 	gui.Name = "HUD"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.IgnoreGuiInset = false
+	gui.DisplayOrder = 1 -- role cards and popups sit above the God / survivor HUDs
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
@@ -600,6 +750,10 @@ function HUDController.Start()
 	buildBanner()
 	buildWelcomeOffer()
 	buildReviveOffer()
+
+	player:GetAttributeChangedSignal(Attributes.Role):Connect(evaluateRoleCard)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(evaluateRoleCard)
+	evaluateRoleCard()
 
 	Remotes.get("Popup").OnClientEvent:Connect(function(text: string, color: Color3?)
 		if typeof(text) == "string" then

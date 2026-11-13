@@ -1,6 +1,7 @@
 --!strict
--- DisasterService: Chaos Energy economy, ability validation, telegraphs, the five
--- disasters, the AI Director (plays God when no human does) and anti-camp radar.
+-- DisasterService: Chaos Energy economy, ability validation (per God kit), telegraphs,
+-- the disasters, the AI Director (plays God when no human does), anti-camp radar and
+-- the end-of-round Hunter's Pulse.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -25,6 +26,7 @@ local Attributes = Config.Attributes
 local Chaos = Config.Chaos
 
 local AudioService = require(script.Parent.AudioService)
+local RagdollService = require(script.Parent.RagdollService)
 
 local RED = Color3.fromRGB(255, 50, 50)
 local ORANGE = Color3.fromRGB(255, 140, 30)
@@ -41,6 +43,7 @@ local state = {
 	Active = false,
 	CastingOpen = false,
 	SuddenDeath = false,
+	HunterPulse = false,
 	God = nil :: Player?,
 }
 local pools: { [any]: Pool } = {}
@@ -104,7 +107,12 @@ end
 local function knock(player: Player, velocity: Vector3)
 	local info = MapService.GetCurrent()
 	local mult = if info and info.KnockbackMultiplier then info.KnockbackMultiplier else 1
-	clientEffect:FireClient(player, "Knockback", velocity * mult)
+	local v = velocity * mult
+	-- a hard enough hit sends the survivor tumbling as a ragdoll
+	if v.Magnitude >= Config.Ragdoll.MinKnockback then
+		RagdollService.Stun(player, Config.Ragdoll.Duration)
+	end
+	clientEffect:FireClient(player, "Knockback", v)
 end
 
 -- Hurt + optionally knock back survivors in a sphere; near-miss everyone just outside.
@@ -188,9 +196,8 @@ end
 ---------------------------------------------------------------------------
 -- disasters
 
-local function lightning(def: Ability, ground: Vector3, caster: Player?)
-	ringTelegraph(ground, def.Radius, def.WarningTime, Color3.fromRGB(120, 200, 255))
-	task.wait(def.WarningTime)
+-- One bolt: visuals, sound, structure damage and the blast. No telegraph.
+local function strike(def: Ability, ground: Vector3, caster: Player?)
 	-- jagged bolt from the sky
 	local top = ground + Vector3.new(0, 140, 0)
 	local prev = top
@@ -218,6 +225,146 @@ local function lightning(def: Ability, ground: Vector3, caster: Player?)
 	shakeAll(0.5, 0.3, ground)
 	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
 	blast(ground, def.Radius, def.PlayerDamage, caster, 30)
+end
+
+local BOLT_BLUE = Color3.fromRGB(120, 200, 255)
+
+local function lightning(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, BOLT_BLUE)
+	task.wait(def.WarningTime)
+	strike(def, ground, caster)
+end
+
+-- Storm Deity: the bolt hops between the nearest survivors.
+local function chainLightning(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, BOLT_BLUE)
+	task.wait(def.WarningTime)
+	strike(def, ground, caster)
+	local pos = ground
+	local hop = def.Duration or 0.6
+	local range = def.Length or 45
+	local targeted: { [Player]: boolean } = {}
+	for _ = 2, def.Count or 4 do
+		local nextPos: Vector3? = nil
+		local best = range
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp and not targeted[player] then
+				local d = Vector3.new(hrp.Position.X - pos.X, 0, hrp.Position.Z - pos.Z).Magnitude
+				if d <= best and d > 2 then
+					best = d
+					nextPos = hrp.Position
+					targeted[player] = true
+				end
+			end
+		end
+		if not nextPos then
+			local a = math.random() * math.pi * 2
+			nextPos = pos + Vector3.new(math.cos(a), 0, math.sin(a)) * range * 0.4
+		end
+		local target = MapService.GroundAt(nextPos :: Vector3)
+		-- crackling arc along the ground toward the next strike
+		local arc = fxPart({
+			Name = "Arc",
+			Size = Vector3.new(0.6, 0.6, math.max(1, (target - pos).Magnitude)),
+			CFrame = CFrame.lookAt((pos + target) / 2 + Vector3.new(0, 2, 0), target + Vector3.new(0, 2, 0)),
+			Color = Color3.fromRGB(200, 235, 255),
+			Transparency = 0.2,
+		})
+		TweenService:Create(arc, TweenInfo.new(hop), { Transparency = 1 }):Play()
+		Debris:AddItem(arc, hop + 0.05)
+		ringTelegraph(target, def.Radius, hop, BOLT_BLUE)
+		task.wait(hop)
+		strike(def, target, caster)
+		pos = target
+	end
+end
+
+-- Magma Titan: a burst that leaves a burning lava pool behind.
+local function eruption(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, ORANGE)
+	shakeAll(0.2, def.WarningTime, ground)
+	task.wait(def.WarningTime)
+	sound("Explosion", ground, 2.4, 0.8)
+	shakeAll(1, 0.6, ground)
+	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
+	blast(ground, def.Radius, def.PlayerDamage, caster, def.Knockback)
+	local duration = def.Duration or 6
+	local pool = fxPart({
+		Name = "LavaPool",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.6, def.Radius * 2, def.Radius * 2),
+		CFrame = CFrame.new(ground + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(255, 110, 20),
+		Transparency = 0.15,
+	})
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 130, 40)
+	light.Range = def.Radius * 2.5
+	light.Brightness = 3
+	light.Parent = pool
+	for i = 1, 8 do
+		local a = i / 8 * math.pi * 2
+		local base = ground + Vector3.new(math.cos(a), 0, math.sin(a)) * def.Radius * 0.5
+		local glob = fxPart({ Name = "Magma", Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = CFrame.new(base), Color = Color3.fromRGB(255, 80, 20) })
+		TweenService:Create(glob, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			CFrame = CFrame.new(base + Vector3.new(0, 26 + i * 2, 0)),
+			Transparency = 1,
+		}):Play()
+		Debris:AddItem(glob, 1)
+	end
+	local elapsed = 0
+	while elapsed < duration and state.Active do
+		task.wait(0.5)
+		elapsed += 0.5
+		creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius * 0.8, def.StructureDamage * 0.15))
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp then
+				local d = hrp.Position - ground
+				if Vector3.new(d.X, 0, d.Z).Magnitude <= def.Radius and d.Y > -4 and d.Y < 12 then
+					hurt(player, def.TickDamage or 10, caster)
+				end
+			end
+		end
+	end
+	TweenService:Create(pool, TweenInfo.new(0.8), { Transparency = 1 }):Play()
+	Debris:AddItem(pool, 0.85)
+end
+
+-- Cyber Glitch: reality stutters — survivors are flung straight up, glass and props break.
+local GLITCH_COLORS = { Color3.fromRGB(255, 60, 200), Color3.fromRGB(60, 230, 255), Color3.fromRGB(120, 255, 90) }
+
+local function glitch(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, GLITCH_COLORS[1])
+	task.wait(def.WarningTime)
+	sound("Glass", ground, 2, 0.5)
+	sound("Lightning", ground, 1.4, 1.9)
+	shakeAll(0.6, 0.3, ground)
+	for i = 1, 16 do
+		local r = def.Radius * math.sqrt(math.random())
+		local a = math.random() * math.pi * 2
+		local cube = fxPart({
+			Name = "Glitch",
+			Size = Vector3.new(math.random(2, 5), math.random(1, 4), math.random(2, 5)),
+			CFrame = CFrame.new(ground + Vector3.new(math.cos(a) * r, math.random(1, 14), math.sin(a) * r)),
+			Color = GLITCH_COLORS[i % #GLITCH_COLORS + 1],
+			Transparency = 0.2,
+		})
+		TweenService:Create(cube, TweenInfo.new(0.5, Enum.EasingStyle.Bounce), { Transparency = 1, Size = cube.Size * 0.2 }):Play()
+		Debris:AddItem(cube, 0.55)
+	end
+	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
+	local k = def.Knockback or 70
+	for _, player in RoleService.GetAliveSurvivors() do
+		local hrp = hrpAndHumanoid(player)
+		if hrp and (hrp.Position - ground).Magnitude <= def.Radius + 1.5 then
+			hurt(player, def.PlayerDamage, caster)
+			local a = math.random() * math.pi * 2
+			knock(player, Vector3.new(math.cos(a) * k * 0.3, k, math.sin(a) * k * 0.3))
+		end
+	end
+	ScoringService.CheckNearMiss(ground, def.Radius)
 end
 
 local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
@@ -469,7 +616,24 @@ local function execute(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		tornado(def, ground, dir, caster)
 	elseif def.Id == "FaultCleave" then
 		faultCleave(def, ground, dir, caster)
+	elseif def.Id == "ChainLightning" then
+		chainLightning(def, ground, caster)
+	elseif def.Id == "Eruption" then
+		eruption(def, ground, caster)
+	elseif def.Id == "Glitch" then
+		glitch(def, ground, caster)
 	end
+end
+
+-- A human God may only cast what their equipped kit contains.
+local function kitAllows(player: Player, id: string): boolean
+	local kitId = player:GetAttribute(Attributes.Kit)
+	for _, kit in Config.Kits do
+		if kit.Id == kitId then
+			return table.find(kit.Abilities, id) ~= nil
+		end
+	end
+	return false
 end
 
 ---------------------------------------------------------------------------
@@ -520,6 +684,11 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 		end
 	end
 	local ground = MapService.GroundAt(target)
+	-- every disaster announces itself with its own sound
+	local cue = Config.Audio.AbilityCue[id]
+	if cue then
+		sound(cue.Key, ground, cue.Volume, cue.Speed)
+	end
 	task.spawn(execute, def, ground, dir, caster)
 	return true
 end
@@ -634,6 +803,36 @@ local function radarTick()
 	end
 end
 
+-- Hunter's Pulse: in the final seconds, the last survivor is pinged for the God so the
+-- round ends in a chase instead of a hide-and-seek stalemate.
+local function hunterPulse(target: Player, god: Player)
+	local character = target.Character
+	local hrp = hrpAndHumanoid(target)
+	if not (character and hrp) then
+		return
+	end
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = RED
+	highlight.OutlineColor = Color3.new(1, 1, 1)
+	highlight.FillTransparency = 0.35
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = character
+	Debris:AddItem(highlight, Config.HunterPulse.Duration)
+	local ripple = fxPart({
+		Name = "HunterPulse",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, 4, 4),
+		CFrame = CFrame.new(hrp.Position - Vector3.new(0, 2.8, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = RED,
+		Transparency = 0.2,
+	})
+	TweenService:Create(ripple, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { Size = Vector3.new(0.2, 70, 70), Transparency = 1 }):Play()
+	Debris:AddItem(ripple, 1.3)
+	sound("Warning", hrp.Position, 0.9, 1.4)
+	ScoringService.Notify(god, "HUNTER'S PULSE: " .. string.upper(target.DisplayName), RED)
+	ScoringService.Notify(target, "THE GOD CAN SEE YOU — RUN!", Color3.fromRGB(255, 90, 160))
+end
+
 ---------------------------------------------------------------------------
 -- public API (driven by MatchService)
 
@@ -663,10 +862,15 @@ function DisasterService.SetSuddenDeath(on: boolean)
 	state.SuddenDeath = on
 end
 
+function DisasterService.SetHunterPulse(on: boolean)
+	state.HunterPulse = on
+end
+
 function DisasterService.EndRound()
 	state.Active = false
 	state.CastingOpen = false
 	state.SuddenDeath = false
+	state.HunterPulse = false
 	state.God = nil
 	ReplicatedStorage:SetAttribute(Attributes.CastingOpen, false)
 	table.clear(pools)
@@ -680,7 +884,7 @@ function DisasterService.Init()
 		if dir ~= nil and (typeof(dir) ~= "Vector3" or not isFiniteVector(dir)) then
 			return
 		end
-		if state.God ~= player or RoleService.GetRole(player) ~= "DisasterGod" then
+		if state.God ~= player or RoleService.GetRole(player) ~= "DisasterGod" or not kitAllows(player, id) then
 			return
 		end
 		tryCast(player, player, id, target, dir)
@@ -690,6 +894,26 @@ function DisasterService.Init()
 		shakeAll(0.9, 0.5, pos)
 		sound("Explosion", pos, 2.6)
 		blast(pos, radius, Config.Destruction.VolatilePlayerDamage, state.God, 50)
+	end)
+
+	-- big collapses rattle every camera nearby
+	DestructionService.Collapsed:Connect(function(_building: Model, center: Vector3, size: Vector3)
+		local J = Config.Juice
+		shakeAll(math.min(J.CollapseShakeMax, J.CollapseShakeBase + size.Magnitude * J.CollapseShakePerStud), 0.6, center)
+		sound("Debris", center, 1.6, 0.9 + math.random() * 0.2)
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.HunterPulse.Interval)
+			local god = state.God
+			if state.Active and state.HunterPulse and god then
+				local alive = RoleService.GetAliveSurvivors()
+				if #alive == 1 then
+					hunterPulse(alive[1], god)
+				end
+			end
+		end
 	end)
 
 	-- energy regen
@@ -721,7 +945,12 @@ function DisasterService.Init()
 		stillSince[player] = nil
 		lastPos[player] = nil
 		if state.God == player then
+			-- the God left mid-round: the AI Director picks the round up seamlessly
 			state.God = nil
+			if state.Active then
+				ReplicatedStorage:SetAttribute(Attributes.GodName, "The Storm")
+				Remotes.get("Banner"):FireAllClients("THE GOD HAS LEFT", "The Storm Director takes over!", PURPLE)
+			end
 		end
 	end)
 end

@@ -76,7 +76,9 @@ function SpectateController.Enter()
 			if now < nextPing then
 				return
 			end
-			local point = OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
+			local point = if input.UserInputType == Enum.UserInputType.Touch
+				then OrbitCamera.ScreenToWorld(Vector2.new(input.Position.X, input.Position.Y), true)
+				else OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 			if point then
 				nextPing = now + Config.Scoring.GhostPingCooldown
 				Remotes.get("GhostPing"):FireServer(point)
@@ -108,7 +110,9 @@ function SpectateController.Start()
 
 	hint = Components.label({
 		Name = "Hint",
-		Text = "👻 SPECTATING · Click the arena to haunt · WASD/QE/Scroll to fly",
+		Text = if Components.isTouch()
+			then "👻 SPECTATING · Tap the arena to haunt · Drag to fly, pinch to zoom"
+			else "👻 SPECTATING · Click the arena to haunt · WASD/QE/Scroll to fly",
 		TextSize = 22,
 		Color = C.PurpleLight,
 		Size = UDim2.fromOffset(760, 30),

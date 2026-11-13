@@ -1,7 +1,8 @@
 --!strict
 -- Sky Sanctuary: a floating grass island beside the arena. Glass observation
--- balcony facing the arena, rainbow paths, winners podium, gear shop stall and a
--- neon mini-obby around the right edge. Also builds the Disaster God's cloud perch.
+-- balcony facing the arena, rainbow paths, winners podium, gear shop stall, map vote
+-- pads, game pass pedestals, the daily quest board, the prize wheel stand and a neon
+-- mini-obby around the right edge. Also builds the Disaster God's cloud perch.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -28,7 +29,8 @@ export type LobbyInfo = {
 	Model: Model,
 	Spawn: SpawnLocation,
 	PodiumAnchors: { BasePart },
-	Leaderboard: BasePart,
+	VotePads: { BasePart },
+	BoardSlots: { CFrame }, -- ground points (facing the island) for the leaderboards
 	ObbyFinish: BasePart,
 	GodPerch: BasePart,
 }
@@ -90,7 +92,7 @@ local function island(model: Model, L: Vector3)
 		Builder.block(ground, "PathTile", L + Vector3.new(x, 0.2, -6), Vector3.new(6, 0.4, 7), RAINBOW[(i % #RAINBOW) + 1], Enum.Material.SmoothPlastic)
 	end
 
-	for _, p in { Vector3.new(-60, 0, -45), Vector3.new(-62, 0, 30), Vector3.new(58, 0, -48), Vector3.new(-25, 0, 40), Vector3.new(30, 0, 42) } do
+	for _, p in { Vector3.new(-70, 0, -14), Vector3.new(-62, 0, 30), Vector3.new(64, 0, -26), Vector3.new(-44, 0, 46), Vector3.new(44, 0, 46) } do
 		tree(ground, L + p)
 	end
 	for _, p in { Vector3.new(-8, 0, -20), Vector3.new(8, 0, -20), Vector3.new(-8, 0, 30), Vector3.new(8, 0, 30) } do
@@ -241,6 +243,178 @@ local function obby(model: Model, L: Vector3): BasePart
 	return f
 end
 
+-- Three pads in front of the balcony; VoteService labels them and counts who stands where.
+local function votePads(model: Model, L: Vector3): { BasePart }
+	local f = Instance.new("Folder")
+	f.Name = "VotePads"
+	f.Parent = model
+	local pads = {}
+	for i, x in { -22, 0, 22 } do
+		Builder.cylinder(f, "VoteRim", L + Vector3.new(x, 0.3, 44), 0.4, 13, Color3.fromRGB(35, 40, 60), Enum.Material.SmoothPlastic)
+		pads[i] = Builder.cylinder(f, "VotePad" .. i, L + Vector3.new(x, 0.5, 44), 0.4, 11, Color3.fromRGB(110, 120, 150), Enum.Material.Neon)
+	end
+	return pads
+end
+
+local function prompt(parent: Instance, name: string, action: string, object: string): ProximityPrompt
+	local p = Instance.new("ProximityPrompt")
+	p.Name = name
+	p.ActionText = action
+	p.ObjectText = object
+	p.HoldDuration = 0
+	p.MaxActivationDistance = 12
+	p.RequiresLineOfSight = false
+	p.Parent = parent
+	return p
+end
+
+-- Daily quest board beside the spawn path (the client opens the quest window).
+local function questBoard(model: Model, L: Vector3)
+	local f = Instance.new("Folder")
+	f.Name = "QuestBoard"
+	f.Parent = model
+	local c = L + Vector3.new(-22, 0, -20)
+	local board = Builder.block(f, "Board", c + Vector3.new(0, 6.5, 0), Vector3.new(13, 6, 0.6), Color3.fromRGB(130, 88, 52), Enum.Material.WoodPlanks)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		Builder.sign(board, face, "📜 DAILY QUESTS\n3 new every day", Color3.fromRGB(255, 225, 90))
+	end
+	for _, x in { -5.5, 5.5 } do
+		Builder.block(f, "Post", c + Vector3.new(x, 2, 0), Vector3.new(0.8, 4, 0.8), WOOD, Enum.Material.Wood)
+	end
+	prompt(board, "QuestPrompt", "View Quests", "Daily Quests")
+end
+
+-- Prize wheel stand (the client opens the spin window).
+local function spinStand(model: Model, L: Vector3)
+	local f = Instance.new("Folder")
+	f.Name = "SpinStand"
+	f.Parent = model
+	local c = L + Vector3.new(22, 0, -20)
+	local hub = c + Vector3.new(0, 7.5, 0)
+	Builder.block(f, "Post", c + Vector3.new(0, 3.5, 0.9), Vector3.new(1.2, 7, 1), Color3.fromRGB(45, 50, 65), Enum.Material.Metal)
+	Builder.part(f, {
+		Name = "Rim",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.7, 10, 10),
+		CFrame = CFrame.new(hub) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(190, 215, 245),
+	})
+	local disc = Builder.part(f, {
+		Name = "Disc",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.9, 9, 9),
+		CFrame = CFrame.new(hub) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(140, 240, 20),
+	})
+	for i = 0, 4 do
+		Builder.part(f, {
+			Name = "Spoke",
+			Size = Vector3.new(0.3, 4.4, 1.05),
+			CFrame = CFrame.new(hub) * CFrame.Angles(0, 0, math.rad(i * 72)) * CFrame.new(0, 2.2, 0),
+			Color = Color3.fromRGB(20, 60, 20),
+		})
+	end
+	Builder.part(f, { Name = "Hub", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2, 2), CFrame = CFrame.new(hub), Color = Color3.fromRGB(255, 200, 40), Material = Enum.Material.Neon })
+	Builder.block(f, "Pointer", hub + Vector3.new(0, 5.2, 0), Vector3.new(1, 1.4, 1.1), Color3.fromRGB(230, 45, 55), Enum.Material.Neon)
+	local sign = Builder.block(f, "SpinSign", hub + Vector3.new(0, 7.4, 0), Vector3.new(11, 2.4, 0.5), Color3.fromRGB(255, 60, 150), Enum.Material.SmoothPlastic)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		Builder.sign(sign, face, "🎡 SPIN TO WIN", Color3.new(1, 1, 1))
+	end
+	prompt(disc, "SpinPrompt", "Spin", "Prize Wheel")
+end
+
+local PASS_SPOTS = {
+	{ Key = "VIP", Offset = Vector3.new(-24, 0, 2), Color = Color3.fromRGB(255, 200, 40) },
+	{ Key = "GodPriority", Offset = Vector3.new(-31, 0, 16), Color = Color3.fromRGB(170, 90, 255) },
+	{ Key = "DoubleCoins", Offset = Vector3.new(24, 0, 2), Color = Color3.fromRGB(90, 220, 90) },
+	{ Key = "QuickDash", Offset = Vector3.new(31, 0, 16), Color = Color3.fromRGB(60, 230, 230) },
+}
+
+-- Blocky display figure standing on `feet`. Returns the torso.
+local function mannequin(parent: Instance, feet: Vector3, color: Color3, material: Enum.Material): BasePart
+	for _, x in { -0.55, 0.55 } do
+		Builder.block(parent, "Leg", feet + Vector3.new(x, 1, 0), Vector3.new(0.95, 2, 0.95), color, material)
+		Builder.block(parent, "Arm", feet + Vector3.new(x * 2.75, 3, 0), Vector3.new(0.9, 2, 0.9), color, material)
+	end
+	local torso = Builder.block(parent, "Torso", feet + Vector3.new(0, 3, 0), Vector3.new(2, 2, 1), color, material)
+	Builder.part(parent, { Name = "Head", Shape = Enum.PartType.Ball, Size = Vector3.new(1.5, 1.5, 1.5), CFrame = CFrame.new(feet + Vector3.new(0, 4.8, 0)), Color = color, Material = material })
+	return torso
+end
+
+-- Glowing pedestals beside the Winners Podium that show each game pass in 3D.
+local function passPedestals(model: Model, L: Vector3)
+	local folder = Instance.new("Folder")
+	folder.Name = "PassPedestals"
+	folder.Parent = model
+	for _, spot in PASS_SPOTS do
+		local def = Config.Monetization.Passes[spot.Key]
+		local f = Instance.new("Folder")
+		f.Name = spot.Key
+		f.Parent = folder
+		local base = L + spot.Offset
+		local pedestal = Builder.cylinder(f, "Pedestal", base + Vector3.new(0, 0.6, 0), 1.2, 7, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
+		local glow = Builder.cylinder(f, "Glow", base + Vector3.new(0, 1.25, 0), 0.15, 6, spot.Color, Enum.Material.Neon)
+		local light = Instance.new("PointLight")
+		light.Color = spot.Color
+		light.Range = 16
+		light.Brightness = 2
+		light.Parent = glow
+		local feet = base + Vector3.new(0, 1.3, 0)
+		local neon = spot.Key == "GodPriority"
+		local torso = mannequin(f, feet, if neon then spot.Color else Color3.fromRGB(235, 236, 242), if neon then Enum.Material.Neon else Enum.Material.SmoothPlastic)
+
+		if spot.Key == "VIP" then
+			-- crown + the rainbow dash trail
+			Builder.cylinder(f, "Crown", feet + Vector3.new(0, 5.8, 0), 0.6, 1.6, spot.Color, Enum.Material.Neon)
+			for i, color in RAINBOW do
+				local streak = Builder.block(f, "Trail", feet + Vector3.new(0, 1.6 + i * 0.4, 3), Vector3.new(0.25, 0.3, 4.5 - i * 0.3), color, Enum.Material.Neon)
+				streak.CanCollide = false
+			end
+		elseif spot.Key == "GodPriority" then
+			-- storm orbs in each hand
+			for _, x in { -2.7, 2.7 } do
+				local orb = Builder.part(f, { Name = "Orb", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.6, 1.6), CFrame = CFrame.new(feet + Vector3.new(x, 4.6, 0)), Color = Color3.fromRGB(230, 200, 255), Material = Enum.Material.Neon, CanCollide = false })
+				orb.Transparency = 0.1
+			end
+		elseif spot.Key == "DoubleCoins" then
+			-- two stacks of coins
+			for _, x in { -2.4, 2.4 } do
+				for k = 0, 4 do
+					Builder.cylinder(f, "Coin", feet + Vector3.new(x, 0.2 + k * 0.36, 0.4), 0.3, 1.7, Color3.fromRGB(255, 200, 40), Enum.Material.Metal)
+				end
+			end
+		else
+			-- speed streaks
+			for i = 1, 4 do
+				local streak = Builder.block(f, "Streak", feet + Vector3.new((i - 2.5) * 0.7, 1 + i * 0.8, 3.2), Vector3.new(0.2, 0.2, 5), spot.Color, Enum.Material.Neon)
+				streak.CanCollide = false
+			end
+		end
+
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "PassLabel"
+		gui.Size = UDim2.new(11, 0, 3.6, 0)
+		gui.StudsOffset = Vector3.new(0, 5.4, 0)
+		gui.MaxDistance = 120
+		gui.Parent = torso
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.RichText = true
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Text = string.format("%s %s\n<font color=\"#FFD23C\">R$ %d</font>", def.Icon, def.Name, def.Price)
+		label.Parent = gui
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Parent = label
+
+		local p = prompt(pedestal, "PassPrompt", "Get " .. def.Name, def.Description)
+		p:SetAttribute("PassKey", spot.Key)
+	end
+end
+
 local function godPerch(model: Model): BasePart
 	local p = Config.World.GodPerch
 	local folder = Instance.new("Folder")
@@ -274,6 +448,10 @@ function Lobby.build(parent: Instance): LobbyInfo
 	local anchors = podium(model, L)
 	shop(model, L)
 	local finish = obby(model, L)
+	local pads = votePads(model, L)
+	questBoard(model, L)
+	spinStand(model, L)
+	passPedestals(model, L)
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"
@@ -298,9 +476,11 @@ function Lobby.build(parent: Instance): LobbyInfo
 		Builder.block(model, "TitlePost", L + Vector3.new(x, 6, -52), Vector3.new(1, 12, 1), Color3.fromRGB(70, 70, 90), Enum.Material.Metal)
 	end
 
-	local board = Builder.block(model, "Leaderboard", L + Vector3.new(38, 8, -50), Vector3.new(26, 14, 1), Color3.fromRGB(35, 38, 55), Enum.Material.SmoothPlastic)
-	for _, x in { 26, 50 } do
-		Builder.block(model, "BoardPost", L + Vector3.new(x, 1, -50), Vector3.new(1, 2, 1), Color3.fromRGB(70, 70, 90), Enum.Material.Metal)
+	-- leaderboards line the back edge, two either side of the title sign, facing the island
+	local boardSlots = {}
+	for _, x in { -57, -33, 33, 57 } do
+		local p = L + Vector3.new(x, 0, -55)
+		table.insert(boardSlots, CFrame.lookAt(p, p + Vector3.new(0, 0, 1)))
 	end
 
 	local perch = godPerch(model)
@@ -309,7 +489,8 @@ function Lobby.build(parent: Instance): LobbyInfo
 		Model = model,
 		Spawn = spawn,
 		PodiumAnchors = anchors,
-		Leaderboard = board,
+		VotePads = pads,
+		BoardSlots = boardSlots,
 		ObbyFinish = finish,
 		GodPerch = perch,
 	}

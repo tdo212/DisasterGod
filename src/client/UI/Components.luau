@@ -1,7 +1,10 @@
 --!strict
--- Reusable UI builders that apply Theme tokens consistently.
+-- Reusable UI builders that apply Theme tokens consistently: studded glossy buttons,
+-- tiles, panels and windows, plus the viewport-scaled root every screen parents to.
 
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(script.Parent:WaitForChild("Theme") :: ModuleScript)
 local Sound = require(script.Parent:WaitForChild("Sound") :: ModuleScript)
@@ -9,6 +12,16 @@ local Sound = require(script.Parent:WaitForChild("Sound") :: ModuleScript)
 local C = Theme.Colors
 
 local Components = {}
+
+-- Touch-first device (phone / tablet): bigger UI, thumb-friendly placement.
+-- Studio testing: set the workspace attribute ForceTouchUI = true before Play to preview
+-- the touch layout with a mouse.
+function Components.isTouch(): boolean
+	if RunService:IsStudio() and workspace:GetAttribute("ForceTouchUI") == true then
+		return true
+	end
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
 
 function Components.corner(parent: GuiObject, radius: UDim?): UICorner
 	local corner = Instance.new("UICorner")
@@ -27,12 +40,42 @@ function Components.stroke(parent: Instance, thickness: number?, color: Color3?,
 	return stroke
 end
 
-function Components.gradient(parent: GuiObject, top: Color3, bottom: Color3, rotation: number?): UIGradient
+-- Colour ramp for a glossy surface. `lip` adds the darker band along the bottom edge.
+function Components.gloss(top: Color3, bottom: Color3, lip: boolean?): ColorSequence
+	if not lip then
+		return ColorSequence.new(top, bottom)
+	end
+	local dark = bottom:Lerp(Color3.new(0, 0, 0), Theme.Gloss.LipDarken)
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, top),
+		ColorSequenceKeypoint.new(Theme.Gloss.LipStart, bottom),
+		ColorSequenceKeypoint.new(Theme.Gloss.LipStart + 0.01, dark),
+		ColorSequenceKeypoint.new(1, dark),
+	})
+end
+
+function Components.gradient(parent: GuiObject, top: Color3, bottom: Color3, rotation: number?, lip: boolean?): UIGradient
 	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(top, bottom)
+	gradient.Color = Components.gloss(top, bottom, lip)
 	gradient.Rotation = rotation or 90
 	gradient.Parent = parent
 	return gradient
+end
+
+-- Tiled stud texture over a surface (sits under the element's other children).
+function Components.studs(parent: GuiObject, transparency: number?, radius: UDim?): ImageLabel
+	local image = Instance.new("ImageLabel")
+	image.Name = "Studs"
+	image.BackgroundTransparency = 1
+	image.Size = UDim2.fromScale(1, 1)
+	image.Image = Theme.Textures.Studs
+	image.ScaleType = Enum.ScaleType.Tile
+	image.TileSize = UDim2.fromOffset(Theme.Textures.StudSize, Theme.Textures.StudSize)
+	image.ImageTransparency = transparency or Theme.Textures.StudTransparency
+	image.ZIndex = 0
+	Components.corner(image, radius)
+	image.Parent = parent
+	return image
 end
 
 function Components.padding(parent: GuiObject, px: number)
@@ -92,6 +135,7 @@ export type PanelProps = {
 	Color: Color3?,
 	Transparency: number?,
 	Radius: UDim?,
+	Studs: boolean?, -- stud texture over the panel (off for tiny pills)
 	Parent: Instance?,
 }
 
@@ -106,8 +150,31 @@ function Components.panel(props: PanelProps): Frame
 	frame.BorderSizePixel = 0
 	Components.corner(frame, props.Radius)
 	Components.stroke(frame, Theme.Stroke.Heavy)
+	if props.Studs then
+		Components.studs(frame, Theme.Textures.StudTransparencyPanel, props.Radius)
+	end
 	frame.Parent = props.Parent
 	return frame
+end
+
+-- Hover / press scale juice shared by every clickable surface.
+function Components.pressable(button: GuiButton, hover: number?): UIScale
+	local scale = Instance.new("UIScale")
+	scale.Parent = button
+	local over = hover or 1.06
+	button.MouseEnter:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = over })
+	end)
+	button.MouseLeave:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
+	end)
+	button.MouseButton1Down:Connect(function()
+		Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.94 })
+	end)
+	button.MouseButton1Up:Connect(function()
+		Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+	end)
+	return scale
 end
 
 export type ButtonProps = {
@@ -123,7 +190,7 @@ export type ButtonProps = {
 	OnClick: (() -> ())?,
 }
 
--- Glossy gradient button with press/hover juice.
+-- Studded glossy button with a bottom lip and press/hover juice.
 function Components.button(props: ButtonProps): TextButton
 	local button = Instance.new("TextButton")
 	button.Name = props.Name or "Button"
@@ -136,31 +203,17 @@ function Components.button(props: ButtonProps): TextButton
 	button.Text = ""
 	Components.corner(button)
 	Components.stroke(button, Theme.Stroke.Heavy)
-	Components.gradient(button, props.ColorLight or C.GreenLight, props.Color or C.Green)
+	Components.gradient(button, props.ColorLight or C.GreenLight, props.Color or C.Green, 90, true)
+	Components.studs(button)
 	-- text (with its own outline) lives on a child label so the border stroke stays on the frame
 	Components.label({
 		Name = "Text",
 		Text = props.Text,
 		TextSize = props.TextSize or Theme.TextSize.Body,
-		Size = UDim2.fromScale(1, 1),
+		Size = UDim2.new(1, 0, 1, -4),
 		Parent = button,
 	})
-
-	local scale = Instance.new("UIScale")
-	scale.Parent = button
-
-	button.MouseEnter:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.06 })
-	end)
-	button.MouseLeave:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
-	end)
-	button.MouseButton1Down:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.94 })
-	end)
-	button.MouseButton1Up:Connect(function()
-		Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
-	end)
+	Components.pressable(button)
 	button.Activated:Connect(function()
 		Sound.play("Click", 0.8, 0.95 + math.random() * 0.1)
 	end)
@@ -178,6 +231,29 @@ function Components.setText(button: GuiObject, text: string)
 	end
 end
 
+-- Recolour a button / card built with Components.gradient.
+function Components.setColors(surface: GuiObject, top: Color3, bottom: Color3, lip: boolean?)
+	local gradient = surface:FindFirstChildOfClass("UIGradient")
+	if gradient then
+		gradient.Color = Components.gloss(top, bottom, lip)
+	end
+end
+
+-- Small corner tag such as "x10" or a spin count.
+function Components.tag(parent: GuiObject, text: string, position: UDim2, anchor: Vector2): TextLabel
+	local tag = Components.label({
+		Name = "Tag",
+		Text = text,
+		TextSize = 20,
+		Size = UDim2.fromOffset(60, 24),
+		Position = position,
+		AnchorPoint = anchor,
+		Parent = parent,
+	})
+	tag.ZIndex = 3
+	return tag
+end
+
 export type WindowHandle = {
 	Root: Frame,
 	Content: Frame,
@@ -186,15 +262,17 @@ export type WindowHandle = {
 	IsOpen: () -> boolean,
 }
 
--- Modal window: orange glossy header, bold title, red X close (matches the shop references).
+-- Modal window: blue studded header, bold title, red X, dark teal studded body.
 function Components.window(parent: Instance, title: string, size: UDim2): WindowHandle
 	local root = Components.panel({
 		Name = title .. "Window",
 		Size = size,
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Color = C.Panel,
+		Color = C.Window,
+		Transparency = 0.06,
 		Radius = Theme.Radius.Large,
+		Studs = true,
 		Parent = parent,
 	})
 	root.Visible = false
@@ -204,42 +282,32 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 
 	local header = Instance.new("Frame")
 	header.Name = "Header"
-	header.Size = UDim2.new(1, 0, 0, 64)
+	header.Size = UDim2.new(1, 0, 0, 60)
 	header.BackgroundColor3 = Color3.new(1, 1, 1)
 	header.BorderSizePixel = 0
-	header.ZIndex = 11
+	header.ZIndex = 2
 	Components.corner(header, Theme.Radius.Large)
-	Components.gradient(header, C.OrangeLight, C.Orange, 0)
+	Components.stroke(header, Theme.Stroke.Heavy)
+	Components.gradient(header, C.BlueLight, C.Blue, 90, true)
+	Components.studs(header, nil, Theme.Radius.Large)
 	header.Parent = root
 
-	-- square off the header's bottom corners
-	local filler = Instance.new("Frame")
-	filler.Size = UDim2.new(1, 0, 0, 18)
-	filler.Position = UDim2.new(0, 0, 1, -18)
-	filler.BackgroundColor3 = Color3.new(1, 1, 1)
-	filler.BorderSizePixel = 0
-	filler.ZIndex = 11
-	Components.gradient(filler, C.OrangeLight, C.Orange, 0)
-	filler.Parent = header
-
-	local titleLabel = Components.label({
+	Components.label({
 		Name = "Title",
 		Text = title,
-		TextSize = 38,
-		Size = UDim2.new(0.6, 0, 1, 0),
+		TextSize = 36,
+		Size = UDim2.new(1, -90, 1, -6),
 		Position = UDim2.fromOffset(20, 0),
 		XAlign = Enum.TextXAlignment.Left,
 		StrokeThickness = Theme.Stroke.Heavy,
 		Parent = header,
 	})
-	titleLabel.ZIndex = 12
 
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
-	content.Size = UDim2.new(1, -24, 1, -84)
-	content.Position = UDim2.fromOffset(12, 74)
-	content.ZIndex = 11
+	content.Size = UDim2.new(1, -24, 1, -80)
+	content.Position = UDim2.fromOffset(12, 70)
 	content.Parent = root
 
 	local open = false
@@ -259,19 +327,18 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		end)
 	end
 
-	local closeButton = Components.button({
+	Components.button({
 		Name = "Close",
 		Text = "X",
 		TextSize = 30,
-		Size = UDim2.fromOffset(50, 50),
-		Position = UDim2.new(1, -10, 0, 7),
+		Size = UDim2.fromOffset(48, 48),
+		Position = UDim2.new(1, -6, 0, 6),
 		AnchorPoint = Vector2.new(1, 0),
 		Color = C.Red,
 		ColorLight = C.RedLight,
 		Parent = header,
 		OnClick = close,
 	})
-	closeButton.ZIndex = 12
 
 	handle = {
 		Root = root,
@@ -291,55 +358,98 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 	return handle
 end
 
--- Square sidebar tile with a big icon and outlined caption (left menu in the references).
+-- Square menu tile with a big icon and outlined caption (left menu in the references).
 function Components.tile(parent: Instance, icon: string, caption: string, color: Color3, order: number): TextButton
 	local tile = Instance.new("TextButton")
 	tile.Name = caption
 	tile.Text = ""
 	tile.AutoButtonColor = false
 	tile.LayoutOrder = order
-	tile.Size = UDim2.fromOffset(78, 78)
+	tile.Size = UDim2.fromOffset(74, 74)
 	tile.BackgroundColor3 = Color3.new(1, 1, 1)
 	Components.corner(tile, Theme.Radius.Medium)
 	Components.stroke(tile, Theme.Stroke.Heavy)
-	Components.gradient(tile, color:Lerp(Color3.new(1, 1, 1), 0.35), color)
+	Components.gradient(tile, color:Lerp(Color3.new(1, 1, 1), 0.4), color, 90, true)
+	Components.studs(tile)
 	tile.Parent = parent
 
 	Components.label({
 		Name = "Icon",
 		Text = icon,
-		TextSize = 38,
-		Size = UDim2.new(1, 0, 0.72, 0),
+		TextSize = 36,
+		Size = UDim2.new(1, 0, 0.7, 0),
 		StrokeThickness = 0,
 		Parent = tile,
 	})
 	local cap = Components.label({
 		Name = "Caption",
 		Text = caption,
-		TextSize = 17,
+		TextSize = 16,
 		Size = UDim2.new(1, 8, 0, 20),
-		Position = UDim2.new(0.5, 0, 1, -6),
+		Position = UDim2.new(0.5, 0, 1, -13),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Parent = tile,
 	})
 	cap.ZIndex = 2
 
-	local scale = Instance.new("UIScale")
-	scale.Parent = tile
+	-- red "!" / count bubble in the top-right corner (hidden until set)
+	local badge = Components.label({
+		Name = "Badge",
+		Text = "",
+		TextSize = 16,
+		Size = UDim2.fromOffset(26, 22),
+		Position = UDim2.new(1, 6, 0, -6),
+		AnchorPoint = Vector2.new(1, 0),
+		Parent = tile,
+	})
+	badge.BackgroundTransparency = 0
+	badge.BackgroundColor3 = C.Red
+	badge.ZIndex = 3
+	badge.Visible = false
+	Components.corner(badge, Theme.Radius.Small)
+
+	Components.pressable(tile, 1.08)
 	tile.Activated:Connect(function()
 		Sound.play("Tab", 0.8)
-	end)
-	tile.MouseEnter:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1.08 })
-	end)
-	tile.MouseLeave:Connect(function()
-		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })
 	end)
 	return tile
 end
 
--- Full-screen layer that scales all HUD content to the viewport (phones / small windows).
--- Parent UI to the returned frame instead of the ScreenGui.
+function Components.setBadge(tile: GuiObject, text: string?)
+	local badge = tile:FindFirstChild("Badge")
+	if badge and badge:IsA("TextLabel") then
+		badge.Visible = text ~= nil and text ~= ""
+		badge.Text = text or ""
+	end
+end
+
+-- Horizontal progress bar. Returns the track and a setter taking 0..1.
+function Components.progress(parent: Instance, size: UDim2, position: UDim2, top: Color3, bottom: Color3): (Frame, (number) -> (), UIGradient)
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.Size = size
+	track.Position = position
+	track.BackgroundColor3 = C.Slot
+	track.BorderSizePixel = 0
+	Components.corner(track, Theme.Radius.Small)
+	Components.stroke(track, Theme.Stroke.Thin)
+	track.Parent = parent
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	fill.BorderSizePixel = 0
+	Components.corner(fill, Theme.Radius.Small)
+	local gradient = Components.gradient(fill, top, bottom, 90, true)
+	fill.Parent = track
+	return track, function(alpha: number)
+		Components.tween(fill, Theme.Tweens.Fade, { Size = UDim2.fromScale(math.clamp(alpha, 0, 1), 1) })
+	end, gradient
+end
+
+-- Full-screen layer that scales all content to the screen. UI is authored against
+-- Theme.Layout's reference canvas (a smaller one on touch devices, so everything is
+-- bigger under a thumb). Parent UI to the returned frame instead of the ScreenGui.
 function Components.scaledRoot(gui: ScreenGui): Frame
 	local root = Instance.new("Frame")
 	root.Name = "ScaledRoot"
@@ -349,19 +459,26 @@ function Components.scaledRoot(gui: ScreenGui): Frame
 	root.Parent = gui
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
+	local layout = Theme.Layout
 	local function update()
-		local camera = workspace.CurrentCamera
-		local size = if camera then camera.ViewportSize else Vector2.new(1280, 760)
-		local s = math.clamp(math.min(size.X / 1280, size.Y / 760), 0.5, 1.15)
+		local size = gui.AbsoluteSize
+		if size.X < 1 or size.Y < 1 then
+			return
+		end
+		local reference = if Components.isTouch() then layout.TouchReference else layout.DesktopReference
+		local s = math.clamp(math.min(size.X / reference.X, size.Y / reference.Y), layout.MinScale, layout.MaxScale)
 		scale.Scale = s
 		root.Size = UDim2.fromScale(1 / s, 1 / s)
 	end
 	update()
-	local camera = workspace.CurrentCamera
-	if camera then
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
-	end
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(update)
 	return root
+end
+
+-- Current scale of a root made by scaledRoot (to convert screen pixels to layer units).
+function Components.rootScale(root: Frame): number
+	local scale = root:FindFirstChildOfClass("UIScale")
+	return if scale then scale.Scale else 1
 end
 
 return Components

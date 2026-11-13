@@ -26,6 +26,8 @@ local LIGHTS = {
 }
 
 local COLS, ROWS = 8, 6
+local FERRIS_ROW, FERRIS_LAST_COLUMN = 3, 2 -- pier sections under the Ferris wheel
+local FOOTING = Color3.fromRGB(150, 150, 158)
 local X0, Z0 = -70, -40 -- centre of the first section
 
 local StarlightBoardwalk = {}
@@ -35,12 +37,22 @@ local function pier(model: Model)
 		for iz = 0, ROWS - 1 do
 			local c = Vector3.new(X0 + ix * 20, 0, Z0 + iz * 20)
 			local section = Builder.building(model, "PierSection")
+			-- the sections under the Ferris wheel's feet stand on unbreakable concrete
+			-- footings, so the wheel always snaps off its A-frame and rolls down the
+			-- boardwalk instead of sinking straight through the floor
+			local reinforced = iz == FERRIS_ROW and ix <= FERRIS_LAST_COLUMN
 			for _, o in { Vector3.new(8.5, 0, 8.5), Vector3.new(-8.5, 0, 8.5), Vector3.new(8.5, 0, -8.5), Vector3.new(-8.5, 0, -8.5) } do
-				local pile = Builder.cylinder(section, "Piling", c + o + Vector3.new(0, 0.75, 0), 13.5, 1.8, PILING, Enum.Material.Wood)
-				Builder.structural(pile, 1, true, 60)
+				if reinforced then
+					Builder.cylinder(section, "Footing", c + o + Vector3.new(0, 0.75, 0), 13.5, 3, FOOTING, Enum.Material.Concrete)
+				else
+					local pile = Builder.cylinder(section, "Piling", c + o + Vector3.new(0, 0.75, 0), 13.5, 1.8, PILING, Enum.Material.Wood)
+					Builder.structural(pile, 1, true, 60)
+				end
 			end
 			local deck = Builder.block(section, "Deck", c + Vector3.new(0, DECK_Y, 0), Vector3.new(20, 1, 20), if (ix + iz) % 2 == 0 then PLANK else PLANK:Lerp(Color3.new(0, 0, 0), 0.08), Enum.Material.WoodPlanks)
-			Builder.structural(deck, 2, false, 60)
+			if not reinforced then
+				Builder.structural(deck, 2, false, 60)
+			end
 			-- perimeter rails belong to their section (they fall with it)
 			local edges = {}
 			if ix == 0 then

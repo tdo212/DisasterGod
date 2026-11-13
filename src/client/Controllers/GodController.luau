@@ -1,6 +1,8 @@
 --!strict
--- GodController: the Disaster God's tactical view — orbit camera, projected
--- targeting reticle, ability hotbar with costs/cooldowns and the Chaos Energy bar.
+-- GodController: the Disaster God's tactical view — orbit camera, projected targeting
+-- reticle, the equipped kit's ability hotbar with costs/cooldowns, the Chaos Energy bar.
+-- Mouse: aim with the cursor, click to cast. Touch: the reticle sits at screen centre
+-- (drag to move the view) with a CAST button; tapping the arena casts right there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,25 +12,40 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
 local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
+local Types = require(Shared:WaitForChild("Types") :: ModuleScript)
 
 local ClientRoot = script.Parent.Parent
 local Theme = require(ClientRoot:WaitForChild("UI"):WaitForChild("Theme") :: ModuleScript)
 local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Components") :: ModuleScript)
 local OrbitCamera = require(ClientRoot:WaitForChild("Util"):WaitForChild("OrbitCamera") :: ModuleScript)
 
+type Ability = Types.AbilityDefinition
+type Slot = { Frame: TextButton, Cooldown: Frame, CooldownText: TextLabel, Icon: TextLabel, Stroke: UIStroke, Scale: UIScale }
+
 local Attributes = Config.Attributes
-local Abilities = Config.Disasters.Abilities
 local C = Theme.Colors
 local player = Players.LocalPlayer
 
 local GodController = {}
 
+local SLOT = 74
+local SLOT_GAP = 12
+
+local abilityById: { [string]: Ability } = {}
+for _, def in Config.Disasters.Abilities do
+	abilityById[def.Id] = def
+end
+
 local started = false
 local active = false
+local touch = false
 local selected = 1
+local loadout: { Ability } = {}
 local gui: ScreenGui
 local layer: Frame -- viewport-scaled root for all UI content
-local slots: { { Frame: TextButton, Cooldown: Frame, CooldownText: TextLabel, Icon: TextLabel, Stroke: UIStroke, Scale: UIScale } } = {}
+local dock: Frame
+local slotHolder: Frame
+local slots: { Slot } = {}
 local energyFill: Frame
 local energyText: TextLabel
 local lockLabel: TextLabel
@@ -37,7 +54,7 @@ local ring: Part? = nil
 local line: Part? = nil
 local beam: Part? = nil
 local castRemote = Remotes.get("CastDisaster")
-local inputConn: RBXScriptConnection? = nil
+local inputConnections: { RBXScriptConnection } = {}
 
 local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
 
@@ -47,6 +64,26 @@ end
 
 local function readyAt(id: string): number
 	return player:GetAttribute(Attributes.CooldownPrefix .. id) :: number? or 0
+end
+
+-- The five abilities of the equipped kit.
+local function currentLoadout(): { Ability }
+	local kitId = player:GetAttribute(Attributes.Kit)
+	local kit = Config.Kits[1]
+	for _, candidate in Config.Kits do
+		if candidate.Id == kitId then
+			kit = candidate
+			break
+		end
+	end
+	local list = {}
+	for _, id in kit.Abilities do
+		local def = abilityById[id]
+		if def then
+			table.insert(list, def)
+		end
+	end
+	return list
 end
 
 ---------------------------------------------------------------------------
@@ -62,44 +99,34 @@ local function select(index: number)
 	end
 end
 
-local function buildGui()
-	gui = Instance.new("ScreenGui")
-	gui.Name = "GodHUD"
-	gui.ResetOnSpawn = false
-	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.Enabled = false
-	gui.Parent = player:WaitForChild("PlayerGui")
-	layer = Components.scaledRoot(gui)
-
-	local dock = Components.panel({
-		Name = "Hotbar",
-		Size = UDim2.fromOffset(#Abilities * 86 + 20, 162),
-		Position = UDim2.new(0.5, 0, 1, -12),
-		AnchorPoint = Vector2.new(0.5, 1),
-		Color = C.Panel,
-		Transparency = 0.15,
-		Radius = Theme.Radius.Large,
-		Parent = layer,
-	})
-
-	for i, def in Abilities do
+local function buildSlots()
+	slotHolder:ClearAllChildren()
+	table.clear(slots)
+	loadout = currentLoadout()
+	local width = #loadout * (SLOT + SLOT_GAP) + SLOT_GAP + 8
+	dock.Size = UDim2.fromOffset(width, 162)
+	for i, def in loadout do
 		local slot = Instance.new("TextButton")
 		slot.Name = def.Id
 		slot.Text = ""
 		slot.AutoButtonColor = false
-		slot.Size = UDim2.fromOffset(74, 74)
-		slot.Position = UDim2.fromOffset(10 + (i - 1) * 86 + 6, 12)
+		slot.Size = UDim2.fromOffset(SLOT, SLOT)
+		slot.Position = UDim2.fromOffset(SLOT_GAP + 4 + (i - 1) * (SLOT + SLOT_GAP), 12)
 		slot.BackgroundColor3 = Color3.new(1, 1, 1)
 		Components.corner(slot, Theme.Radius.Medium)
 		local stroke = Components.stroke(slot, Theme.Stroke.Heavy)
-		Components.gradient(slot, C.PanelLight, C.Slot)
-		slot.Parent = dock
+		local tint = if def.Tier == "Major" then C.Purple else C.Blue
+		Components.gradient(slot, tint:Lerp(Color3.new(1, 1, 1), 0.25), tint:Lerp(Color3.new(0, 0, 0), 0.35), 90, true)
+		Components.studs(slot)
+		slot.Parent = slotHolder
 		local scale = Instance.new("UIScale")
 		scale.Parent = slot
 
 		local icon = Components.label({ Name = "Icon", Text = def.Icon, TextSize = 38, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = slot })
-		Components.label({ Name = "Key", Text = tostring(i), TextSize = 18, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = slot })
-		local cost = Components.label({ Name = "Cost", Text = tostring(def.Cost), TextSize = 18, Color = C.PurpleLight, Size = UDim2.fromOffset(30, 20), Position = UDim2.new(1, -4, 1, -2), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = slot })
+		if not touch then
+			Components.label({ Name = "Key", Text = tostring(i), TextSize = 18, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = slot })
+		end
+		local cost = Components.label({ Name = "Cost", Text = tostring(def.Cost), TextSize = 18, Color = C.GoldLight, Size = UDim2.fromOffset(30, 20), Position = UDim2.new(1, -4, 1, -8), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = slot })
 		cost.ZIndex = 3
 		Components.label({ Name = "Name", Text = def.DisplayName, TextSize = 15, Size = UDim2.new(1, 16, 0, 18), Position = UDim2.new(0.5, 0, 1, 4), AnchorPoint = Vector2.new(0.5, 0), Parent = slot })
 
@@ -122,23 +149,53 @@ local function buildGui()
 		end)
 		slots[i] = { Frame = slot, Cooldown = cd, CooldownText = cdText, Icon = icon, Stroke = stroke, Scale = scale }
 	end
+	select(math.clamp(selected, 1, math.max(1, #loadout)))
+end
+
+local cast: (Vector3?) -> ()
+
+local function buildGui()
+	gui = Instance.new("ScreenGui")
+	gui.Name = "GodHUD"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Enabled = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+	layer = Components.scaledRoot(gui)
+
+	dock = Components.panel({
+		Name = "Hotbar",
+		Size = UDim2.fromOffset(450, 162),
+		Position = UDim2.new(0.5, 0, 1, -10),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Color = C.Panel,
+		Transparency = 0.1,
+		Radius = Theme.Radius.Large,
+		Studs = true,
+		Parent = layer,
+	})
+	slotHolder = Instance.new("Frame")
+	slotHolder.Name = "Slots"
+	slotHolder.BackgroundTransparency = 1
+	slotHolder.Size = UDim2.fromScale(1, 1)
+	slotHolder.Parent = dock
 
 	-- Chaos Energy bar (purple, like the reference)
 	local track = Instance.new("Frame")
 	track.Name = "Energy"
 	track.Size = UDim2.new(1, -24, 0, 26)
-	track.Position = UDim2.new(0, 12, 1, -34)
+	track.Position = UDim2.new(0, 12, 1, -36)
 	track.BackgroundColor3 = C.Slot
 	track.BorderSizePixel = 0
-	Components.corner(track, Theme.Radius.Pill)
+	Components.corner(track, Theme.Radius.Small)
 	Components.stroke(track, Theme.Stroke.Thick)
 	track.Parent = dock
 	energyFill = Instance.new("Frame")
 	energyFill.Size = UDim2.fromScale(0.3, 1)
 	energyFill.BackgroundColor3 = Color3.new(1, 1, 1)
 	energyFill.BorderSizePixel = 0
-	Components.corner(energyFill, Theme.Radius.Pill)
-	Components.gradient(energyFill, C.PurpleLight, C.Purple, 0)
+	Components.corner(energyFill, Theme.Radius.Small)
+	Components.gradient(energyFill, C.PurpleLight, C.Purple, 90, true)
 	energyFill.Parent = track
 	energyText = Components.label({ Name = "Text", Text = "0% Chaos Energy", TextSize = 18, Size = UDim2.fromScale(1, 1), Parent = track })
 	energyText.ZIndex = 2
@@ -148,14 +205,16 @@ local function buildGui()
 		Text = "",
 		TextSize = 26,
 		Color = C.PurpleLight,
-		Size = UDim2.fromOffset(500, 30),
+		Size = UDim2.fromOffset(560, 30),
 		Position = UDim2.new(0.5, 0, 1, -182),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Parent = layer,
 	})
 	Components.label({
 		Name = "Hint",
-		Text = "WASD pan · Q/E rotate · Scroll zoom · Right-drag tilt · 1-5 pick · Click to unleash",
+		Text = if touch
+			then "Drag to move · Pinch to zoom · Tap the arena or press CAST"
+			else "WASD pan · Q/E rotate · Scroll zoom · Right-drag tilt · 1-5 pick · Click to unleash",
 		TextSize = 16,
 		Color = C.TextDim,
 		Size = UDim2.fromOffset(700, 20),
@@ -163,7 +222,25 @@ local function buildGui()
 		AnchorPoint = Vector2.new(0.5, 1),
 		Parent = layer,
 	})
-	select(1)
+
+	if touch then
+		-- thumb-sized cast button on the right; the reticle stays at screen centre
+		Components.button({
+			Name = "Cast",
+			Text = "⚡ CAST",
+			TextSize = 30,
+			Size = UDim2.fromOffset(170, 96),
+			Position = UDim2.new(1, -20, 1, -40),
+			AnchorPoint = Vector2.new(1, 1),
+			Color = C.Purple,
+			ColorLight = C.PurpleLight,
+			Parent = layer,
+			OnClick = function()
+				cast(nil)
+			end,
+		})
+	end
+	buildSlots()
 end
 
 ---------------------------------------------------------------------------
@@ -203,14 +280,19 @@ local function destroyReticle()
 	reticle, ring, line, beam = nil, nil, nil, nil
 end
 
+-- Mouse: under the cursor. Touch: the centre of the screen.
 local function aimPoint(): Vector3?
+	if touch then
+		local camera = workspace.CurrentCamera
+		return if camera then OrbitCamera.ScreenToWorld(camera.ViewportSize / 2) else nil
+	end
 	return OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 end
 
 local function updateReticle()
-	local def = Abilities[selected]
+	local def = loadout[selected]
 	local point = aimPoint()
-	if not (point and ring and line and beam) then
+	if not (def and point and ring and line and beam) then
 		return
 	end
 	local dir = OrbitCamera.GetLookDirection()
@@ -244,7 +326,7 @@ local function refreshHotbar()
 	energyFill.Size = UDim2.fromScale(math.clamp(e / Config.Chaos.Max, 0, 1), 1)
 	energyText.Text = string.format("%d%% Chaos Energy", math.floor(e / Config.Chaos.Max * 100))
 	local now = workspace:GetServerTimeNow()
-	for i, def in Abilities do
+	for i, def in loadout do
 		local slot = slots[i]
 		local remaining = readyAt(def.Id) - now
 		if remaining > 0 then
@@ -267,10 +349,11 @@ local function refreshHotbar()
 	end
 end
 
-local function cast()
-	local def = Abilities[selected]
-	local point = aimPoint()
-	if not point then
+-- Cast the selected ability at `at` (or wherever the reticle is aiming).
+cast = function(at: Vector3?)
+	local def = loadout[selected]
+	local point = at or aimPoint()
+	if not (def and point) then
 		return
 	end
 	if energy() < def.Cost then
@@ -289,6 +372,7 @@ local function enter()
 		return
 	end
 	active = true
+	buildSlots() -- the kit may have changed since last round
 	gui.Enabled = true
 	OrbitCamera.Enable(Config.World.ArenaCenter)
 	makeReticle()
@@ -296,20 +380,26 @@ local function enter()
 		updateReticle()
 		refreshHotbar()
 	end)
-	inputConn = UserInputService.InputBegan:Connect(function(input, processed)
+	table.insert(inputConnections, UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return
 		end
 		for i, key in KEYS do
-			if input.KeyCode == key and Abilities[i] then
+			if input.KeyCode == key and loadout[i] then
 				select(i)
 				return
 			end
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			cast()
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			cast(nil)
 		end
-	end)
+	end))
+	-- a tap (not a drag) on the arena casts exactly where the finger landed
+	table.insert(inputConnections, UserInputService.TouchTapInWorld:Connect(function(position, processed)
+		if not processed then
+			cast(OrbitCamera.ScreenToWorld(position, true))
+		end
+	end))
 end
 
 local function exit()
@@ -319,10 +409,10 @@ local function exit()
 	active = false
 	gui.Enabled = false
 	RunService:UnbindFromRenderStep("GodReticle")
-	if inputConn then
-		inputConn:Disconnect()
-		inputConn = nil
+	for _, connection in inputConnections do
+		connection:Disconnect()
 	end
+	table.clear(inputConnections)
 	destroyReticle()
 	OrbitCamera.Disable()
 end
@@ -346,8 +436,10 @@ function GodController.Start()
 		return
 	end
 	started = true
+	touch = Components.isTouch()
 	buildGui()
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(evaluate)
+	player:GetAttributeChangedSignal(Attributes.Kit):Connect(buildSlots)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(evaluate)
 	player.CharacterAdded:Connect(function()
 		task.defer(evaluate)

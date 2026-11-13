@@ -9,6 +9,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 local DestructionService = require(script.Parent.DestructionService)
 
@@ -77,6 +78,7 @@ function ScoringService.CheckNearMiss(center: Vector3, radius: number)
 			local flat = Vector3.new(hrp.Position.X - center.X, 0, hrp.Position.Z - center.Z).Magnitude
 			if flat > radius and flat <= radius + S.NearMissMargin then
 				record(player).NearMisses += 1
+				QuestService.Progress(player, "NearMiss", 1)
 				ScoringService.Award(player, S.NearMissCoins, "NEAR MISS", CYAN)
 				Remotes.get("ClientEffect"):FireClient(player, "Shake", 0.35, 0.3)
 			end
@@ -95,6 +97,8 @@ function ScoringService.OnEliminated(victim: Player)
 	local hit = lastHit[victim]
 	if hit and hit.By.Parent and os.clock() - hit.At <= S.KillCreditWindow then
 		record(hit.By).Kills += 1
+		PlayerDataService.RecordGodKill(hit.By)
+		QuestService.Progress(hit.By, "GodKill", 1)
 		ScoringService.Award(hit.By, S.GodKillCoins, "ELIMINATED " .. string.upper(victim.DisplayName), PURPLE)
 	end
 	lastHit[victim] = nil
@@ -111,6 +115,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 	local summaries: { [Player]: Types.RoundSummary } = {}
 	local lines: { [Player]: { Types.SummaryLine } } = {}
 	local survivorCount = #RoleService.GetAliveSurvivors()
+	local mapKey = ReplicatedStorage:GetAttribute(Config.Attributes.MapKey)
 
 	for _, p in participants do
 		if not p.Parent then
@@ -118,6 +123,8 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 		end
 		local r = record(p)
 		lines[p] = {}
+		PlayerDataService.RecordPlayed(p)
+		QuestService.Progress(p, "Play", 1)
 		if r.NearMisses > 0 then
 			table.insert(lines[p], { Text = string.format("Near misses x%d", r.NearMisses), Amount = r.NearMisses * S.NearMissCoins })
 		end
@@ -128,6 +135,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			if r.Kills > 0 then
 				table.insert(lines[p], { Text = string.format("Eliminations x%d", r.Kills), Amount = r.Kills * S.GodKillCoins })
 			end
+			QuestService.Progress(p, "Destroy", r.Destroyed)
 			local destruction = math.floor(r.Destroyed * S.GodDestructionCoinsPerPart)
 			if destruction > 0 then
 				destruction = PlayerDataService.EarnCoins(p, destruction)
@@ -139,6 +147,10 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			local streak = PlayerDataService.RecordRound(p, true)
 			local bonus = PlayerDataService.EarnCoins(p, S.SurvivalCoins + S.StreakBonusPerRound * math.max(0, streak - 1))
 			PlayerDataService.RecordWin(p)
+			QuestService.Progress(p, "Survive", 1)
+			if typeof(mapKey) == "string" then
+				QuestService.Progress(p, "Survive:" .. mapKey, 1)
+			end
 			r.Earned += bonus
 			table.insert(lines[p], { Text = if streak > 1 then string.format("Survived (streak %d)", streak) else "Survived", Amount = bonus })
 		else
@@ -209,6 +221,7 @@ function ScoringService.Init()
 			for _, player in inside do
 				if RoleService.IsAliveSurvivor(player) then
 					record(player).Escapes += 1
+					QuestService.Progress(player, "Escape", 1)
 					ScoringService.Award(player, S.StructuralEscapeCoins, "STRUCTURAL ESCAPE", GOLD)
 				end
 			end

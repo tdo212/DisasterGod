@@ -33,6 +33,7 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 
 ## World
 - Maps and the lobby are built **from code at runtime** (`src/server/World/*`), so geometry is version-controlled. Don't hand-build arena geometry in Studio; change the builders.
+- The one exception to code-built geometry is `Workspace.TimePlayedLeaderboard` (a third-party board model): it must stay in Workspace, and `LeaderboardService` clones it for the other lobby boards at runtime.
 - Destructible parts are marked with `Builder.structural(part, level, isSupport)`. A level collapses when its intact supports fall below `Config.Destruction.CollapseSupportFraction`.
 
 ## Configuration
@@ -49,6 +50,7 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 - Use the shared design tokens in `src/client/UI/Theme.luau` (colors, font, radii, strokes, `TweenInfo` presets) and the builders in `UI/Components.luau` (label, button, panel, window, tile) instead of ad-hoc values.
 - Set `UIListLayout.SortOrder = LayoutOrder` explicitly; the default sorts by name.
 - Each controller's ScreenGui gets `layer = Components.scaledRoot(gui)`; parent all content to `layer` (not `gui`) so the UI scales with the viewport.
+- Surfaces use the stud texture and lipped gradient from Components (`studs`, `gradient(..., lip)`); branch layout on `Components.isTouch()` for phones. Set the workspace attribute `ForceTouchUI = true` in Studio to preview the touch layout.
 
 ## Audio
 - All sound IDs and volumes live in `Config.Audio`. World/disaster sounds go through `AudioService` (server, positional); UI sounds through `UI/Sound.luau`; music and ambience through `AudioController`.

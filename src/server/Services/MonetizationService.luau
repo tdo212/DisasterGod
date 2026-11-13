@@ -1,6 +1,7 @@
 --!strict
 -- MonetizationService: developer product receipts (idempotent) and game pass perks.
---   Products: coin packs, Be the God Next Round, Survival Kit, Welcome Pack, Second Chance.
+--   Products: coin packs, Be the God Next Round, Survival Kit, Welcome Pack, Second Chance,
+--             wheel spin packs.
 --   Passes:   2x Coins, VIP, God Priority, Quick Dash (flags as Player attributes Pass_<Key>).
 -- Studio only: ServerStorage.DevPurchase (BindableFunction) runs the same grant path so the
 -- flow can be tested without real purchase prompts.
@@ -18,6 +19,7 @@ local MatchService = require(script.Parent.MatchService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RoleService = require(script.Parent.RoleService)
 local ShopService = require(script.Parent.ShopService)
+local SpinService = require(script.Parent.SpinService)
 
 local M = Config.Monetization
 local Attributes = Config.Attributes
@@ -26,7 +28,9 @@ local MonetizationService = {}
 
 local productKeyById: { [number]: string } = {}
 for key, def in M.Products do
-	productKeyById[def.Id] = key
+	if def.Id ~= 0 then
+		productKeyById[def.Id] = key
+	end
 end
 local passKeyById: { [number]: string } = {}
 for key, def in M.Passes do
@@ -122,6 +126,14 @@ grants.WelcomePack = function(player: Player)
 	PlayerDataService.MarkWelcomeClaimed(player)
 	popup:FireClient(player, "WELCOME PACK CLAIMED!", GOLD)
 end
+
+local function grantSpins(key: string): (Player) -> ()
+	return function(player: Player)
+		SpinService.AddSpins(player, M.Products[key].Spins or 1)
+	end
+end
+grants.Spin1 = grantSpins("Spin1")
+grants.Spin10 = grantSpins("Spin10")
 
 grants.Revive = function(player: Player)
 	if not MatchService.Revive(player) then

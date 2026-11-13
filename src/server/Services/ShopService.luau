@@ -1,5 +1,5 @@
 --!strict
--- ShopService: buy survival gear with coins and use it during a round.
+-- ShopService: buy survival gear and God kits with coins; use gear during a round.
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,9 +10,15 @@ local Types = require(ReplicatedStorage.Shared.Types)
 
 local DestructionService = require(script.Parent.DestructionService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 
 local ShopService = {}
+
+local kits: { [string]: Types.KitDefinition } = {}
+for _, kit in Config.Kits do
+	kits[kit.Id] = kit
+end
 
 local gear: { [string]: Types.GearDefinition } = {}
 for _, def in Config.Gear do
@@ -94,6 +100,32 @@ function ShopService.Init()
 		end
 		if PlayerDataService.ConsumeGear(player, def.Id) then
 			use(player, def)
+			QuestService.Progress(player, "Gear", 1)
+		end
+	end)
+
+	Remotes.get("KitAction").OnServerEvent:Connect(function(player, action, kitId)
+		if typeof(action) ~= "string" or typeof(kitId) ~= "string" then
+			return
+		end
+		local kit = kits[kitId]
+		if not kit then
+			return
+		end
+		if action == "Buy" then
+			if PlayerDataService.OwnsKit(player, kitId) then
+				return
+			end
+			if PlayerDataService.SpendCoins(player, kit.Price) then
+				PlayerDataService.GrantKit(player, kitId)
+				PlayerDataService.EquipKit(player, kitId)
+				popup:FireClient(player, "UNLOCKED " .. string.upper(kit.Name), kit.Color)
+				PlayerDataService.SaveNow(player)
+			else
+				popup:FireClient(player, "NOT ENOUGH COINS", Color3.fromRGB(255, 80, 80))
+			end
+		elseif action == "Equip" and PlayerDataService.EquipKit(player, kitId) then
+			popup:FireClient(player, string.upper(kit.Name) .. " EQUIPPED", kit.Color)
 		end
 	end)
 end

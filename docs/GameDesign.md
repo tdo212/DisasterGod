@@ -51,9 +51,9 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 
 ## World
 ### Sky Sanctuary (lobby)
-A floating grass island beside the arena at (0, 150, -232), low and close enough that the glass balcony overlooks the arena. It has low glass rails, telescopes aimed at the arena, rainbow paths, a winners podium with light beams (name tags appear only once there is a winner), the gear shop stall (proximity prompt), a top-8 coin leaderboard, and a 12-pad neon obby (+15 coins, 20 s cooldown) with a walkable neon ramp back down from the finish. Falling off returns you to spawn.
+A floating grass island beside the arena at (0, 150, -232), low and close enough that the glass balcony overlooks the arena. It has low glass rails, telescopes aimed at the arena, rainbow paths, a winners podium with light beams (name tags appear only once there is a winner), the gear shop stall (proximity prompt), four leaderboards along the back edge, three map vote pads in front of the balcony, game pass pedestals beside the podium, a daily quest board, a prize wheel stand, and a 12-pad neon obby (+15 coins, 20 s cooldown) with a walkable neon ramp back down from the finish. Falling off returns you to spawn.
 
-Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
+Six arenas (`Config.World.MapRotation`). Each intermission opens with a **map vote**: three candidates appear on the lobby pads, a player's vote is the last pad they stood on, and the winner is built for the rest of the countdown (ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event). Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
@@ -62,9 +62,9 @@ Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lig
 | Magma Core Station | Volcanic | Four rock quadrants split by narrow lava channels, joined by land bridges and a central hub plaza; catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; vents burn | Lava to Y 14 |
 | Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); quicksand pits slow and hurt | Sand to Y 12 |
 | Outpost Zero | Arctic | Research containers drop when their stilts snap; one large ice shelf with pressure ridges and a ramped comms plateau; breakable edge floes; **2x knockback** on slippery ice | Freezing water to Y 9 |
-| Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball; climbable coaster trestles; circus tent | Tide to Y 12 |
+| Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent | Tide to Y 12 |
 
-**Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map.
+**Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map (this also skips the vote). Set `ForceTouchUI = true` before Play to preview the touch layout with a mouse.
 
 ### Audio
 - **Music** (`Config.Audio.Music`): calm lobby track, tense round track, boss track in sudden death. `AudioController` crossfades between them.
@@ -74,11 +74,52 @@ Six arenas rotate each round (`Config.World.MapRotation`). Each sets its own lig
 - **Disasters** (`AudioService`, server): positional, replicated sounds for telegraphs, lightning and thunder, meteors, tornado loops, gusts, quakes, collapses, glass breaks and explosions.
 
 ### Destruction model
-Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel). Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris despawns after ~14 s or when it sinks.
+Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel). Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris stays solid for ~9-12 s, then stops colliding with players, shrinks and fades (so rubble can't trap anyone and late-round frame rate holds), or is removed when it sinks. A damaged building that is still standing groans as a warning.
+
+## Game feel
+- **Camera shake and impact punch:** every disaster shakes nearby cameras; building collapses shake in proportion to their size, and heavy hits add a short field-of-view punch.
+- **Ragdolls:** knockback of `Config.Ragdoll.MinKnockback` or more (gusts, tornadoes, fault lines, explosions) sends a survivor tumbling for 1.6 s before they stand back up. Dead characters stay in one piece as ragdolls.
+- **Audio cues:** each disaster has its own telegraph sound (`Config.Audio.AbilityCue`), and an air raid siren loops through Sudden Death.
+- **Hunter's Pulse:** in the last 20 s, if exactly one survivor is left and a human is God, that survivor is highlighted every 4 s so the round ends in a chase.
+
+## God kits
+The God's five-slot hotbar comes from the equipped kit (`Config.Kits`). Kits are bought with coins in the Shop's God Kits tab and can be swapped any time.
+
+| Kit | Price | Abilities |
+|---|---|---|
+| The Architect | free | Lightning, Gust, Meteors, Tornado, Fault Cleave |
+| Storm Deity | 1,500 | Lightning, Chain Bolt, Gust, Tornado, Meteors |
+| Magma Titan | 2,500 | Eruption, Meteors, Fault Cleave, Lightning, Gust |
+| Cyber Glitch | 4,000 | Glitch, Chain Bolt, Lightning, Tornado, Fault Cleave |
+
+Chain Bolt hops between the nearest survivors, Eruption leaves a burning lava pool, and Glitch flings survivors straight up. The server refuses any ability that is not in the caster's kit. The AI Director uses all eight.
+
+## Daily quests
+Three quests a day, the same for everyone: two drawn from `Config.Quests.Pool` plus "survive a round on the map of the day" (which gives the map vote a purpose). Claiming pays coins; claiming all three grants a wheel spin and extends a daily streak. Open them from the Quests tile or the lobby quest board.
+
+## Prize wheel
+Players bank spins: one to start, a free one every 10 minutes (5 for VIP, banking stops at 3), one for finishing the daily quests, and Robux packs of 1 or 10. The server rolls the weighted reward and the wheel shows the real odds on every segment.
+
+| Reward | Odds |
+|---|---|
+| God next round | 8% |
+| 1,500 coins | 12% |
+| 400 coins | 25% |
+| Survival Kit | 20% |
+| 150 coins | 35% |
+
+## Leaderboards
+The lobby boards are built from the `TimePlayedLeaderboard` model in Workspace (RenanMSV's board). That model keeps its own script and stays the Time Played board. `LeaderboardService` clones it for Top Survivors (rounds survived), Deadliest Gods (eliminations) and Longest Streaks, removes the script from each clone and fills them itself from ordered data stores on live servers. In Studio they show the players in the server instead. The model must stay in Workspace; without it the extra boards are skipped with a warning.
+
+## Onboarding
+The first time a player is the God, and the first time they are a survivor, a three-bullet role card appears once the round-start banner clears (with touch wording on phones). The Welcome Pack offer is hidden until the player has finished one round.
+
+## Mobile
+The UI is authored against a smaller canvas on touch devices so everything is larger, the menu sits top-left and the wallet top-right to keep the thumbstick clear, and the dash button sits beside the jump button at the same size. As God, drag pans the camera, pinch zooms, a two-finger twist rotates, the reticle stays at screen centre with a CAST button, and tapping the arena casts at the tap.
 
 ## Economy
 - Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
-- Coins buy gear. Profiles (coins, streaks, gear, welcome-pack flag, recent receipt IDs) persist through DataStore on live servers; Studio sessions stay in memory.
+- Coins buy gear and God kits. Profiles (coins, streaks, gear, welcome-pack flag, recent receipt IDs) persist through DataStore on live servers; Studio sessions stay in memory.
 
 ## Monetization (Robux)
 Created through Open Cloud for universe 10776039268. The IDs are in `Config.Monetization`.
@@ -92,6 +133,7 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | Survival Kit | R$35 | One of each gear item |
 | Welcome Pack | R$15 (list R$40) | +1,000 coins + Survival Kit, one-time offer card on the HUD |
 | Second Chance | R$19 | Offered for 10 s after elimination; revives you into the live round (+250 coins if the round already ended) |
+| 1 Wheel Spin / 10 Wheel Spins | R$34 / 149 | +1 / +10 prize wheel spins |
 
 **Game passes:**
 
@@ -102,6 +144,6 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | God Priority | R$299 | God Chance grows twice as fast |
 | Quick Dash | R$99 | Dash cooldown halved |
 
-**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The sidebar has a Passes shortcut. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
+**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The Shop also has a God Kits tab (coins). The menu has a Passes shortcut, and each pass has a glowing pedestal beside the Winners Podium that previews it in 3D and prompts the purchase. The prize wheel window sells the spin packs. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
 
 All numbers live in `src/shared/Config.luau`.

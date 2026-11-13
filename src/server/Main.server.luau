@@ -10,6 +10,8 @@ end
 local order = {
 	"PlayerDataService",
 	"AudioService",
+	"RagdollService",
+	"QuestService",
 	"RoleService",
 	"EnvironmentService",
 	"DestructionService",
@@ -17,6 +19,8 @@ local order = {
 	"ScoringService",
 	"DisasterService",
 	"ShopService",
+	"SpinService",
+	"VoteService",
 	"LobbyService",
 	"MatchService",
 	"MonetizationService",

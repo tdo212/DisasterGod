@@ -12,8 +12,10 @@ local player = Players.LocalPlayer
 
 local Store = {}
 
+local ROBUX_GLYPH = utf8.char(0xE002) -- the Robux icon in Roblox's built-in fonts
+
 function Store.robux(price: number): string
-	return "R$ " .. tostring(price)
+	return ROBUX_GLYPH .. " " .. tostring(price)
 end
 
 function Store.promptProduct(key: string)
