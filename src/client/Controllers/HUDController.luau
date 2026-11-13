@@ -332,7 +332,7 @@ local function buildGodChance()
 	end)
 	local function refreshGuarantee()
 		local queued = player:GetAttribute(Attributes.GodQueued) == true
-		pillText.Text = if queued then "QUEUED ✔" else "TAP · " .. Store.robux(god.Price)
+		pillText.Text = if queued then "QUEUED ✔" else (if touch then "TAP · " else "BUY · ") .. Store.robux(god.Price)
 	end
 	player:GetAttributeChangedSignal(Attributes.GodQueued):Connect(refreshGuarantee)
 	refreshGuarantee()
@@ -762,7 +762,7 @@ function HUDController.Start()
 	end)
 	Remotes.get("Banner").OnClientEvent:Connect(function(title: string, subtitle: string?, color: Color3?)
 		if typeof(title) == "string" then
-			HUDController.Banner(title, subtitle, color)
+			HUDController.Banner(Components.inputText(title), if typeof(subtitle) == "string" then Components.inputText(subtitle) else nil, color)
 		end
 	end)
 	Remotes.get("RoundSummary").OnClientEvent:Connect(function(summary)

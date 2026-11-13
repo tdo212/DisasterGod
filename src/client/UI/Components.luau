@@ -23,6 +23,17 @@ function Components.isTouch(): boolean
 	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
+-- Swap device words in server-sent hint text: {tap} -> "tap" on phones, "click" otherwise
+-- ({Tap} and {TAP} keep their case).
+function Components.inputText(text: string): string
+	local touch = Components.isTouch()
+	return (
+		text:gsub("{tap}", if touch then "tap" else "click")
+			:gsub("{Tap}", if touch then "Tap" else "Click")
+			:gsub("{TAP}", if touch then "TAP" else "CLICK")
+	)
+end
+
 function Components.corner(parent: GuiObject, radius: UDim?): UICorner
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = radius or Theme.Radius.Medium

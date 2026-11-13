@@ -273,12 +273,39 @@ local function arcade(model: Model, c: Vector3, color: Color3)
 	Builder.structural(screen, 2, false, 15)
 end
 
+-- Boardwalk pavilions on their own piles: the ground pillars run from below the deck,
+-- so a pavilion keeps standing even if the pier sections around it break.
+local function district(model: Model)
+	-- first-floor slab top sits 0.1 above the deck top (flush to walk in, no z-fighting)
+	local pile = 13
+	local seabed = DECK_Y + 0.5 + 0.1 - 1.5 - pile
+	for i, spec in {
+		{ Vector3.new(-46, seabed, -22), Color3.fromRGB(255, 120, 170), "East", 3 },
+		{ Vector3.new(12, seabed, 12), Color3.fromRGB(120, 200, 255), "West", 2 },
+		{ Vector3.new(45, seabed, 15), Color3.fromRGB(255, 210, 90), "East", 3 },
+		{ Vector3.new(-42, seabed, 50), Color3.fromRGB(150, 230, 140), "West", 2 },
+	} do
+		Builder.highrise(model, "Pavilion" .. i, spec[1], 22, 18, spec[4], 11, {
+			SlabColor = PLANK,
+			SlabMaterial = Enum.Material.WoodPlanks,
+			ColumnColor = PILING,
+			ColumnMaterial = Enum.Material.Wood,
+			WallColor = spec[2],
+			WallMaterial = Enum.Material.WoodPlanks,
+			WallTransparency = 0,
+			PillarHeight = pile,
+			OpenSide = spec[3],
+		})
+	end
+end
+
 function StarlightBoardwalk.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "StarlightBoardwalk"
 	model.Parent = parent
 
 	pier(model)
+	district(model)
 	ferrisWheel(model)
 	coaster(model)
 	circusTent(model)

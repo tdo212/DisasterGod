@@ -12,9 +12,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 12,
 		Cooldown = 2.5,
 		WarningTime = 1.5,
-		Radius = 8,
+		Radius = 10,
 		PlayerDamage = 55,
-		StructureDamage = 140,
+		StructureDamage = 170,
 	},
 	{
 		Id = "Gust",
@@ -24,9 +24,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 10,
 		Cooldown = 4,
 		WarningTime = 1.5,
-		Radius = 26,
+		Radius = 30,
 		PlayerDamage = 5,
-		StructureDamage = 35,
+		StructureDamage = 45,
 		Knockback = 85,
 	},
 	{
@@ -37,11 +37,11 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 40,
 		Cooldown = 10,
 		WarningTime = 2,
-		Radius = 24,
+		Radius = 28,
 		PlayerDamage = 45,
-		StructureDamage = 220,
-		Count = 5,
-		ImpactRadius = 10,
+		StructureDamage = 260,
+		Count = 6,
+		ImpactRadius = 12,
 	},
 	{
 		Id = "Tornado",
@@ -51,9 +51,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 55,
 		Cooldown = 16,
 		WarningTime = 2,
-		Radius = 14,
+		Radius = 17,
 		PlayerDamage = 0,
-		StructureDamage = 70, -- per second
+		StructureDamage = 90, -- per second
 		Duration = 8,
 		Speed = 16,
 		TickDamage = 8,
@@ -67,11 +67,11 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 65,
 		Cooldown = 18,
 		WarningTime = 2.5,
-		Radius = 7, -- half-width used for the reticle
+		Radius = 8, -- half-width used for the reticle
 		PlayerDamage = 40,
 		StructureDamage = 999,
-		Length = 100,
-		Width = 8,
+		Length = 120,
+		Width = 10,
 	},
 	-- kit-exclusive disasters (see Kits below)
 	{
@@ -82,9 +82,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 35,
 		Cooldown = 9,
 		WarningTime = 1.2,
-		Radius = 7,
+		Radius = 9,
 		PlayerDamage = 40,
-		StructureDamage = 120,
+		StructureDamage = 150,
 		Count = 4, -- strikes in the chain
 		Length = 45, -- max hop distance to the next target
 		Duration = 0.6, -- telegraph time of each hop
@@ -97,9 +97,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 45,
 		Cooldown = 14,
 		WarningTime = 2,
-		Radius = 12,
+		Radius = 14,
 		PlayerDamage = 30,
-		StructureDamage = 160,
+		StructureDamage = 200,
 		Knockback = 60,
 		Duration = 6, -- lava pool lifetime
 		TickDamage = 12, -- per half second in the pool
@@ -112,9 +112,9 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cost = 18,
 		Cooldown = 6,
 		WarningTime = 1.3,
-		Radius = 14,
+		Radius = 16,
 		PlayerDamage = 15,
-		StructureDamage = 90,
+		StructureDamage = 115,
 		Knockback = 70,
 	},
 }
@@ -253,7 +253,7 @@ local Config = {
 	Chaos = {
 		Max = 100,
 		StartEnergy = 25,
-		RegenPerSecond = 7,
+		RegenPerSecond = 8, -- raised with the bigger, more numerous buildings
 		SuddenDeathRegenMultiplier = 2,
 	},
 
@@ -374,7 +374,7 @@ local Config = {
 		DebrisLifetimeJitter = 3,
 		DebrisFadeTime = 2.5, -- then it ghosts through players, shrinks and fades
 		DebrisFadeScale = 0.35,
-		MaxDebris = 500,
+		MaxDebris = 600,
 		CreakCooldown = 2.5,
 		VolatileRadius = 16,
 		VolatileStructureDamage = 300,

@@ -234,12 +234,34 @@ local function oasis(model: Model)
 	end
 end
 
+-- Sandstone bazaar buildings in the open courtyard corners (kept off the quicksand pits).
+local function district(model: Model)
+	for i, spec in {
+		{ Vector3.new(-17, 0, -65), 3, "East" },
+		{ Vector3.new(-59, 0, 1), 2, "East" },
+		{ Vector3.new(-44, 0, 49), 3, "West" },
+		{ Vector3.new(9, 0, -65), 2, "West" },
+	} do
+		Builder.highrise(model, "Bazaar" .. i, spec[1], 22, 18, spec[2], 11, {
+			SlabColor = STONE_DARK,
+			SlabMaterial = Enum.Material.Sandstone,
+			ColumnColor = STONE_DARK,
+			ColumnMaterial = Enum.Material.Sandstone,
+			WallColor = STONE,
+			WallMaterial = Enum.Material.Sandstone,
+			WallTransparency = 0,
+			OpenSide = spec[3],
+		})
+	end
+end
+
 function SunscorchedMirage.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "SunscorchedMirage"
 	model.Parent = parent
 
 	canyon(model)
+	district(model)
 	pyramid(model)
 	oasis(model)
 	for i = 0, 7 do

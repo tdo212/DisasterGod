@@ -178,6 +178,34 @@ local function dockArea(model: Model)
 	end
 end
 
+-- Larger research buildings on the open shelf.
+local function district(model: Model)
+	local base: Builder.HighriseStyle = {
+		SlabColor = Color3.fromRGB(200, 205, 215),
+		SlabMaterial = Enum.Material.DiamondPlate,
+		ColumnColor = STEEL,
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = ORANGE,
+		WallMaterial = Enum.Material.Metal,
+		WallTransparency = 0,
+	}
+	local bunk = table.clone(base)
+	bunk.OpenSide = "East"
+	Builder.highrise(model, "Bunkhouse", Vector3.new(-94, SHELF_Y, 15), 22, 20, 2, 11, bunk)
+	local hangar = table.clone(base)
+	hangar.WallColor = COBALT
+	hangar.OpenSide = "West"
+	Builder.highrise(model, "Hangar", Vector3.new(-55, SHELF_Y, 48), 26, 20, 2, 13, hangar)
+	local drill = table.clone(base)
+	drill.WallColor = RED
+	drill.OpenSide = "West"
+	Builder.highrise(model, "DrillHall", Vector3.new(56, SHELF_Y, -54), 24, 20, 3, 11, drill)
+	local store = table.clone(base)
+	store.WallColor = Color3.fromRGB(235, 240, 245)
+	store.OpenSide = "East"
+	Builder.highrise(model, "ColdStore", Vector3.new(35, SHELF_Y, 57), 24, 18, 2, 11, store)
+end
+
 function OutpostZero.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "OutpostZero"
@@ -185,6 +213,7 @@ function OutpostZero.build(parent: Instance): Types.MapInfo
 
 	glacier(model)
 	floes(model)
+	district(model)
 
 	local roofs = {
 		container(model, Vector3.new(-66, 0, -20), ORANGE, "LAB-01"),

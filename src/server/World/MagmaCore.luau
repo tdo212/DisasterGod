@@ -240,8 +240,8 @@ local function industry(model: Model)
 	})
 	Builder.structural(skyBeam, 2, false)
 
-	-- SE control block (2 storeys)
-	Builder.highrise(model, "ControlBlock", Vector3.new(55, GROUND, -55), 26, 18, 2, 10, {
+	-- SE control block (3 storeys)
+	Builder.highrise(model, "ControlBlock", Vector3.new(55, GROUND, -55), 26, 18, 3, 10, {
 		SlabColor = CONCRETE,
 		SlabMaterial = Enum.Material.Concrete,
 		ColumnColor = STEEL_GRAY,
@@ -263,8 +263,8 @@ local function industry(model: Model)
 end
 
 local function refineryAndStacks(model: Model)
-	-- SW refinery block (3 storeys, open west side ladder)
-	Builder.highrise(model, "Refinery", Vector3.new(-70, GROUND, -28), 18, 14, 3, 9, {
+	-- SW refinery block (4 storeys, open west side ladder)
+	Builder.highrise(model, "Refinery", Vector3.new(-70, GROUND, -28), 18, 14, 4, 9, {
 		SlabColor = CONCRETE,
 		SlabMaterial = Enum.Material.Concrete,
 		ColumnColor = STEEL_RED,
@@ -299,12 +299,44 @@ local function refineryAndStacks(model: Model)
 	gantry:SetAttribute("Gantry", true)
 end
 
+-- Larger destructible plant buildings on the free quadrant ground.
+local function district(model: Model)
+	local industrial: Builder.HighriseStyle = {
+		SlabColor = CONCRETE,
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = STEEL_GRAY,
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = Color3.fromRGB(150, 60, 45),
+		WallMaterial = Enum.Material.CorrodedMetal,
+		WallTransparency = 0,
+	}
+	local forge = table.clone(industrial)
+	forge.OpenSide = "East"
+	Builder.highrise(model, "ForgeHall", Vector3.new(-69, GROUND, 78), 24, 20, 3, 11, forge)
+	local pump = table.clone(industrial)
+	pump.WallColor = Color3.fromRGB(230, 120, 40)
+	pump.WallMaterial = Enum.Material.Metal
+	pump.OpenSide = "West"
+	Builder.highrise(model, "PumpStation", Vector3.new(6, GROUND, -63), 24, 20, 3, 11, pump)
+	local lab = table.clone(industrial)
+	lab.WallColor = Color3.fromRGB(190, 200, 210)
+	lab.WallMaterial = Enum.Material.Glass
+	lab.WallTransparency = 0.35
+	lab.OpenSide = "East"
+	Builder.highrise(model, "AssayLab", Vector3.new(3, GROUND, 66), 24, 20, 4, 10, lab)
+	local depot = table.clone(industrial)
+	depot.WallColor = DARK
+	depot.OpenSide = "East"
+	Builder.highrise(model, "OreDepot", Vector3.new(63, GROUND, 0), 20, 20, 3, 11, depot)
+end
+
 function MagmaCore.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "MagmaCore"
 	model.Parent = parent
 
 	quadrants(model)
+	district(model)
 	hub(model)
 
 	local pads = {

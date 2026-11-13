@@ -19,17 +19,18 @@ The round ends early as soon as no survivors are left.
 ## Roles
 ### Disaster God
 - Orbit camera: WASD to pan, Q/E to rotate, scroll to zoom, right-drag to tilt. A projected reticle follows the mouse; for directional powers it shows the direction.
-- Chaos Energy: max 100, regen 7/s, doubled in Sudden Death.
+- Chaos Energy: max 100, regen 8/s, doubled in Sudden Death.
 - Hotbar (keys 1-5):
 
 | Ability | Tier | Cost | Cooldown | Telegraph | Effect |
 |---|---|---|---|---|---|
 | ⚡ Lightning | Minor | 12 | 2.5 s | 1.5 s | Precision strike, heavy damage, small radius |
 | 🌬️ Gust | Minor | 10 | 4 s | 1.5 s | Wide knockback along the camera direction; shatters glass and leaves |
-| ☄️ Meteors | Major | 40 | 10 s | 2 s | 5 staggered impacts across a 24-stud zone |
+| ☄️ Meteors | Major | 40 | 10 s | 2 s | 6 staggered impacts across a 28-stud zone |
 | 🌪️ Tornado | Major | 55 | 16 s | 2 s | 8 s funnel that chases the nearest survivor, shreds structures and swirls debris |
-| 💥 Fault Cleave | Major | 65 | 18 s | 2.5 s | 100-stud fault line through bedrock that shears every support on the line |
+| 💥 Fault Cleave | Major | 65 | 18 s | 2.5 s | 120-stud, 10-wide fault line through bedrock that shears every support on the line |
 
+- Ability areas and structure damage are tuned for the bigger, more numerous buildings (about +15-25% over launch), while player damage is unchanged so survivors aren't hit harder. Destructible parts per map rose from 182-589 to 330-789 (Fracture Bay 393 to 623); in testing a Meteor plus a Lightning knocked a quarter of the parts off the 4-storey Bay Hotel.
 - Anti-camp radar: a survivor who stays within 6 studs for 8 s gets pinged. They're highlighted, a ripple shows their position, and the God is notified.
 - Rewards: coins per elimination and per part destroyed.
 
@@ -63,12 +64,12 @@ Six arenas (`Config.World.MapRotation`). Each intermission opens with a **map vo
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
-| Fracture Bay | Sunny beach | Sand bars connect both shores across the channel; glass resort on exposed pillars pancakes down; suspension bridge; lighthouse; harbor office, beach huts, water tower and lifeguard tower | Water to Y 20 |
-| Neo-Shibuya Skyline | Neon night | Four towers on a walkable street grid, each with a long ramp to its roof; glass skybridges link the rooftops; hologram billboards topple; kiosks, cars and vending machines for cover | Toxic smog to Y 16 |
-| Magma Core Station | Volcanic | Four rock quadrants split by narrow lava channels, joined by land bridges and a central hub plaza; catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; vents burn | Lava to Y 14 |
-| Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); quicksand pits slow and hurt | Sand to Y 12 |
-| Outpost Zero | Arctic | Research containers drop when their stilts snap; one large ice shelf with pressure ridges and a ramped comms plateau; breakable edge floes; **2x knockback** on slippery ice | Freezing water to Y 9 |
-| Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent | Tide to Y 12 |
+| Fracture Bay | Sunny beach | Sand bars connect both shores across the channel; glass resort on exposed pillars pancakes down; suspension bridge; lighthouse; 4-storey bay hotel on the sand bar, surf club, fish market, cliff-top villa, 4-storey harbor office, 3-storey cafe, beach huts, water tower and lifeguard tower | Water to Y 20 |
+| Neo-Shibuya Skyline | Neon night | Four towers on a walkable street grid, each with a long ramp to its roof; glass skybridges link the rooftops; hologram billboards topple; four 4-storey destructible neon shophouses on the outer streets (the towers themselves are solid); kiosks, cars and vending machines for cover | Toxic smog to Y 16 |
+| Magma Core Station | Volcanic | Four rock quadrants split by narrow lava channels, joined by land bridges and a central hub plaza; catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; 3-storey control block, 4-storey refinery, forge hall, pump station, 4-storey assay lab and ore depot; vents burn | Lava to Y 14 |
+| Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); sandstone bazaar buildings (2-3 storeys) in the courtyard corners; quicksand pits slow and hurt | Sand to Y 12 |
+| Outpost Zero | Arctic | Research containers drop when their stilts snap; one large ice shelf with pressure ridges and a ramped comms plateau; bunkhouse, hangar, 3-storey drill hall and cold store; breakable edge floes; **2x knockback** on slippery ice | Freezing water to Y 9 |
+| Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent; four 2-3 storey pavilions on their own piles, so they stay up when the pier around them breaks | Tide to Y 12 |
 
 **Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map (this also skips the vote). Set `ForceTouchUI = true` before Play to preview the touch layout with a mouse.
 
@@ -122,6 +123,8 @@ The first time a player is the God, and the first time they are a survivor, a th
 
 ## Mobile
 The UI is authored against a smaller canvas on touch devices so everything is larger, the menu sits top-left and the wallet top-right to keep the thumbstick clear, and the dash button sits beside the jump button at the same size. As God, drag pans the camera, pinch zooms, a two-finger twist rotates, the reticle stays at screen centre with a CAST button, and tapping the arena casts at the tap.
+
+Every control hint matches the device: role cards, the God and spectate hints, the dash button (`DASH` vs `DASH [Q]`), gear hotbar keys (hidden on touch) and the shop's gear text. Server banners write `{tap}` / `{Tap}` / `{TAP}` and the client swaps in tap or click (`Components.inputText`).
 
 ## Economy
 - Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.

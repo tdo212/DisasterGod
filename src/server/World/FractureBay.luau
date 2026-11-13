@@ -102,7 +102,7 @@ local function resort(model: Model)
 	)
 
 	-- small beach cafe on the east beach
-	Builder.highrise(model, "BayCafe", Vector3.new(110, G, -45), 22, 16, 2, 10, {
+	Builder.highrise(model, "BayCafe", Vector3.new(110, G, -45), 22, 16, 3, 10, {
 		SlabColor = Color3.fromRGB(255, 240, 220),
 		SlabMaterial = Enum.Material.WoodPlanks,
 		ColumnColor = Color3.fromRGB(255, 120, 90),
@@ -227,8 +227,8 @@ local function docks(model: Model)
 end
 
 local function townBuildings(model: Model)
-	-- harbor office (3 storeys) on the east beach
-	Builder.highrise(model, "HarborOffice", Vector3.new(128, G, -5), 20, 16, 3, 10, {
+	-- harbor office (4 storeys) on the east beach
+	Builder.highrise(model, "HarborOffice", Vector3.new(128, G, -5), 20, 16, 4, 10, {
 		SlabColor = Color3.fromRGB(230, 230, 235),
 		SlabMaterial = Enum.Material.Concrete,
 		ColumnColor = Color3.fromRGB(70, 110, 170),
@@ -278,7 +278,7 @@ local function decor(model: Model)
 		Vector3.new(-40, G, -60),
 		Vector3.new(-50, G, 50),
 		Vector3.new(55, G, -60),
-		Vector3.new(125, G, -10),
+		Vector3.new(125, G, -22), -- clear of the harbor office
 		Vector3.new(130, G, 75),
 		Vector3.new(60, 24.4, 50),
 		Vector3.new(100, 24.4, 10),
@@ -295,12 +295,57 @@ local function decor(model: Model)
 	end
 end
 
+-- Larger destructible buildings on the open sand and the east cliff top.
+local function district(model: Model)
+	Builder.highrise(model, "SurfClub", Vector3.new(-76, G, 11), 24, 20, 3, 11, {
+		SlabColor = Color3.fromRGB(250, 240, 225),
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = Color3.fromRGB(255, 130, 110),
+		ColumnMaterial = Enum.Material.Brick,
+		WallColor = Color3.fromRGB(255, 190, 150),
+		WallMaterial = Enum.Material.Brick,
+		WallTransparency = 0,
+		OpenSide = "East",
+	})
+	Builder.highrise(model, "BayHotel", Vector3.new(-1, G, -43), 26, 20, 4, 11, {
+		SlabColor = Color3.fromRGB(235, 235, 240),
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = Color3.fromRGB(80, 150, 200),
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = Color3.fromRGB(140, 215, 255),
+		WallMaterial = Enum.Material.Glass,
+		WallTransparency = 0.4,
+		OpenSide = "West",
+	})
+	Builder.highrise(model, "FishMarket", Vector3.new(56, G, -34), 24, 20, 3, 11, {
+		SlabColor = Color3.fromRGB(245, 235, 210),
+		SlabMaterial = Enum.Material.WoodPlanks,
+		ColumnColor = WOOD,
+		ColumnMaterial = Enum.Material.Wood,
+		WallColor = Color3.fromRGB(120, 200, 230),
+		WallMaterial = Enum.Material.WoodPlanks,
+		WallTransparency = 0,
+		OpenSide = "East",
+	})
+	Builder.highrise(model, "CliffVilla", Vector3.new(77, 24, 11), 22, 18, 2, 11, {
+		SlabColor = WHITE,
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = WHITE,
+		ColumnMaterial = Enum.Material.Concrete,
+		WallColor = Color3.fromRGB(250, 245, 235),
+		WallMaterial = Enum.Material.Plaster,
+		WallTransparency = 0,
+		OpenSide = "West",
+	})
+end
+
 function FractureBay.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "FractureBay"
 	model.Parent = parent
 
 	terrain(model)
+	district(model)
 	resort(model)
 	lighthouse(model)
 	bridge(model)

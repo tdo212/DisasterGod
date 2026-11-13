@@ -216,12 +216,37 @@ local function streetProps(model: Model)
 	end
 end
 
+-- Neon shophouses on the outer streets: destructible, unlike the four solid towers.
+local function district(model: Model)
+	for i, spec in {
+		{ Vector3.new(-72, STREET, 36), PINK, "West" },
+		{ Vector3.new(36, STREET, 78), CYAN, "East" },
+		{ Vector3.new(72, STREET, -36), LIME, "West" },
+		{ Vector3.new(-42, STREET, -78), PURPLE, "East" },
+	} do
+		local house, roofY = Builder.highrise(model, "Shophouse" .. i, spec[1], 24, 20, 4, 10, {
+			SlabColor = ROOF,
+			SlabMaterial = Enum.Material.Metal,
+			ColumnColor = METAL,
+			ColumnMaterial = Enum.Material.Metal,
+			WallColor = spec[2]:Lerp(Color3.new(0, 0, 0), 0.55),
+			WallMaterial = Enum.Material.Glass,
+			WallTransparency = 0.25,
+			OpenSide = spec[3],
+		})
+		-- neon trim along the front roof edge (falls with the roof)
+		local trim = Builder.neon(house, Vector3.new(spec[1].X, roofY + 0.3, spec[1].Z - 10), Vector3.new(24, 0.6, 0.6), spec[2])
+		Builder.structural(trim, 5, false, 30)
+	end
+end
+
 function NeoShibuya.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "NeoShibuya"
 	model.Parent = parent
 
 	streets(model)
+	district(model)
 	for i, t in TOWERS do
 		tower(model, t, i)
 		rooftop(model, t, i)

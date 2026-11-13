@@ -180,7 +180,8 @@ local function buildGearPage(content: Frame)
 		})
 		local function refresh()
 			local n = player:GetAttribute(Attributes.GearPrefix .. def.Id) :: number? or 0
-			sub.Text = string.format("%s\nOwned x%d · Key %s", def.Description, n, def.Key)
+			local use = if Components.isTouch() then "tap it on your hotbar" else "Key " .. def.Key
+			sub.Text = string.format("%s\nOwned x%d · %s", def.Description, n, use)
 		end
 		player:GetAttributeChangedSignal(Attributes.GearPrefix .. def.Id):Connect(refresh)
 		refresh()

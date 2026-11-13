@@ -45,7 +45,7 @@ local survivorsAssigned = false
 local started = false
 local siren: Sound? = nil
 
-local GOD_HINT = "Pick a disaster, then click or tap the arena to unleash it"
+local GOD_HINT = "Pick a disaster, then {tap} the arena to unleash it" -- {tap} is swapped per device on the client
 
 local phaseChanged = Instance.new("BindableEvent")
 MatchService.PhaseChanged = phaseChanged.Event -- (phase, duration)

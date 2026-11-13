@@ -252,7 +252,9 @@ local function buildGui()
 		Components.gradient(b, def.Color:Lerp(Color3.new(1, 1, 1), 0.35), def.Color)
 		b.Parent = gearBar
 		Components.label({ Name = "Icon", Text = def.Icon, TextSize = 34, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = b })
-		Components.label({ Name = "Key", Text = def.Key, TextSize = 16, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = b })
+		if not Components.isTouch() then
+			Components.label({ Name = "Key", Text = def.Key, TextSize = 16, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = b })
+		end
 		local count = Components.label({ Name = "Count", Text = "x0", TextSize = 18, Size = UDim2.fromOffset(40, 20), Position = UDim2.new(1, -4, 1, -2), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = b })
 		local function refresh()
 			local n = player:GetAttribute(Attributes.GearPrefix .. def.Id) :: number? or 0
