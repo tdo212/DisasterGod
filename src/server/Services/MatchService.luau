@@ -20,6 +20,7 @@ local LeaderboardService = require(script.Parent.LeaderboardService)
 local LobbyService = require(script.Parent.LobbyService)
 local MapService = require(script.Parent.MapService)
 local PropService = require(script.Parent.PropService)
+local ShowdownService = require(script.Parent.ShowdownService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RagdollService = require(script.Parent.RagdollService)
 local RoleService = require(script.Parent.RoleService)
@@ -45,6 +46,7 @@ local participants: { [Player]: boolean } = {}
 local survivorsAssigned = false
 local started = false
 local siren: Sound? = nil
+local finalKill = false -- the last survivor just died: hold the round end for the camera
 
 local GOD_HINT = "Pick a disaster, then {tap} the arena to unleash it" -- {tap} is swapped per device on the client
 
@@ -153,7 +155,17 @@ end
 
 local function onDied(player: Player)
 	if RoleService.MarkEliminated(player) then
-		ScoringService.OnEliminated(player)
+		-- the round's last survivor: everyone's camera plays the final-kill moment
+		local final = state.Phase == "Active" and survivorsAssigned and #RoleService.GetAliveSurvivors() == 0
+		ScoringService.OnEliminated(player, final)
+		if final then
+			finalKill = true
+			local character = player.Character
+			local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if hrp then
+				Remotes.get("ClientEffect"):FireAllClients("FinalKill", hrp.Position, Config.Feed.FinalKillHold)
+			end
+		end
 		updateAlive()
 		banner:FireClient(player, "ELIMINATED", "Watch from the Sky Lodge deck, run the obby, or Spectate & haunt!", RED)
 	end
@@ -264,7 +276,8 @@ local function hazardStep(dt: number)
 		local floor = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), footParams)
 		local zone = floor and floor.Instance
 		local dps = zone and zone:GetAttribute("HazardDPS")
-		if typeof(dps) == "number" then
+		if typeof(dps) == "number" and zone then
+			ScoringService.NoteHit(player, nil, zone.Name)
 			humanoid:TakeDamage(dps * dt)
 		end
 		local slow = zone and zone:GetAttribute("HazardWalkSpeed")
@@ -272,10 +285,13 @@ local function hazardStep(dt: number)
 
 		local y = hrp.Position.Y
 		if y < Config.Player.KillPlaneY then
+			ScoringService.NoteHit(player, nil, "Void")
 			humanoid.Health = 0
 		elseif fluidTop and y < fluidTop - 1 then
+			ScoringService.NoteHit(player, nil, "Fluid:" .. (if info then info.FluidName else "WATER"))
 			humanoid:TakeDamage(Config.SuddenDeath.FluidDamagePerSecond * dt)
 		elseif info and info.HazardFloorY and y < info.HazardFloorY then
+			ScoringService.NoteHit(player, nil, "HazardFloor")
 			humanoid:TakeDamage(Config.Player.HazardFloorDamagePerSecond * dt)
 		end
 	end
@@ -345,6 +361,8 @@ end
 
 local function active(god: Player?)
 	ScoringService.ResetRound()
+	ShowdownService.Reset()
+	finalKill = false
 	DisasterService.BeginRound(god)
 	ShopService.SetRoundActive(true)
 	PropService.SetRoundActive(true)
@@ -380,10 +398,17 @@ local function active(god: Player?)
 			break -- everyone is out: skip straight to the podium
 		end
 		DisasterService.SetHunterPulse(aliveCount == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
+		ShowdownService.Update(RoleService.GetAliveSurvivors(), state.TimeRemaining)
 	end
 end
 
 local function roundEnd(mapName: string)
+	if finalKill then
+		-- let the final-kill camera play before everyone is pulled back to the lodge
+		task.wait(Config.Feed.FinalKillHold)
+		finalKill = false
+	end
+	ShowdownService.Reset()
 	local god = RoleService.GetGod()
 	DisasterService.EndRound()
 	ShopService.SetRoundActive(false)

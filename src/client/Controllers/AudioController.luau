@@ -86,7 +86,9 @@ local function evaluate()
 	local ambience = channel("Ambience", A.Volume.Ambience)
 	local layer = channel("AmbienceLayer", A.Volume.Ambience * 0.6)
 	if inArena() then
-		local sudden = ReplicatedStorage:GetAttribute(Attributes.SubPhase) == "SuddenDeath"
+		-- the boss track for Sudden Death and for a Last Stand showdown
+		local lastStand = ReplicatedStorage:GetAttribute(Attributes.LastStand)
+		local sudden = ReplicatedStorage:GetAttribute(Attributes.SubPhase) == "SuddenDeath" or (typeof(lastStand) == "string" and lastStand ~= "")
 		crossfade(music, if sudden then A.Music.SuddenDeath else A.Music.Round)
 		local key = ReplicatedStorage:GetAttribute(Attributes.MapKey)
 		local mapKey = if typeof(key) == "string" then key else ""
@@ -139,6 +141,7 @@ function AudioController.Start()
 		previousPhase = phase
 		evaluate()
 	end)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.LastStand):Connect(evaluate)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.SubPhase):Connect(function()
 		if ReplicatedStorage:GetAttribute(Attributes.SubPhase) == "SuddenDeath" then
 			local s = Instance.new("Sound")

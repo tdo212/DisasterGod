@@ -72,6 +72,9 @@ local function dash()
 	if player:GetAttribute(Attributes.PassPrefix .. "QuickDash") == true then
 		cooldown *= Config.Monetization.QuickDashCooldownMultiplier
 	end
+	if player:GetAttribute(Attributes.LastStander) == true then
+		cooldown *= Config.Showdown.DashCooldownScale -- Last Stand: dash recharges twice as fast
+	end
 	dashReadyAt = now + cooldown
 	local dir = humanoid.MoveDirection
 	if dir.Magnitude < 0.1 then

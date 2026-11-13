@@ -19,6 +19,8 @@ local order = {
 	"ScoringService",
 	"StealthService",
 	"ComboService",
+	"ShowdownService",
+	"EmoteService",
 	"DisasterService",
 	"PropService",
 	"ShopService",

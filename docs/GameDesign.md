@@ -107,6 +107,12 @@ Every destructible part has health (from its material), a level, and a support f
 - **Audio cues:** each disaster has its own telegraph sound (`Config.Audio.AbilityCue`), and an air raid siren loops through Sudden Death.
 - **Hunter's Pulse:** in the last 20 s, if exactly one survivor is left and a human is God, that survivor is highlighted every 4 s so the round ends in a chase.
 
+## Showdowns, taunts and the kill feed
+- **Last Stand** (`Config.Showdown`, ShowdownService): when a round that had 2+ survivors is down to one with at least 15 s left, everyone gets a LAST STAND banner and feed line, a heartbeat loops and the music switches to the boss track. The God sees a 40-stud zone around the survivor (offset up to 22 studs, refreshed every 5 s), and the survivor's dash recharges twice as fast and near misses pay double.
+- **Daredevil taunts** (`Config.Emotes`, EmoteService / EmoteController): a 😜 button above DASH (T on keyboard) opens Wave, Whistle, Scream and Dance (8 s cooldown, a bubble over your head, and noise). Emoting while HIDDEN is a Daredevil taunt: the God sees your silhouette for 1.5 s and gets a callout, and every coin you earn for 10 s is multiplied by 1.5. The button turns 😈 while you're hidden.
+- **Kill feed** (`Config.Feed`, FeedController): eliminations name what got you. "Flattened by Bay Hotel" if a building collapsed on you in the last 4 s, otherwise the last hit within 6 s ("was crushed by Meteors", "was electrocuted", "was swallowed by the rising lava", "fell into the void"...). Clutch callouts: "escaped Meteors by 2 studs!" for near misses within 3 studs, and "escaped the collapsing Fish Market!".
+- **Final kill:** the round's last elimination is posted as FINAL KILL, and every camera glides in on it with a desaturated grade and narrowed FOV for 2.4 s before everyone returns to the lodge.
+
 ## God kits
 The God's five-slot hotbar comes from the equipped kit (`Config.Kits`). Kits are bought with coins in the Shop's God Kits tab and can be swapped any time.
 

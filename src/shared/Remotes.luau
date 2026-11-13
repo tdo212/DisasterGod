@@ -20,6 +20,8 @@ local NAMES = {
 	"QuestClaim", -- C->S (questId)
 	"TutorialSeen", -- C->S (kind)
 	"Rubble", -- S->C ({ { CFrame, Size, Color, Material, Transparency, Velocity } }) cosmetic debris, batched per frame
+	"Emote", -- C->S (emoteId) taunt wheel
+	"Feed", -- S->C (text, color) kill feed / clutch callouts
 }
 
 local Remotes = {}

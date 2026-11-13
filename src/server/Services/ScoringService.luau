@@ -1,5 +1,6 @@
 --!strict
--- ScoringService: round records, close-call rewards, kill credit and round-end payouts.
+-- ScoringService: round records, close-call rewards, kill credit, the kill feed (with
+-- physics-aware causes and clutch callouts) and round-end payouts.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,12 +15,19 @@ local RoleService = require(script.Parent.RoleService)
 local DestructionService = require(script.Parent.DestructionService)
 
 local S = Config.Scoring
+local F = Config.Feed
+local Attributes = Config.Attributes
 
 local ScoringService = {}
 
 local records: { [Player]: Types.RoundRecord } = {}
 local lastHit: { [Player]: { By: Player, At: number } } = {}
+local lastCause: { [Player]: { Cause: string, At: number } } = {}
+local lastCrush: { [Player]: { Name: string, At: number } } = {}
+local lastClutch: { [Player]: number } = {}
 local popup = Remotes.get("Popup")
+local feed = Remotes.get("Feed")
+local RED = Color3.fromRGB(255, 90, 90)
 
 local GOLD = Color3.fromRGB(255, 210, 60)
 local CYAN = Color3.fromRGB(90, 230, 255)
@@ -47,8 +55,19 @@ local function hrpOf(player: Player): BasePart?
 	return if character then character:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 end
 
--- Pay coins and show a floating score tick.
+-- "BayHotel" / "Shophouse2" -> "Bay Hotel" / "Shophouse"
+local function prettyName(name: string): string
+	local base = name:gsub("%d+$", "")
+	return (base:gsub("(%l)(%u)", "%1 %2"))
+end
+
+-- Pay coins and show a floating score tick. Daredevil taunts multiply survivor awards.
 function ScoringService.Award(player: Player, amount: number, text: string, color: Color3?)
+	local bonusEnds = player:GetAttribute(Attributes.DaredevilUntil)
+	if typeof(bonusEnds) == "number" and bonusEnds > workspace:GetServerTimeNow() then
+		amount = math.floor(amount * Config.Emotes.DaredevilMultiplier)
+		text ..= " 😈"
+	end
 	local paid = PlayerDataService.EarnCoins(player, amount)
 	record(player).Earned += paid
 	popup:FireClient(player, string.format("%s +%d", text, paid), color or GOLD)
@@ -61,6 +80,9 @@ end
 function ScoringService.ResetRound()
 	table.clear(records)
 	table.clear(lastHit)
+	table.clear(lastCause)
+	table.clear(lastCrush)
+	table.clear(lastClutch)
 	for _, p in Players:GetPlayers() do
 		record(p)
 	end
@@ -71,7 +93,8 @@ function ScoringService.GetRecord(player: Player): Types.RoundRecord
 end
 
 -- Survivors who were just outside a blast radius get a near-miss reward.
-function ScoringService.CheckNearMiss(center: Vector3, radius: number, _cause: string?)
+-- `cause` (the disaster's name) turns very close calls into a kill-feed callout.
+function ScoringService.CheckNearMiss(center: Vector3, radius: number, cause: string?)
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpOf(player)
 		if hrp then
@@ -79,21 +102,57 @@ function ScoringService.CheckNearMiss(center: Vector3, radius: number, _cause: s
 			if flat > radius and flat <= radius + S.NearMissMargin then
 				record(player).NearMisses += 1
 				QuestService.Progress(player, "NearMiss", 1)
-				ScoringService.Award(player, S.NearMissCoins, "NEAR MISS", CYAN)
+				local mult = if player:GetAttribute(Attributes.LastStander) == true then Config.Showdown.NearMissMultiplier else 1
+				ScoringService.Award(player, S.NearMissCoins * mult, if mult > 1 then "LAST STAND NEAR MISS" else "NEAR MISS", CYAN)
 				Remotes.get("ClientEffect"):FireClient(player, "Shake", 0.35, 0.3)
+				local margin = flat - radius
+				local now = os.clock()
+				if cause and margin <= F.ClutchMargin and (lastClutch[player] or 0) + F.ClutchCooldown <= now then
+					lastClutch[player] = now
+					feed:FireAllClients(string.format("💨 %s escaped %s by %d stud%s!", player.DisplayName, cause, math.max(1, math.round(margin)), if math.round(margin) <= 1 then "" else "s"), CYAN)
+				end
 			end
 		end
 	end
 end
 
-function ScoringService.NoteHit(victim: Player, by: Player?, _cause: string?)
+-- Record who (God credit) and what (kill-feed cause) last hurt `victim`.
+function ScoringService.NoteHit(victim: Player, by: Player?, cause: string?)
+	if cause then
+		lastCause[victim] = { Cause = cause, At = os.clock() }
+	end
 	if by and by ~= victim then
 		lastHit[victim] = { By = by, At = os.clock() }
 	end
 end
 
--- Called when a survivor is eliminated: credits the God if they caused it.
-function ScoringService.OnEliminated(victim: Player)
+-- "PlayerA was flattened by Bay Hotel", "PlayerB was struck by Lightning", ...
+local function deathLine(victim: Player): string
+	local now = os.clock()
+	local crush = lastCrush[victim]
+	if crush and now - crush.At <= F.CrushWindow then
+		return string.format("%s was flattened by %s", victim.DisplayName, crush.Name)
+	end
+	local cause = lastCause[victim]
+	if cause and now - cause.At <= F.CauseWindow then
+		local phrase = F.Phrases[cause.Cause]
+		if phrase then
+			return victim.DisplayName .. " " .. phrase
+		end
+		if cause.Cause:sub(1, 6) == "Fluid:" then
+			return string.format("%s was swallowed by the rising %s", victim.DisplayName, string.lower(cause.Cause:sub(7)))
+		end
+		return string.format("%s was taken out by %s", victim.DisplayName, cause.Cause)
+	end
+	return victim.DisplayName .. " was eliminated"
+end
+
+-- Called when a survivor is eliminated: credits the God if they caused it and posts the
+-- kill-feed line. `final` marks the round's last elimination.
+function ScoringService.OnEliminated(victim: Player, final: boolean?)
+	feed:FireAllClients((if final then "💀 FINAL KILL: " else "☠️ ") .. deathLine(victim), RED)
+	lastCause[victim] = nil
+	lastCrush[victim] = nil
 	local hit = lastHit[victim]
 	if hit and hit.By.Parent and os.clock() - hit.At <= S.KillCreditWindow then
 		record(hit.By).Kills += 1
@@ -202,15 +261,17 @@ end
 
 function ScoringService.Init()
 	-- Structural escape: survivors inside a collapsing building who live through it.
-	DestructionService.Collapsed:Connect(function(_building: Model, center: Vector3, size: Vector3)
+	DestructionService.Collapsed:Connect(function(building: Model, center: Vector3, size: Vector3)
 		local half = size / 2 + Vector3.new(4, 4, 4)
 		local inside = {}
+		local name = prettyName(building.Name)
 		for _, player in RoleService.GetAliveSurvivors() do
 			local hrp = hrpOf(player)
 			if hrp then
 				local d = hrp.Position - center
 				if math.abs(d.X) <= half.X and math.abs(d.Y) <= half.Y and math.abs(d.Z) <= half.Z then
 					table.insert(inside, player)
+					lastCrush[player] = { Name = name, At = os.clock() }
 				end
 			end
 		end
@@ -223,6 +284,7 @@ function ScoringService.Init()
 					record(player).Escapes += 1
 					QuestService.Progress(player, "Escape", 1)
 					ScoringService.Award(player, S.StructuralEscapeCoins, "STRUCTURAL ESCAPE", GOLD)
+					feed:FireAllClients(string.format("🏃 %s escaped the collapsing %s!", player.DisplayName, name), GOLD)
 				end
 			end
 		end)

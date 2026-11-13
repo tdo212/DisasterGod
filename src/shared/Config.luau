@@ -327,6 +327,61 @@ local Config = {
 		PuddleSources = { "WaterTower", "PipeGantry" } :: { string },
 	},
 
+	-- Last Stand: the final survivor of a round that started with 2+ gets a showdown.
+	Showdown = {
+		MinSecondsLeft = 15, -- only triggers with at least this much of the round left
+		ZoneInterval = 5, -- the God is shown the survivor's general zone this often
+		ZoneRadius = 40,
+		ZoneJitter = 22, -- the zone centre is offset up to this far from the survivor
+		DashCooldownScale = 0.5, -- dash recharges twice as fast
+		NearMissMultiplier = 2,
+		HeartbeatVolume = 0.7,
+	},
+
+	-- Daredevil taunts: emoting while Hidden pings you to the God for a coin multiplier.
+	Emotes = {
+		Cooldown = 8,
+		BubbleSeconds = 2.5,
+		DaredevilSeconds = 10,
+		DaredevilMultiplier = 1.5, -- on every coin award during the window
+		RevealSeconds = 1.5, -- the God sees a daredevil's silhouette this long
+		List = {
+			{ Id = "Wave", Icon = "👋", Label = "Wave", Emote = "wave" },
+			{ Id = "Whistle", Icon = "😗", Label = "Whistle", Emote = "point", Sound = "Whistle" },
+			{ Id = "Scream", Icon = "😱", Label = "Scream", Sound = "Scream" },
+			{ Id = "Dance", Icon = "🕺", Label = "Dance", Emote = "dance2" },
+		} :: { { Id: string, Icon: string, Label: string, Emote: string?, Sound: string? } },
+	},
+
+	-- Kill feed and clutch callouts.
+	Feed = {
+		MaxLines = 5,
+		LineSeconds = 6,
+		CauseWindow = 6, -- a hit this recent names the cause of death
+		CrushWindow = 4, -- dying this soon after a building collapsed on you = flattened
+		ClutchMargin = 3, -- near misses within this many studs are announced
+		ClutchCooldown = 4, -- per player
+		FinalKillHold = 2.4, -- seconds the final-kill camera plays before the round ends
+		Phrases = {
+			Lightning = "was struck by Lightning",
+			["Chain Bolt"] = "was fried by a Chain Bolt",
+			Gust = "was blown away",
+			Meteors = "was crushed by Meteors",
+			Tornado = "was swept up by a Tornado",
+			["Fault Cleave"] = "fell into the Fault Cleave",
+			Eruption = "was launched by an Eruption",
+			Lava = "melted in the lava",
+			Glitch = "was glitched out of existence",
+			Firenado = "was torched by a Firenado",
+			["Conducted Lightning"] = "was electrocuted",
+			["Electrified Water"] = "was electrocuted in the water",
+			Explosion = "was blown up",
+			Void = "fell into the void",
+			Quicksand = "sank in the quicksand",
+			HazardFloor = "touched the burning floor",
+		} :: { [string]: string },
+	},
+
 	AntiCamp = {
 		CheckInterval = 1,
 		StationaryTime = 8,
@@ -548,6 +603,9 @@ local Config = {
 			SuddenDeathAlarm = 125227661736774,
 			Siren = 9113073742, -- air raid siren (PSE)
 			Creak = 9116638731, -- metal groans (PSE)
+			Heartbeat = 9043365842, -- "HEARTBEAT 02 96BPM" (APM), Last Stand loop
+			Whistle = 9120675895, -- "Whistle Calling 4" (PSE), taunt
+			Scream = 9125652432, -- "Male Scream Short Yelling Bursts" (PSE), taunt
 		} :: { [string]: number },
 		-- distinct telegraph cue per disaster so survivors can react by ear
 		AbilityCue = {
@@ -648,6 +706,9 @@ local Config = {
 		VoteOpen = "VoteOpen", -- ReplicatedStorage: map vote in progress
 		Slowed = "Slowed", -- Player: standing in quicksand
 		Hidden = "Hidden", -- Player: hidden from the God (still indoors, or jammed)
+		LastStand = "LastStand", -- ReplicatedStorage: display name of the last survivor ("" = none)
+		LastStander = "LastStander", -- Player: is the Last Stand survivor (dash + near-miss buffs)
+		DaredevilUntil = "DaredevilUntil", -- Player: server time the taunt coin bonus ends
 	},
 }
 
