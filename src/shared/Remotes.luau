@@ -24,6 +24,7 @@ local NAMES = {
 	"Feed", -- S->C (text, color) kill feed / clutch callouts
 	"CosmeticAction", -- C->S ("Buy" | "Equip", cosmeticId) coin cosmetics + equipping
 	"GodAim", -- C->S (Vector3) the God's reticle, throttled, drives the sky skin
+	"MapVote", -- C->S (candidateIndex) intermission map vote
 }
 
 local Remotes = {}

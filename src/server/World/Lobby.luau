@@ -2,7 +2,7 @@
 -- Sky Lodge: a big timber great hall floating beside the arena. Inside: the Hall of
 -- Legends podium (all-time records) under the title wall, four leaderboards along the
 -- back wall, the gear shop, a fireside lounge, game pass pedestals, the quest board,
--- the prize wheel, map vote pads and the Neon Climb obby up the east wall to a loft.
+-- the prize wheel and the Neon Climb obby up the east wall to a loft.
 -- The front opens onto a glass-floored observation deck that looks down on the arena.
 -- Also builds the Disaster God's cloud perch.
 --
@@ -59,7 +59,6 @@ export type LobbyInfo = {
 	Model: Model,
 	Spawn: SpawnLocation,
 	HallSpots: { CFrame }, -- top centre of podium tiers 1..3, facing into the hall
-	VotePads: { BasePart },
 	BoardSlots: { CFrame }, -- ground points (facing into the hall) for the leaderboards
 	ObbyFinish: BasePart,
 	GodPerch: BasePart,
@@ -434,17 +433,6 @@ local function deck(model: Model, L: Vector3)
 	end
 end
 
--- Three pads near the deck doorway; VoteService labels them and counts who stands where.
-local function votePads(model: Model, L: Vector3): { BasePart }
-	local f = folder(model, "VotePads")
-	local pads = {}
-	for i, x in { -22, 0, 22 } do
-		Builder.cylinder(f, "VoteRim", L + Vector3.new(x, 0.3, 44), 0.4, 13, Color3.fromRGB(35, 40, 60), Enum.Material.SmoothPlastic)
-		pads[i] = Builder.cylinder(f, "VotePad" .. i, L + Vector3.new(x, 0.5, 44), 0.4, 11, Color3.fromRGB(110, 120, 150), Enum.Material.Neon)
-	end
-	return pads
-end
-
 local function prompt(parent: Instance, name: string, action: string, object: string): ProximityPrompt
 	local p = Instance.new("ProximityPrompt")
 	p.Name = name
@@ -664,7 +652,6 @@ function Lobby.build(parent: Instance): LobbyInfo
 	local hallSpots = hallOfLegends(model, L)
 	shop(model, L)
 	local finish = obby(model, L)
-	local pads = votePads(model, L)
 	questBoard(model, L)
 	spinStand(model, L)
 	passPedestals(model, L)
@@ -699,7 +686,6 @@ function Lobby.build(parent: Instance): LobbyInfo
 		Model = model,
 		Spawn = spawn,
 		HallSpots = hallSpots,
-		VotePads = pads,
 		BoardSlots = boardSlots,
 		ObbyFinish = finish,
 		GodPerch = perch,

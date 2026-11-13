@@ -33,7 +33,7 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 
 ## World
 - Maps and the lobby are built **from code at runtime** (`src/server/World/*`), so geometry is version-controlled. Don't hand-build arena geometry in Studio; change the builders.
-- The one exception to code-built geometry is `Workspace.TimePlayedLeaderboard` (a third-party board model): it must stay in Workspace, and `LeaderboardService` clones it for the other lobby boards at runtime.
+- The exceptions to code-built geometry are `Workspace.TimePlayedLeaderboard` (a third-party board model) and `Workspace.dancinggirl` (the dancer on each board's pedestal): both must stay in Workspace in the place file. `LeaderboardService` clones the board for the other lobby boards and moves the dancer to ServerStorage as a clone source at runtime.
 - Destructible parts are marked with `Builder.structural(part, level, isSupport)`. A level collapses when its intact supports fall below `Config.Destruction.CollapseSupportFraction`.
 
 ## Configuration

@@ -15,6 +15,8 @@ local order = {
 	"DebrisController",
 	"StealthController",
 	"FeedController",
+	"VoteController",
+	"FeelController",
 	"CosmeticController",
 	"HUDController",
 	"SurvivorController",

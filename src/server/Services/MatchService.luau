@@ -319,7 +319,7 @@ local function intermission(): (boolean, string)
 	-- players vote on the lobby pads first; the winner is built for the rest of the countdown
 	local mapName: string
 	if VoteService.Begin() then
-		ReplicatedStorage:SetAttribute(Attributes.MapName, "Vote on the lobby pads!")
+		ReplicatedStorage:SetAttribute(Attributes.MapName, "Vote for the next map!")
 		local voteEnds = M.IntermissionDuration - Config.Voting.Duration
 		while state.TimeRemaining > voteEnds do
 			tick()

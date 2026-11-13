@@ -150,7 +150,23 @@ function FeedController.Start()
 	list.Name = "Feed"
 	list.BackgroundTransparency = 1
 	list.AnchorPoint = Vector2.new(0.5, 0)
-	list.Position = UDim2.new(0.5, 0, 0, if Components.isTouch() then 122 else 128)
+	local baseY = 134 -- 10 below the round bar's status pills (which end at 124)
+	list.Position = UDim2.new(0.5, 0, 0, baseY)
+	-- step below the map vote strip while it is up (VoteController), so nothing overlaps
+	local voteToken = 0
+	ReplicatedStorage:GetAttributeChangedSignal(Config.Attributes.VoteOpen):Connect(function()
+		voteToken += 1
+		local token = voteToken
+		if ReplicatedStorage:GetAttribute(Config.Attributes.VoteOpen) == true then
+			list.Position = UDim2.new(0.5, 0, 0, baseY + 92)
+		else
+			task.delay(2.6, function()
+				if voteToken == token then
+					list.Position = UDim2.new(0.5, 0, 0, baseY)
+				end
+			end)
+		end
+	end)
 	list.Size = UDim2.fromOffset(460, F.MaxLines * 30)
 	list.Parent = layer
 	local layout = Instance.new("UIListLayout")

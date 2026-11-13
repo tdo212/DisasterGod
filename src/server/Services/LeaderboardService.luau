@@ -6,11 +6,17 @@
 --     script removed; this service fills it from an OrderedDataStore (live servers) or
 --     from the players in the server (Studio).
 --   * The Hall of Legends podium in the lodge shows the all-time top three of
---     Config.Leaderboards.Hall.Stat as full avatar statues.
+--     Config.Leaderboards.Hall.Stat as full avatar statues (a clone of the live character
+--     when that player is in the server). Empty places are filled with the best players
+--     in the server so the podium is never bare.
+--   * Every board's first-place pedestal holds a clone of the Config.Leaderboards.Dancer
+--     model instead of the template's avatar rig (the template's own rig is kept hidden,
+--     because its script keeps rebuilding it).
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
@@ -159,10 +165,6 @@ local function render(board: Board, rows: { Row })
 	back.Name = "_backside"
 	back.Face = Enum.NormalId.Back
 	back.Parent = scoreBlock
-	local first = rows[1]
-	if first and board.Rig then
-		task.spawn(pcall, board.Rig.SetRigHumanoidDescription, if first.UserId > 0 then first.UserId else 1, true)
-	end
 end
 
 local function refresh(board: Board)
@@ -240,16 +242,100 @@ local function makeClone(template: Model, def: { Stat: string, Title: string, Un
 	clone.Parent = template.Parent
 
 	local store = openStore(def.Stat)
-	local rig = nil
+	-- the dancer replaces the template's first-place avatar rig; keep only the pedestal
 	local avatar = clone:FindFirstChild("First Place Avatar")
-	local module = avatar and avatar:FindFirstChild("PlayAnimationInRig")
-	if module and module:IsA("ModuleScript") then
-		local ok, result = pcall(require, module)
-		if ok and typeof(result) == "table" and result.SetRigHumanoidDescription then
-			rig = result
+	if avatar then
+		for _, child in avatar:GetChildren() do
+			if child.Name ~= "Pedestal" then
+				child:Destroy()
+			end
 		end
 	end
-	return { Model = clone, Stat = def.Stat, Unit = def.Unit, Store = store, Rig = rig }
+	return { Model = clone, Stat = def.Stat, Unit = def.Unit, Store = store, Rig = nil }
+end
+
+---------------------------------------------------------------------------
+-- dancers on the first-place pedestals
+
+local dancerSource: Model? = nil
+
+local function hidePart(d: Instance)
+	if d:IsA("BasePart") then
+		d.Transparency = 1
+		d.CanCollide = false
+		d.CanQuery = false
+	elseif d:IsA("Decal") then
+		d.Transparency = 1
+	elseif d:IsA("BillboardGui") then
+		d.Enabled = false
+	end
+end
+
+-- The template's own script rebuilds its "Rig" whenever first place changes: keep it invisible.
+local function hideTemplateRig(avatar: Instance)
+	local function hide(rig: Instance)
+		if rig.Name ~= "Rig" then
+			return
+		end
+		for _, d in rig:GetDescendants() do
+			hidePart(d)
+		end
+		rig.DescendantAdded:Connect(hidePart)
+	end
+	for _, child in avatar:GetChildren() do
+		hide(child)
+	end
+	avatar.ChildAdded:Connect(hide)
+end
+
+local function standDancer(board: Model)
+	local source = dancerSource
+	if not source then
+		return
+	end
+	local pivot = board:GetPivot()
+	local look = pivot.LookVector
+	local avatar = board:FindFirstChild("First Place Avatar")
+	local pedestal = avatar and avatar:FindFirstChild("Pedestal")
+	local spot: Vector3
+	if pedestal and pedestal:IsA("Model") then
+		local cf, size = pedestal:GetBoundingBox()
+		spot = Vector3.new(cf.X, cf.Y + size.Y / 2, cf.Z)
+	elseif pedestal and pedestal:IsA("BasePart") then
+		spot = pedestal.Position + Vector3.new(0, pedestal.Size.Y / 2, 0)
+	else
+		spot = (pivot * CFrame.new(L.DancerFallbackOffset)).Position
+	end
+	if avatar then
+		hideTemplateRig(avatar)
+	end
+	local dancer = source:Clone()
+	dancer.Name = "Dancer"
+	local root = dancer:FindFirstChild("HumanoidRootPart") :: BasePart?
+	for _, d in dancer:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = d == root
+			d.CanCollide = false
+			d.CanTouch = false
+		end
+	end
+	local humanoid = dancer:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+	place(dancer, CFrame.lookAt(spot, spot + Vector3.new(look.X, 0, look.Z)))
+	dancer.Parent = board
+end
+
+local function findDancerSource()
+	local found = workspace:FindFirstChild(L.Dancer) or ServerStorage:FindFirstChild(L.Dancer)
+	if found and found:IsA("Model") then
+		-- out of the arena: it is only a source for the clones
+		found.Parent = ServerStorage
+		dancerSource = found
+	else
+		warn("[Leaderboard] dancer model '" .. L.Dancer .. "' not found; boards keep empty pedestals")
+	end
 end
 
 -- Avatar statue for the Hall of Legends (anchored, non-colliding, no scripts), standing
@@ -257,6 +343,21 @@ end
 -- the whole rig is frozen.
 local function buildStatue(userId: number, spot: CFrame, name: string, parent: Instance): Model?
 	local ok, model = pcall(function()
+		-- a player in this server: clone their actual character (exact look, no web call)
+		local live = Players:GetPlayerByUserId(userId)
+		local character = live and live.Character
+		if character and character:FindFirstChildOfClass("Humanoid") then
+			character.Archivable = true
+			local copy = character:Clone()
+			if copy then
+				for _, d in copy:GetDescendants() do
+					if d:IsA("ForceField") or d:IsA("BillboardGui") or d:IsA("Highlight") then
+						d:Destroy()
+					end
+				end
+				return copy
+			end
+		end
 		if userId > 0 then
 			return Players:CreateHumanoidModelFromUserId(userId)
 		end
@@ -350,13 +451,52 @@ local function updateHall(rows: { Row })
 	end
 end
 
-local function refreshHall()
-	local ok, err = pcall(function()
-		updateHall(fetch(L.Hall.Stat, hallStore))
-	end)
-	if not ok then
-		warn("[Leaderboard] hall update failed", err)
+-- All-time rows, then the best players in the server for any empty places (even at 0),
+-- so the podium always shows someone.
+local function hallRows(): { Row }
+	local rows = fetch(L.Hall.Stat, hallStore)
+	local taken: { [number]: boolean } = {}
+	for _, row in rows do
+		taken[row.UserId] = true
 	end
+	local extra: { Row } = {}
+	for _, player in Players:GetPlayers() do
+		local profile = PlayerDataService.Get(player)
+		if profile and not taken[player.UserId] then
+			local value = (profile :: any)[L.Hall.Stat]
+			table.insert(extra, { UserId = player.UserId, Value = if typeof(value) == "number" then value else 0 })
+		end
+	end
+	table.sort(extra, function(a, b)
+		return a.Value > b.Value
+	end)
+	for _, row in extra do
+		if #rows >= #hallSlots then
+			break
+		end
+		table.insert(rows, row)
+	end
+	return rows
+end
+
+local hallBusy = false
+local hallPending = false
+local function refreshHall()
+	if hallBusy then
+		hallPending = true
+		return
+	end
+	hallBusy = true
+	repeat
+		hallPending = false
+		local ok, err = pcall(function()
+			updateHall(hallRows())
+		end)
+		if not ok then
+			warn("[Leaderboard] hall update failed", err)
+		end
+	until not hallPending
+	hallBusy = false
 end
 
 -- Hall of Legends: `spots` are the podium tier tops (rank 1..3) facing into the hall.
@@ -381,6 +521,13 @@ function LeaderboardService.SetupHall(spots: { CFrame }, parent: Instance)
 		label.Text = string.format("#%d", rank)
 		table.insert(hallSlots, { Spot = spot, Label = label })
 	end
+	-- refresh as soon as anyone's profile is ready, when they leave, and periodically
+	PlayerDataService.ProfileLoaded:Connect(function()
+		task.spawn(refreshHall)
+	end)
+	Players.PlayerRemoving:Connect(function()
+		task.defer(refreshHall)
+	end)
 	task.spawn(function()
 		while true do
 			refreshHall()
@@ -418,6 +565,7 @@ function LeaderboardService.RecordAll(players: { Player })
 			LeaderboardService.Record(player)
 		end
 	end
+	task.spawn(refreshHall) -- a new record can change the podium right away
 end
 
 -- Stand the boards on the lobby slots. Slot 1 is the template (Time Played).
@@ -444,6 +592,11 @@ function LeaderboardService.Setup(slots: { CFrame })
 		if slot then
 			place(board.Model, slot)
 		end
+	end
+	findDancerSource()
+	standDancer(template)
+	for _, board in boards do
+		standDancer(board.Model)
 	end
 
 	Players.PlayerRemoving:Connect(function(player)

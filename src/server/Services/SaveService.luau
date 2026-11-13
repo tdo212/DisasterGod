@@ -25,6 +25,7 @@ local GOLD = Color3.fromRGB(255, 210, 60)
 local SaveService = {}
 
 local lastFired: { [Player]: number } = {}
+local mercyUntil: { [Player]: number } = {}
 
 local function ready(player: Player): boolean
 	return (lastFired[player] or 0) + SV.Cooldown <= os.clock()
@@ -83,6 +84,22 @@ function SaveService.TryAegis(player: Player, humanoid: Humanoid, damage: number
 	return true
 end
 
+-- The single gate for disaster damage. False = absorbed: the player is in their mercy
+-- window after a previous hit (no chain deaths from overlapping blasts), or an Aegis charge
+-- caught a fatal hit. Otherwise the hit lands and opens a short mercy window.
+function SaveService.AllowHit(player: Player, humanoid: Humanoid, damage: number): boolean
+	local now = os.clock()
+	if (mercyUntil[player] or 0) > now then
+		return false
+	end
+	if SaveService.TryAegis(player, humanoid, damage) then
+		return false
+	end
+	mercyUntil[player] = now + Config.Feel.MercySeconds
+	Remotes.get("ClientEffect"):FireClient(player, "Mercy", Config.Feel.MercySeconds)
+	return true
+end
+
 -- True while the player has a ForceField (Aegis or Shield gear): skip further damage.
 function SaveService.IsShielded(humanoid: Humanoid): boolean
 	return humanoid.Parent ~= nil and humanoid.Parent:FindFirstChildOfClass("ForceField") ~= nil
@@ -107,6 +124,7 @@ end
 function SaveService.Init()
 	Players.PlayerRemoving:Connect(function(player)
 		lastFired[player] = nil
+		mercyUntil[player] = nil
 	end)
 end
 

@@ -209,17 +209,17 @@ local Products: { [string]: Types.ProductDefinition } = {
 	Revive = { Id = 3730591976, Name = "Second Chance", Price = 19, Icon = "💖", Badge = "" },
 	Spin1 = { Id = 3730754273, Name = "1 Wheel Spin", Price = 34, Icon = "🎡", Spins = 1, Badge = "" },
 	Spin10 = { Id = 3730754283, Name = "10 Wheel Spins", Price = 149, Icon = "🎡", Spins = 10, Badge = "Best Value" },
-	-- PLACEHOLDERS (Id = 0): create these in the Creator Dashboard and paste the ids here.
-	-- Items with Id 0 are hidden from purchase ("coming soon") and skipped by ProcessReceipt.
-	SkinMagmaClaw = { Id = 0, Name = "Magma Claw God Skin", Price = 149, Icon = "🔥", Cosmetic = "MagmaClaw", Badge = "" },
-	SkinCyberGauntlet = { Id = 0, Name = "Cyber Gauntlet God Skin", Price = 149, Icon = "🤖", Cosmetic = "CyberGauntlet", Badge = "" },
-	SkinCelestialMask = { Id = 0, Name = "Celestial Mask God Skin", Price = 199, Icon = "🌟", Cosmetic = "CelestialMask", Badge = "Legendary" },
-	FxNeonVoid = { Id = 0, Name = "Neon Void Disaster FX", Price = 99, Icon = "🟣", Cosmetic = "NeonVoid", Badge = "" },
-	FxPixelChaos = { Id = 0, Name = "Pixel Chaos Disaster FX", Price = 129, Icon = "👾", Cosmetic = "PixelChaos", Badge = "" },
-	FinConfettiPop = { Id = 0, Name = "Confetti Pop Finisher", Price = 99, Icon = "🎉", Cosmetic = "ConfettiPop", Badge = "" },
-	FinCartoonBoing = { Id = 0, Name = "Cartoon Boing Finisher", Price = 99, Icon = "🌀", Cosmetic = "CartoonBoing", Badge = "" },
-	SaveGlider = { Id = 0, Name = "Emergency Glider", Price = 9, Icon = "🪂", Save = "Glider", Badge = "" },
-	SaveAegis = { Id = 0, Name = "Aegis Bubble", Price = 15, Icon = "🛡️", Save = "Aegis", Badge = "" },
+	-- cosmetics and panic saves (created through Open Cloud). A new product can start with
+	-- Id = 0: it shows as SOON in the shop and is skipped by ProcessReceipt until set.
+	SkinMagmaClaw = { Id = 3730856189, Name = "Magma Claw God Skin", Price = 149, Icon = "🔥", Cosmetic = "MagmaClaw", Badge = "" },
+	SkinCyberGauntlet = { Id = 3730856191, Name = "Cyber Gauntlet God Skin", Price = 149, Icon = "🤖", Cosmetic = "CyberGauntlet", Badge = "" },
+	SkinCelestialMask = { Id = 3730856195, Name = "Celestial Mask God Skin", Price = 199, Icon = "🌟", Cosmetic = "CelestialMask", Badge = "Legendary" },
+	FxNeonVoid = { Id = 3730856203, Name = "Neon Void Disaster FX", Price = 99, Icon = "🟣", Cosmetic = "NeonVoid", Badge = "" },
+	FxPixelChaos = { Id = 3730856205, Name = "Pixel Chaos Disaster FX", Price = 129, Icon = "👾", Cosmetic = "PixelChaos", Badge = "" },
+	FinConfettiPop = { Id = 3730856210, Name = "Confetti Pop Finisher", Price = 99, Icon = "🎉", Cosmetic = "ConfettiPop", Badge = "" },
+	FinCartoonBoing = { Id = 3730856215, Name = "Cartoon Boing Finisher", Price = 99, Icon = "🌀", Cosmetic = "CartoonBoing", Badge = "" },
+	SaveGlider = { Id = 3730856220, Name = "Emergency Glider", Price = 9, Icon = "🪂", Save = "Glider", Badge = "" },
+	SaveAegis = { Id = 3730856223, Name = "Aegis Bubble", Price = 15, Icon = "🛡️", Save = "Aegis", Badge = "" },
 }
 
 -- Cosmetics: one free starter, one coin item and Robux items per category.
@@ -273,8 +273,6 @@ local Config = {
 	Voting = {
 		Duration = 9,
 		Candidates = 3,
-		PadRadius = 6,
-		CountInterval = 0.3,
 	},
 
 	Pity = {
@@ -377,6 +375,16 @@ local Config = {
 		DisplayScale = 0.16, -- lodge display statues
 		BoingUpSpeed = 70, -- Cartoon Boing: the body is flung up and floats
 		BoingFloatSeconds = 3,
+	},
+
+	-- Nintendo-style game feel: forgiving inputs and clear feedback.
+	Feel = {
+		CoyoteTime = 0.12, -- a jump pressed this soon after walking off a ledge still jumps
+		JumpBuffer = 0.15, -- a jump pressed this soon before landing fires on touchdown
+		MercySeconds = 0.4, -- after a disaster hit, overlapping hits can't chain (character flickers)
+		HardLandingSpeed = 55, -- falling faster than this gives a small camera thump
+		LandingShake = 0.22,
+		Countdown = 3, -- 3-2-1-GO! before disasters unlock
 	},
 
 	-- Panic saves: cheap single-use charges that fire automatically.
@@ -511,6 +519,8 @@ local Config = {
 	Leaderboards = {
 		RefreshSeconds = 60,
 		Template = "TimePlayedLeaderboard", -- workspace model the extra boards are cloned from
+		Dancer = "dancinggirl", -- workspace model that dances on each board's pedestal (moved to ServerStorage at runtime)
+		DancerFallbackOffset = Vector3.new(-9, 1, 0), -- board-local spot if a board has no pedestal
 		-- Hall of Legends podium in the lodge: the all-time top three of this stat stand on it
 		Hall = { Stat = "RoundsSurvived", Unit = "rounds", Subtitle = "Most rounds survived · all time" },
 		Boards = {
@@ -725,6 +735,14 @@ local Config = {
 			OutpostZero = "Outpost Zero",
 			StarlightBoardwalk = "Starlight Boardwalk",
 		} :: { [string]: string },
+		MapIcons = {
+			FractureBay = "🏖️",
+			NeoShibuya = "🌃",
+			MagmaCore = "🌋",
+			SunscorchedMirage = "🏜️",
+			OutpostZero = "🧊",
+			StarlightBoardwalk = "🎡",
+		} :: { [string]: string },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
 	},
 
@@ -771,6 +789,10 @@ local Config = {
 		TutorialPrefix = "Tut_", -- Player: has seen the role card (bool)
 		Ragdolled = "Ragdolled", -- Player
 		VoteOpen = "VoteOpen", -- ReplicatedStorage: map vote in progress
+		VoteCandidates = "VoteCandidates", -- ReplicatedStorage: "MapA,MapB,MapC"
+		VoteCounts = "VoteCounts", -- ReplicatedStorage: "2,0,1"
+		VoteEndsAt = "VoteEndsAt", -- ReplicatedStorage: server time the vote closes
+		VoteWinner = "VoteWinner", -- ReplicatedStorage: winning candidate index (0 = none yet)
 		Slowed = "Slowed", -- Player: standing in quicksand
 		Hidden = "Hidden", -- Player: hidden from the God (still indoors, or jammed)
 		LastStand = "LastStand", -- ReplicatedStorage: display name of the last survivor ("" = none)

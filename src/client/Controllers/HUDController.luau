@@ -666,6 +666,11 @@ end
 
 local function evaluateRoleCard()
 	local kind = roleKind()
+	-- the round ended (or the role changed): a leftover tutorial card must not linger
+	if not kind and openCard then
+		openCard:Destroy()
+		openCard = nil
+	end
 	if kind and not cardShown[kind] and player:GetAttribute(Attributes.TutorialPrefix .. kind) ~= true then
 		-- wait for the round-start banner to clear, then show the card if the role still holds
 		task.delay(Config.Onboarding.CardDelay, function()

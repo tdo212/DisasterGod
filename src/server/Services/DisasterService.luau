@@ -106,8 +106,8 @@ local function hurt(player: Player, damage: number, caster: Player?, cause: stri
 	local _, humanoid = hrpAndHumanoid(player)
 	if humanoid and humanoid.Health > 0 and damage > 0 then
 		ScoringService.NoteHit(player, caster, cause)
-		if SaveService.TryAegis(player, humanoid, damage) then
-			return -- a panic save absorbed a fatal hit
+		if not SaveService.AllowHit(player, humanoid, damage) then
+			return -- mercy window after a hit, or a panic save absorbed a fatal one
 		end
 		humanoid:TakeDamage(damage)
 	end

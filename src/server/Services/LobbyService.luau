@@ -103,7 +103,6 @@ function LobbyService.Init()
 		task.spawn(LobbyService.TeleportToLobby, player)
 	end
 
-	VoteService.SetPads(info.VotePads)
 	LeaderboardService.Setup(info.BoardSlots)
 	LeaderboardService.SetupHall(info.HallSpots, info.Model)
 

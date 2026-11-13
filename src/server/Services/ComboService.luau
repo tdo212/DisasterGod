@@ -83,7 +83,7 @@ local function shock(player: Player, damage: number, caster: Player?, cause: str
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if humanoid and hrp and humanoid.Health > 0 then
 		ScoringService.NoteHit(player, caster, cause)
-		if SaveService.TryAegis(player, humanoid, damage) then
+		if not SaveService.AllowHit(player, humanoid, damage) then
 			return
 		end
 		humanoid:TakeDamage(damage)

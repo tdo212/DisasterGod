@@ -69,14 +69,14 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 ## World
 ### Sky Lodge (lobby)
 A big timber great hall floating beside the arena at (0, 150, -232), built to feel wide, warm and calm: 160 x 120 studs inside, a 34-stud beamed ceiling under a pitched roof, tall side windows, candle chandeliers, a red runner rug and potted plants. It is enclosed, so nobody falls out.
-- **Hall of Legends** (back wall, centre): a gold/silver/bronze podium where the all-time top three for `Config.Leaderboards.Hall` (rounds survived) stand as statues of their real avatars, with name and record above. Empty spots read "Your name here?". It refreshes with the leaderboards. There is no per-round winners podium in the lodge any more; the round summary still shows the round's top three.
+- **Hall of Legends** (back wall, centre): a gold/silver/bronze podium where the all-time top three for `Config.Leaderboards.Hall` (rounds survived) stand as statues of their real avatars (a clone of the live character when that player is in the server), with name and record above. Places the all-time list can't fill are taken by the best players in the server, so the podium always shows someone. It refreshes when a profile loads, after each round and every minute. There is no per-round winners podium in the lodge any more; the round summary still shows the round's top three.
 - **Leaderboards:** four boards along the back wall, two either side of the Hall of Legends.
-- **Centre:** spawn pad on the runner, daily quest board and prize wheel either side, the four game pass pedestals, and three map vote pads by the deck doorway.
+- **Centre:** spawn pad on the runner, daily quest board and prize wheel either side, and the four game pass pedestals.
 - **West:** the gear shop stall and a fireside lounge (hearth, sofas, rug).
 - **East: Neon Climb obby.** 11 evenly spaced pads (8 studs apart, 1.5 studs higher each, alternating 2 studs left/right) on glowing stems up the east wall to a loft in the front corner (+15 coins, 20 s cooldown), with a neon ramp back down. A glass divider separates the course from the ramp and the hall so it can't be skipped; falling lands you on the lodge floor next to the start.
 - **Observation deck:** past the wide front opening, 112 x 34 studs with a glass-floor strip at the edge, a low glass rail with no neon on the front (so nothing glares across the view), invisible walls above the rails, and the telescopes and benches kept to the sides so the middle stays clear for looking down on the arena.
 
-Six arenas (`Config.World.MapRotation`). Each intermission opens with a **map vote**: three candidates appear on the lobby pads, a player's vote is the last pad they stood on, and the winner is built for the rest of the countdown (ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event). Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
+Six arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vote** (VoteService / VoteController): a compact strip of three map cards appears under the round bar (never the map just played), players tap or click a card and can change their mind, live counts show on the cards, then the winner flashes and the strip tucks away. Ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event. The round bar carries the countdown, so the strip only says "Tap a map to vote". It replaced the lobby vote pads, which only worked if you walked over to them. Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
@@ -102,6 +102,13 @@ Every destructible part has health (from its material), a level, and a support f
 **Performance (`Config.Debris`).** Floors, supports and collapsing slabs stay server-simulated so collisions are fair. Small non-load-bearing pieces (up to 60 cubic studs, plus all glass, neon, fabric and leaves) are removed on the server when they break and sent, batched once per frame, to every client, which simulates them locally as rubble that never touches characters (`DebrisController`): up to 220 pieces for 7 s on desktop, 80 pieces for 4.5 s on phones. Server debris that has rested for 2 s is anchored with touch and query off so the solver stops working on rubble piles (the tornado wakes pieces it picks up). On touch devices, particle emitters run at half rate and 60% lifetime, trails at half length, fire at 70% size, and debris casts no shadows.
 
 ## Game feel
+**Nintendo-style pass (`Config.Feel`, FeelController / SaveService.AllowHit).** What makes Nintendo games feel good is forgiving input, readable feedback and pacing beats. This pass adds:
+- **Coyote time (0.12 s):** jump just after walking off a ledge and it still counts.
+- **Jump buffering (0.15 s):** press jump just before landing and it fires on touchdown (great on the obby and rooftops).
+- **Mercy invulnerability (0.4 s):** after a disaster hit, overlapping blasts (a meteor shower, a gust into a bolt) can't chain-kill you; your character flickers so you can read it. Tick damage (lava, fire, tornado) still lands.
+- **Landing weight:** a hard landing (falling faster than 55 studs/s) gives a small camera thump.
+- **3-2-1-GO!** pops into the moment disasters unlock, with tick and go sounds. It stays silent visually while a first-time role card is open so the tutorial isn't covered.
+
 - **Camera shake and impact punch:** every disaster shakes nearby cameras; building collapses shake in proportion to their size, and heavy hits add a short field-of-view punch.
 - **Ragdolls:** knockback of `Config.Ragdoll.MinKnockback` or more (gusts, tornadoes, fault lines, explosions) sends a survivor tumbling for 1.6 s before they stand back up. Dead characters stay in one piece as ragdolls.
 - **Audio cues:** each disaster has its own telegraph sound (`Config.Audio.AbilityCue`), and an air raid siren loops through Sudden Death.
@@ -141,6 +148,8 @@ Players bank spins: one to start, a free one every 10 minutes (5 for VIP, bankin
 
 ## Leaderboards
 The lobby boards are built from the `TimePlayedLeaderboard` model in Workspace (RenanMSV's board). That model keeps its own script and stays the Time Played board. `LeaderboardService` clones it for Top Survivors (rounds survived), Deadliest Gods (eliminations) and Longest Streaks, removes the script from each clone and fills them itself from ordered data stores on live servers. In Studio they show the players in the server instead. The model must stay in Workspace; without it the extra boards are skipped with a warning.
+
+Each board's first-place pedestal holds a clone of the `dancinggirl` model (`Config.Leaderboards.Dancer`, placed in Workspace by hand and moved to ServerStorage at runtime as the clone source) dancing its own emote. The template board's own avatar rig is kept invisible because its script keeps rebuilding it.
 
 ## Onboarding
 The first time a player is the God, and the first time they are a survivor, a three-bullet role card appears once the round-start banner clears (with touch wording on phones). The Welcome Pack offer is hidden until the player has finished one round.
@@ -184,7 +193,7 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | Disaster FX: Neon Void / Pixel Chaos | R$99 / 129 | Permanent cosmetic |
 | Finishers: Confetti Pop / Cartoon Boing | R$99 / 99 | Permanent cosmetic |
 
-The products added in the cat-and-mouse update still have **placeholder ids (0)** in `Config.Monetization.Products`: their shop buttons read SOON and `ProcessReceipt` never matches them until the real ids are pasted in. `DevPurchase` grants them in Studio regardless.
+The nine cat-and-mouse products are live (created through Open Cloud). A product added later can start with `Id = 0`: its shop button reads SOON and `ProcessReceipt` ignores it until the real id is set; `DevPurchase` grants it in Studio regardless.
 
 **Panic saves instead of mid-danger prompts:** a purchase prompt that opens while you're falling arrives too late and feels predatory, so saves are bought ahead (Specials tab) and fire on their own. After a death a save would have prevented (void or fluid for the Glider, a disaster hit for the Aegis), a one-tap "this would have saved you" card appears for 8 s if you have none. Owned charges show above the gear bar during rounds.
 
