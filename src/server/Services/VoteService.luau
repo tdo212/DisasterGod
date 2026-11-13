@@ -1,5 +1,5 @@
 --!strict
--- VoteService: three physical voting pads in the Sky Sanctuary. Each intermission offers
+-- VoteService: three physical voting pads in the Sky Lodge. Each intermission offers
 -- three candidate maps; a player's vote is the last pad they stood on. The winner is
 -- built next, and every vote is logged as a custom analytics event (map popularity).
 

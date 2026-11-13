@@ -327,6 +327,8 @@ local Config = {
 	Leaderboards = {
 		RefreshSeconds = 60,
 		Template = "TimePlayedLeaderboard", -- workspace model the extra boards are cloned from
+		-- Hall of Legends podium in the lodge: the all-time top three of this stat stand on it
+		Hall = { Stat = "RoundsSurvived", Unit = "rounds", Subtitle = "Most rounds survived · all time" },
 		Boards = {
 			{ Stat = "RoundsSurvived", Title = "TOP SURVIVORS", Unit = "rounds" },
 			{ Stat = "GodKills", Title = "DEADLIEST GODS", Unit = "kills" },

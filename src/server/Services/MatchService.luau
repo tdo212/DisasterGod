@@ -154,7 +154,7 @@ local function onDied(player: Player)
 	if RoleService.MarkEliminated(player) then
 		ScoringService.OnEliminated(player)
 		updateAlive()
-		banner:FireClient(player, "ELIMINATED", "Watch from the Sky Sanctuary, run the obby, or Spectate & haunt!", RED)
+		banner:FireClient(player, "ELIMINATED", "Watch from the Sky Lodge deck, run the obby, or Spectate & haunt!", RED)
 	end
 end
 
@@ -400,13 +400,8 @@ local function roundEnd(mapName: string)
 	end
 
 	local summaries = ScoringService.FinishRound(mapName, god, list)
-	local podium = nil
 	for p, summary in summaries do
 		Remotes.get("RoundSummary"):FireClient(p, summary)
-		podium = summary.Podium
-	end
-	if podium then
-		LobbyService.SetPodium(podium)
 	end
 	RoleService.AdvancePity(list, god, survivedSet)
 	LeaderboardService.RecordAll(list)
@@ -415,7 +410,7 @@ local function roundEnd(mapName: string)
 	setSubPhase("None")
 	EnvironmentService.SetMood("Calm", 2)
 
-	-- everyone back to the Sky Sanctuary
+	-- everyone back to the Sky Lodge
 	for _, p in list do
 		if RoleService.GetRole(p) == "DisasterGod" then
 			unperch(p)

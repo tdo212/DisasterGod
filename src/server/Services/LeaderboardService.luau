@@ -5,6 +5,8 @@
 --   * Each entry in Config.Leaderboards.Boards gets a clone of the template with that
 --     script removed; this service fills it from an OrderedDataStore (live servers) or
 --     from the players in the server (Studio).
+--   * The Hall of Legends podium in the lodge shows the all-time top three of
+--     Config.Leaderboards.Hall.Stat as full avatar statues.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -22,9 +24,11 @@ local TEMPLATE_ONLY = { "TimePlayedClass", "TimePlayedLeaderboardBE-SR", "Thumbn
 local TEMPLATE_TAG = "TopTimePlayedLeaderboard_Board_Tag"
 local TEMPLATE_MAIN_ATTRIBUTE = "TopTimePlayedLeaderboard_IsMainBoard"
 local TEST_THUMBNAIL = "rbxassetid://1146888101"
+local STATUE_SETTLE = 0.5 -- seconds for accessory welds to seat before freezing a statue
 
 type Row = { UserId: number, Value: number }
 type Board = { Model: Model, Stat: string, Unit: string, Store: OrderedDataStore?, Rig: any }
+type HallSlot = { Spot: CFrame, Label: TextLabel, UserId: number?, Statue: Model? }
 
 local LeaderboardService = {}
 
@@ -32,6 +36,9 @@ local boards: { Board } = {}
 local written: { [Player]: { [string]: number } } = {}
 local nameCache: { [number]: string } = {}
 local thumbCache: { [number]: string } = {}
+local hallSlots: { HallSlot } = {}
+local hallFolder: Folder? = nil
+local hallStore: OrderedDataStore? = nil
 
 local function formatNumber(n: number): string
 	local s = tostring(math.floor(n))
@@ -89,9 +96,8 @@ local function thumbOf(userId: number): string
 	return TEST_THUMBNAIL
 end
 
-local function fetch(board: Board): { Row }
+local function fetch(stat: string, store: OrderedDataStore?): { Row }
 	local rows: { Row } = {}
-	local store = board.Store
 	if store then
 		local ok, err = pcall(function()
 			local page = store:GetSortedAsync(false, ROWS):GetCurrentPage()
@@ -103,13 +109,13 @@ local function fetch(board: Board): { Row }
 			end
 		end)
 		if not ok then
-			warn("[Leaderboard] fetch failed for", board.Stat, err)
+			warn("[Leaderboard] fetch failed for", stat, err)
 		end
 		return rows
 	end
 	for _, player in Players:GetPlayers() do
 		local profile = PlayerDataService.Get(player)
-		local value = profile and (profile :: any)[board.Stat]
+		local value = profile and (profile :: any)[stat]
 		if typeof(value) == "number" and value > 0 then
 			table.insert(rows, { UserId = player.UserId, Value = value })
 		end
@@ -161,7 +167,7 @@ end
 
 local function refresh(board: Board)
 	local ok, err = pcall(function()
-		render(board, fetch(board))
+		render(board, fetch(board.Stat, board.Store))
 	end)
 	if not ok then
 		warn("[Leaderboard] render failed for", board.Stat, err)
@@ -209,6 +215,16 @@ local function titlePlate(clone: Model, title: string)
 	text3d:Destroy()
 end
 
+local function openStore(stat: string): OrderedDataStore?
+	if not PlayerDataService.UsesDataStores() then
+		return nil
+	end
+	local ok, result = pcall(function()
+		return DataStoreService:GetOrderedDataStore(STORE_PREFIX .. stat)
+	end)
+	return if ok then result else nil
+end
+
 local function makeClone(template: Model, def: { Stat: string, Title: string, Unit: string }): Board
 	local clone = template:Clone()
 	clone.Name = def.Stat .. "Leaderboard"
@@ -223,15 +239,7 @@ local function makeClone(template: Model, def: { Stat: string, Title: string, Un
 	titlePlate(clone, def.Title)
 	clone.Parent = template.Parent
 
-	local store: OrderedDataStore? = nil
-	if PlayerDataService.UsesDataStores() then
-		local ok, result = pcall(function()
-			return DataStoreService:GetOrderedDataStore(STORE_PREFIX .. def.Stat)
-		end)
-		if ok then
-			store = result
-		end
-	end
+	local store = openStore(def.Stat)
 	local rig = nil
 	local avatar = clone:FindFirstChild("First Place Avatar")
 	local module = avatar and avatar:FindFirstChild("PlayAnimationInRig")
@@ -242,6 +250,143 @@ local function makeClone(template: Model, def: { Stat: string, Title: string, Un
 		end
 	end
 	return { Model = clone, Stat = def.Stat, Unit = def.Unit, Store = store, Rig = rig }
+end
+
+-- Avatar statue for the Hall of Legends (anchored, non-colliding, no scripts), standing
+-- on `spot`. Only the root is anchored at first so welds can seat the accessories, then
+-- the whole rig is frozen.
+local function buildStatue(userId: number, spot: CFrame, name: string, parent: Instance): Model?
+	local ok, model = pcall(function()
+		if userId > 0 then
+			return Players:CreateHumanoidModelFromUserId(userId)
+		end
+		return Players:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
+	end)
+	if not ok or not model then
+		warn("[Leaderboard] hall statue failed for", userId, model)
+		return nil
+	end
+	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = d == root
+			d.CanCollide = false
+			d.CanTouch = false
+		elseif d:IsA("BaseScript") then
+			d:Destroy()
+		end
+	end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	end
+	local lift = if humanoid and root then humanoid.HipHeight + root.Size.Y / 2 else 3
+	model.Name = name
+	model:PivotTo(spot * CFrame.new(0, lift, 0))
+	model.Parent = parent
+	task.wait(STATUE_SETTLE)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+		end
+	end
+	return model
+end
+
+local function hallLabel(parent: BasePart, offset: Vector3): TextLabel
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "LegendLabel"
+	gui.Size = UDim2.new(7.5, 0, 2.2, 0) -- narrower than the 9-stud tier spacing
+	gui.StudsOffsetWorldSpace = offset
+	gui.MaxDistance = 150
+	gui.Parent = parent
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.RichText = true
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.Parent = gui
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 3
+	stroke.Parent = label
+	return label
+end
+
+local function updateHall(rows: { Row })
+	local folder = hallFolder
+	if not folder then
+		return
+	end
+	for rank, slot in hallSlots do
+		local row = rows[rank]
+		if not row then
+			if slot.Statue then
+				slot.Statue:Destroy()
+				slot.Statue = nil
+			end
+			slot.UserId = nil
+			slot.Label.Text = string.format("#%d\n<font color=\"#C8C8D2\">Your name here?</font>", rank)
+			continue
+		end
+		slot.Label.Text = string.format("#%d %s\n<font color=\"#FFD23C\">%s %s</font>", rank, nameOf(row.UserId), formatNumber(row.Value), L.Hall.Unit)
+		if slot.UserId ~= row.UserId or not slot.Statue then
+			slot.UserId = row.UserId
+			local statue = buildStatue(row.UserId, slot.Spot, "Legend" .. rank, folder)
+			if slot.UserId ~= row.UserId then
+				-- a newer refresh claimed this spot while the avatar loaded
+				if statue then
+					statue:Destroy()
+				end
+				continue
+			end
+			if slot.Statue then
+				slot.Statue:Destroy()
+			end
+			slot.Statue = statue
+		end
+	end
+end
+
+local function refreshHall()
+	local ok, err = pcall(function()
+		updateHall(fetch(L.Hall.Stat, hallStore))
+	end)
+	if not ok then
+		warn("[Leaderboard] hall update failed", err)
+	end
+end
+
+-- Hall of Legends: `spots` are the podium tier tops (rank 1..3) facing into the hall.
+function LeaderboardService.SetupHall(spots: { CFrame }, parent: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Legends"
+	folder.Parent = parent
+	hallFolder = folder
+	hallStore = openStore(L.Hall.Stat)
+	for rank, spot in spots do
+		local anchor = Instance.new("Part")
+		anchor.Name = "LegendSpot" .. rank
+		anchor.Anchored = true
+		anchor.CanCollide = false
+		anchor.CanQuery = false
+		anchor.CanTouch = false
+		anchor.Transparency = 1
+		anchor.Size = Vector3.new(1, 1, 1)
+		anchor.CFrame = spot
+		anchor.Parent = folder
+		local label = hallLabel(anchor, Vector3.new(0, 7.6, 0))
+		label.Text = string.format("#%d", rank)
+		table.insert(hallSlots, { Spot = spot, Label = label })
+	end
+	task.spawn(function()
+		while true do
+			refreshHall()
+			task.wait(L.RefreshSeconds)
+		end
+	end)
 end
 
 -- Save one player's board stats (round end). Only values that changed are written.

@@ -122,7 +122,7 @@ function SpectateController.Start()
 	})
 	Components.button({
 		Name = "Exit",
-		Text = "Back to Sanctuary",
+		Text = "Back to Lodge",
 		TextSize = 20,
 		Size = UDim2.fromOffset(220, 50),
 		Position = UDim2.new(0.5, 0, 1, -50),

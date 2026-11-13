@@ -12,7 +12,7 @@ With no human God (solo play, or nobody picked), the **Storm Director** AI plays
 | Prep | first 10 s of the round | Survivors scatter and claim high ground; the God's energy charges and powers are locked |
 | Escalation | 10 s – 65 s | The God fires disasters from the hotbar and knocks out supports so buildings collapse |
 | Sudden Death | final 20 s | The sea (water/lava) rises to the map's flood line; God energy regen doubles |
-| Round End | 8 s | Payout breakdown, podium, everyone back to the Sky Sanctuary |
+| Round End | 8 s | Payout breakdown, podium, everyone back to the Sky Lodge |
 
 The round ends early as soon as no survivors are left.
 
@@ -40,9 +40,9 @@ The round ends early as soon as no survivors are left.
 - **Close-call rewards**: NEAR MISS +25 when you're just outside a blast; STRUCTURAL ESCAPE +50 when a building collapses with you inside and you live. Each comes with screen shake and a pop-up.
 
 ### Eliminated / waiting players
-- Respawn straight into the **Sky Sanctuary** lobby.
+- Respawn straight into the **Sky Lodge** lobby (watch from the observation deck).
 - **Spectate** opens a free orbit camera over the arena. **Haunt**: click to drop harmless 👻 ghost pings (5 s cooldown).
-- Run the neon obby for coins and check the leaderboard.
+- Run the Neon Climb obby for coins and check the leaderboards and Hall of Legends.
 
 ## God pity (the "one more round" hook)
 Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra for surviving it. The God is drawn by weighted random, and their weight resets to 1. Everyone always sees their current **God Chance %**.
@@ -50,8 +50,14 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 **Solo testing:** with one player, the sidebar shows a **Play God / Survivor** toggle. It works mid-round: swapping to God hands over from the Director; swapping to Survivor drops you into the arena.
 
 ## World
-### Sky Sanctuary (lobby)
-A floating grass island beside the arena at (0, 150, -232), low and close enough that the glass balcony overlooks the arena. It has low glass rails, telescopes aimed at the arena, rainbow paths, a winners podium with light beams (name tags appear only once there is a winner), the gear shop stall (proximity prompt), four leaderboards along the back edge, three map vote pads in front of the balcony, game pass pedestals beside the podium, a daily quest board, a prize wheel stand, and a 12-pad neon obby (+15 coins, 20 s cooldown) with a walkable neon ramp back down from the finish. Falling off returns you to spawn.
+### Sky Lodge (lobby)
+A big timber great hall floating beside the arena at (0, 150, -232), built to feel wide, warm and calm: 160 x 120 studs inside, a 34-stud beamed ceiling under a pitched roof, tall side windows, candle chandeliers, a red runner rug and potted plants. It is enclosed, so nobody falls out.
+- **Hall of Legends** (back wall, centre): a gold/silver/bronze podium where the all-time top three for `Config.Leaderboards.Hall` (rounds survived) stand as statues of their real avatars, with name and record above. Empty spots read "Your name here?". It refreshes with the leaderboards. There is no per-round winners podium in the lodge any more; the round summary still shows the round's top three.
+- **Leaderboards:** four boards along the back wall, two either side of the Hall of Legends.
+- **Centre:** spawn pad on the runner, daily quest board and prize wheel either side, the four game pass pedestals, and three map vote pads by the deck doorway.
+- **West:** the gear shop stall and a fireside lounge (hearth, sofas, rug).
+- **East: Neon Climb obby.** 11 evenly spaced pads (8 studs apart, 1.5 studs higher each, alternating 2 studs left/right) on glowing stems up the east wall to a loft in the front corner (+15 coins, 20 s cooldown), with a neon ramp back down. A glass divider separates the course from the ramp and the hall so it can't be skipped; falling lands you on the lodge floor next to the start.
+- **Observation deck:** past the wide front opening, 112 x 34 studs with a glass-floor strip at the edge, a low glass rail with no neon on the front (so nothing glares across the view), invisible walls above the rails, and the telescopes and benches kept to the sides so the middle stays clear for looking down on the arena.
 
 Six arenas (`Config.World.MapRotation`). Each intermission opens with a **map vote**: three candidates appear on the lobby pads, a player's vote is the last pad they stood on, and the winner is built for the rest of the countdown (ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event). Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
@@ -144,6 +150,6 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | God Priority | R$299 | God Chance grows twice as fast |
 | Quick Dash | R$99 | Dash cooldown halved |
 
-**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The Shop also has a God Kits tab (coins). The menu has a Passes shortcut, and each pass has a glowing pedestal beside the Winners Podium that previews it in 3D and prompts the purchase. The prize wheel window sells the spin packs. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
+**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The Shop also has a God Kits tab (coins). The menu has a Passes shortcut, and each pass has a glowing pedestal in the middle of the lodge that previews it in 3D and prompts the purchase. The prize wheel window sells the spin packs. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
 
 All numbers live in `src/shared/Config.luau`.

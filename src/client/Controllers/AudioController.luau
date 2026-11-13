@@ -1,6 +1,6 @@
 --!strict
 -- AudioController: adaptive music + environment ambience + round-flow cues.
---   Music:    lobby track in the Sky Sanctuary, tense track in the arena, boss track in
+--   Music:    lobby track in the Sky Lodge, tense track in the arena, boss track in
 --             sudden death (crossfaded).
 --   Ambience: birds in the lobby; per-map beds in the arena (waves, city, lava, wind...).
 --   Cues:     intermission countdown ticks, prep tocks, round-start hit, sudden-death

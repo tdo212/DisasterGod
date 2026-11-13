@@ -1,7 +1,7 @@
 --!strict
--- LobbyService: builds the Sky Sanctuary and runs its activities — obby rewards,
--- winners podium, fall resets and ghost "haunt" pings. Hands the vote pads to
--- VoteService and the leaderboard slots to LeaderboardService.
+-- LobbyService: builds the Sky Lodge and runs its activities — obby rewards, fall
+-- resets and ghost "haunt" pings. Hands the vote pads to VoteService and the
+-- leaderboard slots and Hall of Legends podium to LeaderboardService.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -52,40 +52,6 @@ function LobbyService.SetGhostPingsOpen(open: boolean)
 	castingOpen = open
 end
 
-local function makeBillboard(anchor: BasePart): TextLabel
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "PodiumName"
-	-- sized in studs so the three names never overlap, hidden until there's a winner
-	gui.Size = UDim2.new(7.5, 0, 2.6, 0)
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 160
-	gui.Enabled = false
-	gui.Parent = anchor
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.Text = "—"
-	label.Parent = gui
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Parent = label
-	return label
-end
-
-local podiumLabels: { TextLabel } = {}
-
-function LobbyService.SetPodium(entries: { { Name: string, Earned: number } })
-	for i, label in podiumLabels do
-		local entry = entries[i]
-		label.Text = if entry then string.format("%s\n+%d", entry.Name, entry.Earned) else ""
-		local gui = label.Parent :: BillboardGui
-		gui.Enabled = entry ~= nil
-	end
-end
-
 local function ghostPing(position: Vector3)
 	local ground = MapService.GroundAt(position)
 	local hazards = MapService.GetHazardsFolder()
@@ -125,22 +91,21 @@ function LobbyService.Init()
 		end
 	end
 	-- a preview copy may exist from edit-mode building; runtime always rebuilds from code
-	local stale = workspace:FindFirstChild("SkySanctuary")
-	if stale then
-		stale:Destroy()
+	for _, name in { "SkyLodge", "SkySanctuary" } do
+		local stale = workspace:FindFirstChild(name)
+		if stale then
+			stale:Destroy()
+		end
 	end
 	info = Lobby.build(workspace)
-	-- anyone who spawned before the island existed gets placed on it
+	-- anyone who spawned before the lodge existed gets placed in it
 	for _, player in Players:GetPlayers() do
 		task.spawn(LobbyService.TeleportToLobby, player)
 	end
 
-	for _, anchor in info.PodiumAnchors do
-		table.insert(podiumLabels, makeBillboard(anchor))
-	end
-
 	VoteService.SetPads(info.VotePads)
 	LeaderboardService.Setup(info.BoardSlots)
+	LeaderboardService.SetupHall(info.HallSpots, info.Model)
 
 	info.ObbyFinish.Touched:Connect(function(hit)
 		local character = hit.Parent
@@ -180,7 +145,7 @@ function LobbyService.Init()
 		pingCooldown[player] = nil
 	end)
 
-	-- fall reset: anyone not playing in the arena who drops off the island returns to spawn
+	-- fall reset: anyone not playing in the arena who somehow drops out of the lodge returns to spawn
 	local resetY = Config.World.LobbyOrigin.Y - Config.Player.LobbyFallResetDepth
 	task.spawn(function()
 		while true do
