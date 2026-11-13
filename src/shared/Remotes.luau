@@ -19,6 +19,7 @@ local NAMES = {
 	"KitAction", -- C->S ("Buy" | "Equip", kitId)
 	"QuestClaim", -- C->S (questId)
 	"TutorialSeen", -- C->S (kind)
+	"Rubble", -- S->C ({ { CFrame, Size, Color, Material, Transparency, Velocity } }) cosmetic debris, batched per frame
 }
 
 local Remotes = {}

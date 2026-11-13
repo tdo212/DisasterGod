@@ -12,6 +12,7 @@ end)
 local order = {
 	"AudioController",
 	"EffectsController",
+	"DebrisController",
 	"HUDController",
 	"SurvivorController",
 	"GodController",

@@ -381,6 +381,25 @@ local Config = {
 		VolatilePlayerDamage = 45,
 	},
 
+	-- Debris performance. Small non-load-bearing pieces (wall panels, glass, trim) become
+	-- client-only rubble; floors, supports and collapsing slabs stay on the server so
+	-- collisions stay fair. Settled server debris goes to sleep (anchored, no queries).
+	Debris = {
+		ClientMaxVolume = 60, -- non-support parts up to this many cubic studs shatter client-side
+		ClientMaterials = { Glass = true, Neon = true, Fabric = true, Grass = true } :: { [string]: boolean },
+		ClientLifetime = 7, -- seconds before a client rubble piece fades (desktop)
+		TouchClientLifetime = 4.5, -- phones / tablets
+		ClientFadeTime = 1.5,
+		ClientCap = 220, -- active client rubble pieces (desktop)
+		TouchClientCap = 80,
+		SleepSpeed = 1.5, -- studs/s (and rad/s) below which server debris counts as resting
+		SleepSeconds = 2, -- resting this long -> anchored, CanTouch/CanQuery off
+		TouchParticleRate = 0.5, -- particle emitter rate multiplier on touch devices
+		TouchParticleLifetime = 0.6,
+		TouchTrailLifetime = 0.5,
+		TouchFireSize = 0.7,
+	},
+
 	Scoring = {
 		NearMissMargin = 7,
 		NearMissCoins = 25,
