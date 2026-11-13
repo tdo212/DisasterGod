@@ -31,7 +31,8 @@ The round ends early as soon as no survivors are left.
 | 💥 Fault Cleave | Major | 65 | 18 s | 2.5 s | 120-stud, 10-wide fault line through bedrock that shears every support on the line |
 
 - Ability areas and structure damage are tuned for the bigger, more numerous buildings (about +15-25% over launch), while player damage is unchanged so survivors aren't hit harder. Destructible parts per map rose from 182-589 to 330-789 (Fracture Bay 393 to 623); in testing a Meteor plus a Lightning knocked a quarter of the parts off the 4-storey Bay Hotel.
-- Anti-camp radar: a survivor who stays within 6 studs for 8 s gets pinged. They're highlighted, a ripple shows their position, and the God is notified.
+- Anti-camp radar (outdoors only): a survivor who stays within 6 studs for 8 s in the open gets pinged. They're highlighted, a ripple shows their position, and the God is notified. Survivors hiding indoors or inside a jammed zone are exempt.
+- 📡 **Seismic Ping** (every kit, slot 6 / key 6; a separate round radar button offset from the five disasters on phones): 15 energy, 14 s cooldown. After a 0.5 s ring, every survivor within 70 studs who isn't in a jammed zone glows through walls for 2 s, and they get a "PINGED" warning.
 - Rewards: coins per elimination and per part destroyed.
 
 ### Survivors
@@ -39,6 +40,21 @@ The round ends early as soon as no survivors are left.
 - **Ledge mantle**: jump in mid-air against a ledge to haul yourself up.
 - **Gear** (bought in the Shop, keys 1-3): Speed Soda (sprint), Balloon Glider (low gravity), Shockwave Shield (brief invulnerability that pushes debris away).
 - **Close-call rewards**: NEAR MISS +25 when you're just outside a blast; STRUCTURAL ESCAPE +50 when a building collapses with you inside and you live. Each comes with screen shake and a pop-up.
+
+### Hide and seek (`Config.Stealth`, StealthService / StealthController)
+- The God sees every survivor's name tag through walls, except survivors who are **Hidden**: standing still for 1 s under an intact roof (any structural part within 45 studs overhead), or standing in a jammed zone. A HIDDEN badge shows when you are. When the God breaks the roof above you, you lose cover.
+- **Noise:** jumping, dashing, using gear, flipping a breaker, riding a launch pad, or standing within 10 studs of a window that shatters sends a ripple only the God sees, and resets your hiding.
+
+### Map props (`World/Props.luau`, PropService)
+Every arena has, on scanned free ground away from spawns and hazards:
+- **2 circuit breakers:** hold for 1.2 s to jam the God's radar for 12 s within 30 studs (everyone inside is hidden and immune to the Seismic Ping and anti-camp radar). 35 s recharge; flipping one is loud.
+- **3 launch pads:** two on the ground and one on the roof of the map's tallest new building (it falls with that roof). Each flings you about 25 studs up and toward the middle of the map.
+- **1 vault:** a reinforced bunker whose parts have 450 health, enough to take one Meteor or Lightning hit before caving in on the second. Its roof also makes it a hiding spot.
+
+### Disaster combos (`Config.Combos`, ComboService)
+- **Conduction:** Lightning and Chain Bolt arc into intact metal structure within 1.6x the strike radius (up to 8 parts) and shock survivors within 7 studs of a charged part (25 damage). A strike at the rising water line shocks swimmers within 45 studs (30 damage), and a strike into a puddle shocks everyone standing in it.
+- **Firenado:** a Tornado that touches fire (an Eruption pool or a burning patch) turns into a firenado and drops 6-stud burning patches every 0.5 s for its remaining life.
+- **Puddles:** a toppled water tower or pipe gantry floods a 16-stud puddle for 14 s. Puddles put out fires and lava pools, conduct lightning, and make knockback 1.6x stronger.
 
 ### Eliminated / waiting players
 - Respawn straight into the **Sky Lodge** lobby (watch from the observation deck).

@@ -227,6 +227,7 @@ export type HighriseStyle = {
 	WallTransparency: number,
 	PillarHeight: number?, -- open ground floor of exposed pillars
 	OpenSide: string?, -- "East" | "West": side left open for the ladder
+	Health: number?, -- per-part health override (reinforced vaults)
 }
 
 -- Multi-storey structure whose floors stack on support columns.
@@ -264,7 +265,7 @@ function Builder.highrise(
 					style.ColumnColor,
 					style.ColumnMaterial
 				)
-				Builder.structural(col, lvl, true)
+				Builder.structural(col, lvl, true, style.Health)
 			end
 		end
 	end
@@ -283,7 +284,7 @@ function Builder.highrise(
 					style.SlabColor,
 					style.SlabMaterial
 				)
-				Builder.structural(tile, lvl, false)
+				Builder.structural(tile, lvl, false, style.Health)
 			end
 		end
 	end
@@ -310,7 +311,7 @@ function Builder.highrise(
 					Material = style.WallMaterial,
 					Transparency = style.WallTransparency,
 				})
-				Builder.structural(panel, lvl, false)
+				Builder.structural(panel, lvl, false, style.Health)
 			end
 		end
 		local cy = fromY + height / 2

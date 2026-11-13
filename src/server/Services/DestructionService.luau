@@ -37,6 +37,10 @@ local collapsed = Instance.new("BindableEvent")
 -- (building: Model, center: Vector3, size: Vector3)
 DestructionService.Collapsed = collapsed.Event
 
+local glassBroken = Instance.new("BindableEvent")
+-- (position: Vector3) a window shattered (StealthService: nearby survivors make noise)
+DestructionService.GlassBroken = glassBroken.Event
+
 local volatileBurst = Instance.new("BindableEvent")
 -- (position: Vector3, radius: number)
 DestructionService.VolatileBurst = volatileBurst.Event
@@ -250,6 +254,7 @@ local function breakPart(part: BasePart, from: Vector3?): boolean
 	end
 	if part.Material == Enum.Material.Glass then
 		AudioService.playAt("Glass", part.Position, 1.4, 0.9 + math.random() * 0.3, Config.Audio.GlassSoundCooldown)
+		glassBroken:Fire(part.Position)
 	end
 	if isCosmetic(part) then
 		shatter(part, from)

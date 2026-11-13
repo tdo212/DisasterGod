@@ -71,7 +71,7 @@ function ScoringService.GetRecord(player: Player): Types.RoundRecord
 end
 
 -- Survivors who were just outside a blast radius get a near-miss reward.
-function ScoringService.CheckNearMiss(center: Vector3, radius: number)
+function ScoringService.CheckNearMiss(center: Vector3, radius: number, _cause: string?)
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpOf(player)
 		if hrp then
@@ -86,7 +86,7 @@ function ScoringService.CheckNearMiss(center: Vector3, radius: number)
 	end
 end
 
-function ScoringService.NoteHit(victim: Player, by: Player?)
+function ScoringService.NoteHit(victim: Player, by: Player?, _cause: string?)
 	if by and by ~= victim then
 		lastHit[victim] = { By = by, At = os.clock() }
 	end

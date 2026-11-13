@@ -8,7 +8,7 @@ export type SubPhase = "None" | "Prep" | "Escalation" | "SuddenDeath"
 
 export type PlayerRole = "Survivor" | "DisasterGod" | "Spectator"
 
-export type AbilityTier = "Minor" | "Major"
+export type AbilityTier = "Minor" | "Major" | "Utility" -- Utility: scouting, never cast by the AI Director
 
 export type AbilityDefinition = {
 	Id: string,

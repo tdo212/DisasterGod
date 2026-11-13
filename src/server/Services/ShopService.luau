@@ -12,6 +12,7 @@ local DestructionService = require(script.Parent.DestructionService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
+local StealthService = require(script.Parent.StealthService)
 
 local ShopService = {}
 
@@ -34,6 +35,7 @@ function ShopService.SetRoundActive(active: boolean)
 end
 
 local function use(player: Player, def: Types.GearDefinition)
+	StealthService.Noise(player, 1) -- gear is loud: the God hears it
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?

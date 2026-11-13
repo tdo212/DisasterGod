@@ -573,8 +573,8 @@ local function roleCards(): { [string]: RoleCard }
 			Color = C.Purple,
 			Light = C.PurpleLight,
 			Bullets = if touch
-				then { "👆 Drag to fly · pinch to zoom", "🎯 Pick a disaster, then tap the arena", "🏚️ Break supports to collapse buildings" }
-				else { "🕹️ WASD to fly · scroll to zoom", "🎯 Keys 1-5 pick · click to cast", "🏚️ Break supports to collapse buildings" },
+				then { "👆 Drag to fly · pinch to zoom", "🎯 Pick a disaster, then tap the arena", "📡 Round radar button finds hidden survivors" }
+				else { "🕹️ WASD to fly · scroll to zoom", "🎯 Keys 1-5 pick · click to cast", "📡 Key 6 pings survivors hiding indoors" },
 		},
 		Survivor = {
 			Title = "🏃 SURVIVE THE DISASTERS",
@@ -583,7 +583,7 @@ local function roleCards(): { [string]: RoleCard }
 			Bullets = {
 				"🔴 Red zones mean a disaster is about to hit",
 				if touch then "💨 Tap DASH to dodge out of danger" else "💨 Press Q to DASH out of danger",
-				"⛰️ Sudden Death: get to high ground!",
+				"🫥 Stand still indoors to hide · jumping is loud",
 			},
 		},
 	}

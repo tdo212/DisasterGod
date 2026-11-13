@@ -117,6 +117,20 @@ local Abilities: { Types.AbilityDefinition } = {
 		StructureDamage = 115,
 		Knockback = 70,
 	},
+	-- every kit also gets this one (Disasters.UniversalAbilities)
+	{
+		Id = "SeismicPing",
+		DisplayName = "Seismic Ping",
+		Icon = "📡",
+		Tier = "Utility",
+		Cost = 15,
+		Cooldown = 14,
+		WarningTime = 0.5,
+		Radius = 70, -- survivors inside are revealed through walls
+		PlayerDamage = 0,
+		StructureDamage = 0,
+		Duration = 2, -- reveal seconds
+	},
 }
 
 -- God loadouts. Each kit is five ability ids; bought with coins, equipped in the shop.
@@ -265,6 +279,54 @@ local Config = {
 		MajorChance = 0.35,
 	},
 
+	-- Hide-and-seek. A survivor standing still under an intact roof (or inside a jammed
+	-- zone) is Hidden: the God loses their through-wall name tag and the anti-camp radar
+	-- ignores them. Jumping, dashing, gear, emotes and launch pads make a noise ripple
+	-- that only the God sees.
+	Stealth = {
+		CheckInterval = 0.25,
+		StillSpeed = 3, -- studs/s; slower than this counts as still
+		HideDelay = 1, -- seconds still (and indoors) before hidden
+		RoofCheckHeight = 45, -- an intact structural part this far overhead = indoors
+		JumpNoiseSpeed = 22, -- upward speed that counts as a jump
+		RunNoiseSpeed = 30, -- horizontal speed that counts as a dash
+		NoiseCooldown = 1.2,
+		NoiseRippleRadius = 22, -- God-side ripple size for strength 1
+		GlassNoiseRadius = 10, -- survivors this close to a shattering window make noise
+	},
+
+	-- Interactive map props (positions in World/Props.luau).
+	Props = {
+		JamRadius = 30,
+		JamDuration = 12,
+		BreakerHold = 1.2,
+		BreakerCooldown = 35,
+		LaunchUp = 95,
+		LaunchForward = 32,
+		LaunchCooldown = 2.5,
+		VaultHealth = 450, -- per part: survives one Meteor or Lightning hit, caves on the second
+	},
+
+	-- Disasters reacting to the world and to each other.
+	Combos = {
+		MetalReach = 1.6, -- x the strike radius: metal parts this close conduct the bolt
+		MetalMaxArcs = 8,
+		MetalShockRadius = 7, -- survivors this close to a charged metal part
+		ShockDamage = 25,
+		WaterShockRadius = 45, -- a bolt at the rising water line shocks swimmers this close
+		WaterShockMargin = 4, -- strike within this many studs of the fluid surface
+		WaterShockDamage = 30,
+		FireRadius = 6, -- burning patches dropped by a firenado
+		FireDuration = 5,
+		FireDamage = 6, -- per FireTick
+		FireTick = 0.5,
+		FireDropInterval = 0.5,
+		PuddleRadius = 16,
+		PuddleDuration = 14,
+		WetKnockback = 1.6, -- knockback multiplier while standing in a puddle
+		PuddleSources = { "WaterTower", "PipeGantry" } :: { string },
+	},
+
 	AntiCamp = {
 		CheckInterval = 1,
 		StationaryTime = 8,
@@ -300,6 +362,7 @@ local Config = {
 
 	Disasters = {
 		Abilities = Abilities,
+		UniversalAbilities = { "SeismicPing" }, -- added to every kit as hotbar slot 6
 		PostImpactLinger = 0.6,
 	},
 
@@ -584,6 +647,7 @@ local Config = {
 		Ragdolled = "Ragdolled", -- Player
 		VoteOpen = "VoteOpen", -- ReplicatedStorage: map vote in progress
 		Slowed = "Slowed", -- Player: standing in quicksand
+		Hidden = "Hidden", -- Player: hidden from the God (still indoors, or jammed)
 	},
 }
 

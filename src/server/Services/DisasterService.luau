@@ -1,7 +1,8 @@
 --!strict
 -- DisasterService: Chaos Energy economy, ability validation (per God kit), telegraphs,
--- the disasters, the AI Director (plays God when no human does), anti-camp radar and
--- the end-of-round Hunter's Pulse.
+-- the disasters, the Seismic Ping, the AI Director (plays God when no human does),
+-- anti-camp radar (outdoors only) and the end-of-round Hunter's Pulse.
+-- World / disaster interactions live in ComboService, hiding in StealthService.
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -13,11 +14,13 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
 
+local ComboService = require(script.Parent.ComboService)
 local DestructionService = require(script.Parent.DestructionService)
 local EnvironmentService = require(script.Parent.EnvironmentService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
+local StealthService = require(script.Parent.StealthService)
 
 type Ability = Types.AbilityDefinition
 type Pool = { Energy: number, Ready: { [string]: number } }
@@ -96,10 +99,11 @@ local function hrpAndHumanoid(player: Player): (BasePart?, Humanoid?)
 	return character:FindFirstChild("HumanoidRootPart") :: BasePart?, character:FindFirstChildOfClass("Humanoid")
 end
 
-local function hurt(player: Player, damage: number, caster: Player?)
+-- `cause` names what hit them for the kill feed ("Meteors", "Tornado", ...).
+local function hurt(player: Player, damage: number, caster: Player?, cause: string?)
 	local _, humanoid = hrpAndHumanoid(player)
 	if humanoid and humanoid.Health > 0 and damage > 0 then
-		ScoringService.NoteHit(player, caster)
+		ScoringService.NoteHit(player, caster, cause)
 		humanoid:TakeDamage(damage)
 	end
 end
@@ -107,6 +111,10 @@ end
 local function knock(player: Player, velocity: Vector3)
 	local info = MapService.GetCurrent()
 	local mult = if info and info.KnockbackMultiplier then info.KnockbackMultiplier else 1
+	local hrp = hrpAndHumanoid(player)
+	if hrp then
+		mult *= ComboService.KnockbackScale(hrp.Position) -- slippery puddles
+	end
 	local v = velocity * mult
 	-- a hard enough hit sends the survivor tumbling as a ragdoll
 	if v.Magnitude >= Config.Ragdoll.MinKnockback then
@@ -116,13 +124,13 @@ local function knock(player: Player, velocity: Vector3)
 end
 
 -- Hurt + optionally knock back survivors in a sphere; near-miss everyone just outside.
-local function blast(center: Vector3, radius: number, damage: number, caster: Player?, knockback: number?)
+local function blast(center: Vector3, radius: number, damage: number, caster: Player?, knockback: number?, cause: string?)
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpAndHumanoid(player)
 		if hrp then
 			local offset = hrp.Position - center
 			if offset.Magnitude <= radius + 1.5 then
-				hurt(player, damage, caster)
+				hurt(player, damage, caster, cause)
 				if knockback then
 					local flat = Vector3.new(offset.X, 0, offset.Z)
 					local dir = if flat.Magnitude > 0.1 then flat.Unit else Vector3.xAxis
@@ -131,7 +139,7 @@ local function blast(center: Vector3, radius: number, damage: number, caster: Pl
 			end
 		end
 	end
-	ScoringService.CheckNearMiss(center, radius)
+	ScoringService.CheckNearMiss(center, radius, cause)
 end
 
 local function creditDestruction(caster: Player?, count: number)
@@ -224,7 +232,9 @@ local function strike(def: Ability, ground: Vector3, caster: Player?)
 	sound("Thunder", ground, 1.6, 0.9 + math.random() * 0.2)
 	shakeAll(0.5, 0.3, ground)
 	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
-	blast(ground, def.Radius, def.PlayerDamage, caster, 30)
+	blast(ground, def.Radius, def.PlayerDamage, caster, 30, def.DisplayName)
+	-- conducts through nearby metal, the rising water and puddles
+	ComboService.Electrify(ground, def.Radius, caster)
 end
 
 local BOLT_BLUE = Color3.fromRGB(120, 200, 255)
@@ -288,8 +298,10 @@ local function eruption(def: Ability, ground: Vector3, caster: Player?)
 	sound("Explosion", ground, 2.4, 0.8)
 	shakeAll(1, 0.6, ground)
 	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
-	blast(ground, def.Radius, def.PlayerDamage, caster, def.Knockback)
+	blast(ground, def.Radius, def.PlayerDamage, caster, def.Knockback, def.DisplayName)
 	local duration = def.Duration or 6
+	-- the pool counts as fire: a tornado through it becomes a firenado, a puddle puts it out
+	local fire = ComboService.AddFire(ground, def.Radius, duration)
 	local pool = fxPart({
 		Name = "LavaPool",
 		Shape = Enum.PartType.Cylinder,
@@ -314,7 +326,7 @@ local function eruption(def: Ability, ground: Vector3, caster: Player?)
 		Debris:AddItem(glob, 1)
 	end
 	local elapsed = 0
-	while elapsed < duration and state.Active do
+	while elapsed < duration and state.Active and ComboService.IsBurning(fire) do
 		task.wait(0.5)
 		elapsed += 0.5
 		creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius * 0.8, def.StructureDamage * 0.15))
@@ -323,7 +335,7 @@ local function eruption(def: Ability, ground: Vector3, caster: Player?)
 			if hrp then
 				local d = hrp.Position - ground
 				if Vector3.new(d.X, 0, d.Z).Magnitude <= def.Radius and d.Y > -4 and d.Y < 12 then
-					hurt(player, def.TickDamage or 10, caster)
+					hurt(player, def.TickDamage or 10, caster, "Lava")
 				end
 			end
 		end
@@ -359,12 +371,12 @@ local function glitch(def: Ability, ground: Vector3, caster: Player?)
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpAndHumanoid(player)
 		if hrp and (hrp.Position - ground).Magnitude <= def.Radius + 1.5 then
-			hurt(player, def.PlayerDamage, caster)
+			hurt(player, def.PlayerDamage, caster, def.DisplayName)
 			local a = math.random() * math.pi * 2
 			knock(player, Vector3.new(math.cos(a) * k * 0.3, k, math.sin(a) * k * 0.3))
 		end
 	end
-	ScoringService.CheckNearMiss(ground, def.Radius)
+	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
 end
 
 local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
@@ -393,11 +405,11 @@ local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpAndHumanoid(player)
 		if hrp and (hrp.Position - ground).Magnitude <= def.Radius then
-			hurt(player, def.PlayerDamage, caster)
+			hurt(player, def.PlayerDamage, caster, def.DisplayName)
 			knock(player, dir * k + Vector3.new(0, 28, 0))
 		end
 	end
-	ScoringService.CheckNearMiss(ground, def.Radius)
+	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
 end
 
 local function meteors(def: Ability, ground: Vector3, caster: Player?)
@@ -438,7 +450,7 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 			sound("MeteorImpact", point, 2.2, 0.85 + math.random() * 0.3)
 			shakeAll(0.8, 0.4, point)
 			creditDestruction(caster, DestructionService.DamageArea(point, impact, def.StructureDamage))
-			blast(point, impact, def.PlayerDamage, caster, 45)
+			blast(point, impact, def.PlayerDamage, caster, 45, def.DisplayName)
 		end)
 		task.wait(0.28)
 	end
@@ -480,6 +492,8 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 	local playerTimer = 0
 	local spin = 0
 	local radius = def.Radius
+	local burning = false -- caught fire from a lava pool / burning patch: a firenado
+	local dropTimer = 0
 	local conn: RBXScriptConnection
 	local finished = Instance.new("BindableEvent")
 
@@ -517,12 +531,30 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		if tickTimer >= 0.25 then
 			tickTimer = 0
 			creditDestruction(caster, DestructionService.DamageArea(pos + Vector3.new(0, 8, 0), radius, def.StructureDamage * 0.25))
+			if not burning and ComboService.FireNear(pos, radius) then
+				burning = true
+				for i, ring in rings do
+					ring.Part.Color = Color3.fromRGB(255, 120 - i * 8, 30)
+					ring.Part.Material = Enum.Material.Neon
+				end
+				sound("Explosion", pos, 1.8, 0.7)
+				if caster then
+					ScoringService.Notify(caster, "🔥 COMBO: FIRENADO!", ORANGE)
+				end
+			end
 			for _, part in DestructionService.GetDebrisNear(pos, radius * 1.8) do
 				local offset = part.Position - pos
 				local tangent = Vector3.new(-offset.Z, 0, offset.X)
 				if tangent.Magnitude > 0.1 then
 					part.AssemblyLinearVelocity = tangent.Unit * 40 - Vector3.new(offset.X, 0, offset.Z) * 0.6 + Vector3.new(0, 35, 0)
 				end
+			end
+		end
+		if burning then
+			dropTimer += dt
+			if dropTimer >= Config.Combos.FireDropInterval then
+				dropTimer = 0
+				ComboService.DropFire(pos, caster)
 			end
 		end
 		playerTimer += dt
@@ -534,7 +566,7 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 				if hrp then
 					local offset = Vector3.new(hrp.Position.X - pos.X, 0, hrp.Position.Z - pos.Z)
 					if offset.Magnitude <= radius and hrp.Position.Y - pos.Y < 50 then
-						hurt(player, def.TickDamage or 8, caster)
+						hurt(player, def.TickDamage or 8, caster, if burning then "Firenado" else def.DisplayName)
 						local tangent = if offset.Magnitude > 0.1 then Vector3.new(-offset.Z, 0, offset.X).Unit else Vector3.xAxis
 						knock(player, tangent * k * 0.6 + Vector3.new(0, k, 0))
 					end
@@ -595,7 +627,7 @@ local function faultCleave(def: Ability, ground: Vector3, dir: Vector3, caster: 
 		if hrp then
 			local localPos = boxCf:PointToObjectSpace(hrp.Position)
 			if math.abs(localPos.X) <= width / 2 + 1 and math.abs(localPos.Y) <= boxSize.Y / 2 and math.abs(localPos.Z) <= length / 2 then
-				hurt(player, def.PlayerDamage, caster)
+				hurt(player, def.PlayerDamage, caster, def.DisplayName)
 				knock(player, Vector3.new(0, 55, 0) + cf.RightVector * (if localPos.X >= 0 then 25 else -25))
 			elseif math.abs(localPos.X) <= width / 2 + Config.Scoring.NearMissMargin and math.abs(localPos.Z) <= length / 2 then
 				ScoringService.Award(player, Config.Scoring.NearMissCoins, "NEAR MISS", Color3.fromRGB(90, 230, 255))
@@ -605,8 +637,31 @@ local function faultCleave(def: Ability, ground: Vector3, dir: Vector3, caster: 
 	end
 end
 
+-- Every God's scouting tool: survivors in range show through walls for a moment.
+local function seismicPing(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, PURPLE)
+	task.wait(def.WarningTime)
+	sound("Rumble", ground, 1.4, 1.4)
+	local wave = fxPart({
+		Name = "SeismicWave",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, 4, 4),
+		CFrame = CFrame.new(ground + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = PURPLE,
+		Transparency = 0.3,
+	})
+	TweenService:Create(wave, TweenInfo.new(0.8, Enum.EasingStyle.Quad), { Size = Vector3.new(0.3, def.Radius * 2, def.Radius * 2), Transparency = 1 }):Play()
+	Debris:AddItem(wave, 0.85)
+	local found = StealthService.Reveal(ground, def.Radius, def.Duration or 2, caster)
+	if caster then
+		ScoringService.Notify(caster, if found > 0 then string.format("📡 PING: %d FOUND", found) else "📡 PING: NOTHING NEARBY", PURPLE)
+	end
+end
+
 local function execute(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
-	if def.Id == "Lightning" then
+	if def.Id == "SeismicPing" then
+		seismicPing(def, ground, caster)
+	elseif def.Id == "Lightning" then
 		lightning(def, ground, caster)
 	elseif def.Id == "Gust" then
 		gust(def, ground, dir, caster)
@@ -625,8 +680,11 @@ local function execute(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 	end
 end
 
--- A human God may only cast what their equipped kit contains.
+-- A human God may only cast what their equipped kit contains (plus the universal slot).
 local function kitAllows(player: Player, id: string): boolean
+	if table.find(Config.Disasters.UniversalAbilities, id) then
+		return true
+	end
 	local kitId = player:GetAttribute(Attributes.Kit)
 	for _, kit in Config.Kits do
 		if kit.Id == kitId then
@@ -715,7 +773,7 @@ local function directorLoop()
 		local affordable: { Ability } = {}
 		local majors: { Ability } = {}
 		for _, def in Config.Disasters.Abilities do
-			if pool.Energy >= def.Cost and (pool.Ready[def.Id] or 0) <= now then
+			if def.Tier ~= "Utility" and pool.Energy >= def.Cost and (pool.Ready[def.Id] or 0) <= now then
 				table.insert(affordable, def)
 				if def.Tier == "Major" then
 					table.insert(majors, def)
@@ -790,6 +848,12 @@ local function radarTick()
 	local now = os.clock()
 	for _, player in RoleService.GetAliveSurvivors() do
 		local hrp = hrpAndHumanoid(player)
+		-- hiding indoors or in a jammed zone is fair play; camping in the open is not
+		if hrp and (StealthService.IsIndoors(player) or StealthService.IsJammed(hrp.Position)) then
+			stillSince[player] = os.clock()
+			lastPos[player] = hrp.Position
+			continue
+		end
 		if hrp then
 			local last = lastPos[player]
 			if not last or (hrp.Position - last).Magnitude > Config.AntiCamp.StationaryRadius then
@@ -838,6 +902,8 @@ end
 
 function DisasterService.BeginRound(god: Player?)
 	table.clear(pools)
+	ComboService.Reset()
+	StealthService.Reset()
 	state.Active = true
 	state.CastingOpen = false
 	state.SuddenDeath = false
@@ -893,7 +959,7 @@ function DisasterService.Init()
 	DestructionService.VolatileBurst:Connect(function(pos: Vector3, radius: number)
 		shakeAll(0.9, 0.5, pos)
 		sound("Explosion", pos, 2.6)
-		blast(pos, radius, Config.Destruction.VolatilePlayerDamage, state.God, 50)
+		blast(pos, radius, Config.Destruction.VolatilePlayerDamage, state.God, 50, "Explosion")
 	end)
 
 	-- big collapses rattle every camera nearby

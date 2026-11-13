@@ -1,6 +1,8 @@
 --!strict
 -- GodController: the Disaster God's tactical view — orbit camera, projected targeting
 -- reticle, the equipped kit's ability hotbar with costs/cooldowns, the Chaos Energy bar.
+-- The universal Seismic Ping sits after the five kit slots as a separate, round radar
+-- button (offset further on phones so thumbs don't hit it by mistake).
 -- Mouse: aim with the cursor, click to cast. Touch: the reticle sits at screen centre
 -- (drag to move the view) with a CAST button; tapping the arena casts right there.
 
@@ -30,6 +32,9 @@ local GodController = {}
 
 local SLOT = 74
 local SLOT_GAP = 12
+local UTILITY_GAP = 26 -- extra space before the radar slot (desktop)
+local UTILITY_GAP_TOUCH = 44
+local RADAR = Color3.fromRGB(40, 205, 190)
 
 local abilityById: { [string]: Ability } = {}
 for _, def in Config.Disasters.Abilities do
@@ -56,7 +61,7 @@ local beam: Part? = nil
 local castRemote = Remotes.get("CastDisaster")
 local inputConnections: { RBXScriptConnection } = {}
 
-local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five }
+local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six }
 
 local function energy(): number
 	return player:GetAttribute(Attributes.ChaosEnergy) :: number? or 0
@@ -66,7 +71,7 @@ local function readyAt(id: string): number
 	return player:GetAttribute(Attributes.CooldownPrefix .. id) :: number? or 0
 end
 
--- The five abilities of the equipped kit.
+-- The five abilities of the equipped kit, then the universal ones (Seismic Ping).
 local function currentLoadout(): { Ability }
 	local kitId = player:GetAttribute(Attributes.Kit)
 	local kit = Config.Kits[1]
@@ -78,6 +83,12 @@ local function currentLoadout(): { Ability }
 	end
 	local list = {}
 	for _, id in kit.Abilities do
+		local def = abilityById[id]
+		if def then
+			table.insert(list, def)
+		end
+	end
+	for _, id in Config.Disasters.UniversalAbilities do
 		local def = abilityById[id]
 		if def then
 			table.insert(list, def)
@@ -103,19 +114,30 @@ local function buildSlots()
 	slotHolder:ClearAllChildren()
 	table.clear(slots)
 	loadout = currentLoadout()
-	local width = #loadout * (SLOT + SLOT_GAP) + SLOT_GAP + 8
+	local utilityGap = if touch then UTILITY_GAP_TOUCH else UTILITY_GAP
+	local hasUtility = false
+	for _, def in loadout do
+		hasUtility = hasUtility or def.Tier == "Utility"
+	end
+	local width = #loadout * (SLOT + SLOT_GAP) + SLOT_GAP + 8 + (if hasUtility then utilityGap else 0)
 	dock.Size = UDim2.fromOffset(width, 162)
+	local x = SLOT_GAP + 4
 	for i, def in loadout do
+		local utility = def.Tier == "Utility"
+		if utility then
+			x += utilityGap
+		end
 		local slot = Instance.new("TextButton")
 		slot.Name = def.Id
 		slot.Text = ""
 		slot.AutoButtonColor = false
 		slot.Size = UDim2.fromOffset(SLOT, SLOT)
-		slot.Position = UDim2.fromOffset(SLOT_GAP + 4 + (i - 1) * (SLOT + SLOT_GAP), 12)
+		slot.Position = UDim2.fromOffset(x, 12)
+		x += SLOT + SLOT_GAP
 		slot.BackgroundColor3 = Color3.new(1, 1, 1)
-		Components.corner(slot, Theme.Radius.Medium)
+		Components.corner(slot, if utility then UDim.new(0.5, 0) else Theme.Radius.Medium)
 		local stroke = Components.stroke(slot, Theme.Stroke.Heavy)
-		local tint = if def.Tier == "Major" then C.Purple else C.Blue
+		local tint = if utility then RADAR elseif def.Tier == "Major" then C.Purple else C.Blue
 		Components.gradient(slot, tint:Lerp(Color3.new(1, 1, 1), 0.25), tint:Lerp(Color3.new(0, 0, 0), 0.35), 90, true)
 		Components.studs(slot)
 		slot.Parent = slotHolder
