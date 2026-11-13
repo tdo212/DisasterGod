@@ -18,6 +18,7 @@ local AudioService = require(script.Parent.AudioService)
 local DestructionService = require(script.Parent.DestructionService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
+local SaveService = require(script.Parent.SaveService)
 local ScoringService = require(script.Parent.ScoringService)
 
 local CB = Config.Combos
@@ -82,6 +83,9 @@ local function shock(player: Player, damage: number, caster: Player?, cause: str
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if humanoid and hrp and humanoid.Health > 0 then
 		ScoringService.NoteHit(player, caster, cause)
+		if SaveService.TryAegis(player, humanoid, damage) then
+			return
+		end
 		humanoid:TakeDamage(damage)
 		arc(hrp.Position + Vector3.new(0, 6, 0), hrp.Position)
 	end
@@ -266,7 +270,9 @@ function ComboService.Init()
 					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 					if humanoid and humanoid.Health > 0 then
 						ScoringService.NoteHit(player, zone.Caster, "Firenado")
-						humanoid:TakeDamage(CB.FireDamage)
+						if not SaveService.TryAegis(player, humanoid, CB.FireDamage) then
+							humanoid:TakeDamage(CB.FireDamage)
+						end
 					end
 				end
 			end

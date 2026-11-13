@@ -126,6 +126,15 @@ function ScoringService.NoteHit(victim: Player, by: Player?, cause: string?)
 	end
 end
 
+-- The last recorded cause of damage (within the feed window), before it is cleared.
+function ScoringService.GetLastCause(victim: Player): string?
+	local cause = lastCause[victim]
+	if cause and os.clock() - cause.At <= F.CauseWindow then
+		return cause.Cause
+	end
+	return nil
+end
+
 -- "PlayerA was flattened by Bay Hotel", "PlayerB was struck by Lightning", ...
 local function deathLine(victim: Player): string
 	local now = os.clock()

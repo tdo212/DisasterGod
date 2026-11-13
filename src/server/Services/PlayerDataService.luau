@@ -45,7 +45,15 @@ local function defaultProfile(): Profile
 		Gear = gear,
 		WelcomeClaimed = false,
 		Receipts = {},
+		Cosmetics = {},
+		Equipped = table.clone(Config.Cosmetics.Defaults),
+		Saves = { Glider = 0, Aegis = 0 },
 	}
+end
+
+-- Free starters are always owned.
+local function isFree(def: any): boolean
+	return def.Coins == nil and def.Product == nil
 end
 
 local function publish(player: Player, profile: Profile)
@@ -64,6 +72,15 @@ local function publish(player: Player, profile: Profile)
 	end
 	for kind, seen in profile.Tutorials do
 		player:SetAttribute(Attributes.TutorialPrefix .. kind, seen)
+	end
+	for _, def in Config.Cosmetics.Items do
+		player:SetAttribute(Attributes.CosmeticPrefix .. def.Id, profile.Cosmetics[def.Id] == true or isFree(def))
+	end
+	for category, id in profile.Equipped do
+		player:SetAttribute(Attributes.EquipPrefix .. category, id)
+	end
+	for kind, count in profile.Saves do
+		player:SetAttribute(Attributes.SavePrefix .. kind, count)
 	end
 	local stats = player:FindFirstChild("leaderstats")
 	if stats then
@@ -98,6 +115,12 @@ local function merge(profile: Profile, data: { [string]: any })
 			copyMap(profile.Kits, value, "boolean")
 		elseif key == "Tutorials" then
 			copyMap(profile.Tutorials, value, "boolean")
+		elseif key == "Cosmetics" then
+			copyMap(profile.Cosmetics, value, "boolean")
+		elseif key == "Equipped" then
+			copyMap(profile.Equipped, value, "string")
+		elseif key == "Saves" then
+			copyMap(profile.Saves, value, "number")
 		elseif key == "Receipts" and typeof(value) == "table" then
 			for _, id in value do
 				if typeof(id) == "string" then
@@ -124,6 +147,19 @@ local function merge(profile: Profile, data: { [string]: any })
 	profile.Kits[Config.DefaultKit] = true
 	if not profile.Kits[profile.Kit] then
 		profile.Kit = Config.DefaultKit
+	end
+	-- an equipped cosmetic that is no longer owned (or no longer exists) falls back
+	for category, fallback in Config.Cosmetics.Defaults do
+		local id = profile.Equipped[category]
+		local ok = false
+		for _, def in Config.Cosmetics.Items do
+			if def.Id == id and def.Category == category and (profile.Cosmetics[id] or isFree(def)) then
+				ok = true
+			end
+		end
+		if not ok then
+			profile.Equipped[category] = fallback
+		end
 	end
 end
 
@@ -345,6 +381,66 @@ function PlayerDataService.EquipKit(player: Player, kitId: string): boolean
 	end
 	profile.Kit = kitId
 	publish(player, profile)
+	return true
+end
+
+---------------------------------------------------------------------------
+-- cosmetics and panic saves
+
+local function cosmeticDef(id: string): Types.CosmeticDefinition?
+	for _, def in Config.Cosmetics.Items do
+		if def.Id == id then
+			return def
+		end
+	end
+	return nil
+end
+
+function PlayerDataService.OwnsCosmetic(player: Player, id: string): boolean
+	local profile = profiles[player]
+	local def = cosmeticDef(id)
+	return profile ~= nil and def ~= nil and (profile.Cosmetics[id] == true or isFree(def))
+end
+
+function PlayerDataService.GrantCosmetic(player: Player, id: string)
+	local profile = profiles[player]
+	if profile and cosmeticDef(id) then
+		profile.Cosmetics[id] = true
+		player:SetAttribute(Attributes.CosmeticPrefix .. id, true)
+	end
+end
+
+function PlayerDataService.EquipCosmetic(player: Player, id: string): boolean
+	local profile = profiles[player]
+	local def = cosmeticDef(id)
+	if not (profile and def and PlayerDataService.OwnsCosmetic(player, id)) then
+		return false
+	end
+	profile.Equipped[def.Category] = id
+	player:SetAttribute(Attributes.EquipPrefix .. def.Category, id)
+	return true
+end
+
+function PlayerDataService.GetEquipped(player: Player, category: string): string
+	local profile = profiles[player]
+	return (profile and profile.Equipped[category]) or Config.Cosmetics.Defaults[category]
+end
+
+function PlayerDataService.AddSave(player: Player, kind: string, count: number)
+	local profile = profiles[player]
+	if profile then
+		profile.Saves[kind] = (profile.Saves[kind] or 0) + count
+		player:SetAttribute(Attributes.SavePrefix .. kind, profile.Saves[kind])
+	end
+end
+
+function PlayerDataService.UseSave(player: Player, kind: string): boolean
+	local profile = profiles[player]
+	if not profile or (profile.Saves[kind] or 0) <= 0 then
+		return false
+	end
+	profile.Saves[kind] -= 1
+	player:SetAttribute(Attributes.SavePrefix .. kind, profile.Saves[kind])
 	return true
 end
 

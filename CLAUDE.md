@@ -43,7 +43,8 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 ## Monetization
 - Developer product and game pass IDs live in `Config.Monetization` (Products / Passes). Grants live in `MonetizationService`; every product grant must be idempotent (receipt IDs are stored per profile).
 - Never commit Open Cloud API keys or other credentials. Create new items through the Studio MCP `open_cloud_invoke` tool once its scopes are granted, or with a key held only outside the repo.
-- Test grants in Play Solo with `ServerStorage.DevPurchase:Invoke(userId, "Product" | "Pass", key)` (Studio only).
+- Test grants in Play Solo with `ServerStorage.DevPurchase:Invoke(userId, "Product" | "Pass", key)` (Studio only). It also grants placeholder products (Id 0).
+- New products start with `Id = 0` (placeholder): the shop shows SOON and receipts never match them until the real id is filled in. Cosmetic and panic-save products are wired from their `Cosmetic` / `Save` fields; no per-product grant code needed.
 
 ## UI
 - UI code lives under `src/client/` (controllers build or drive UI).

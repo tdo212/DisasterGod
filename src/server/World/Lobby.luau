@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = require(script.Parent.Builder)
 local Config = require(ReplicatedStorage.Shared.Config)
+local GodSkins = require(ReplicatedStorage.Shared.GodSkins)
 
 local ROCK = Color3.fromRGB(125, 105, 90)
 local ROCK_DARK = Color3.fromRGB(95, 82, 75)
@@ -587,6 +588,50 @@ local function passPedestals(model: Model, L: Vector3)
 	end
 end
 
+-- God skin display: a small statue of every skin either side of the spawn, facing the
+-- hall. The prompt opens the shop's Style tab (MenuController).
+local SKIN_SPOTS = { Vector3.new(-40, 0, -42), Vector3.new(-30, 0, -42), Vector3.new(-20, 0, -42), Vector3.new(20, 0, -42), Vector3.new(30, 0, -42) }
+
+local function skinDisplays(model: Model, L: Vector3)
+	local root = folder(model, "SkinDisplays")
+	local i = 0
+	for _, def in Config.Cosmetics.Items do
+		if def.Category ~= "GodSkin" then
+			continue
+		end
+		i += 1
+		local spot = SKIN_SPOTS[i]
+		if not spot then
+			break
+		end
+		local base = L + spot
+		local pedestal = Builder.cylinder(root, "SkinPedestal", base + Vector3.new(0, 0.75, 0), 1.5, 6, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
+		local glow = Builder.cylinder(root, "SkinGlow", base + Vector3.new(0, 1.55, 0), 0.15, 5, def.Color, Enum.Material.Neon)
+		pointLight(glow, 12, 1.5, def.Color)
+		local statue = GodSkins.build(def.Id, Config.Cosmetics.DisplayScale)
+		statue:PivotTo(CFrame.new(base + Vector3.new(0, 5.2, 0)) * CFrame.Angles(0, math.rad(180), 0))
+		statue.Parent = root
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "SkinLabel"
+		gui.Size = UDim2.new(8, 0, 2.2, 0)
+		gui.StudsOffset = Vector3.new(0, 7.6, 0)
+		gui.MaxDistance = 90
+		gui.Parent = pedestal
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Text = def.Icon .. " " .. def.Name
+		label.Parent = gui
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Parent = label
+		prompt(pedestal, "CosmeticPrompt", "View God Skins", def.Name)
+	end
+end
+
 local function godPerch(model: Model): BasePart
 	local p = Config.World.GodPerch
 	local f = folder(model, "GodPerch")
@@ -623,6 +668,7 @@ function Lobby.build(parent: Instance): LobbyInfo
 	questBoard(model, L)
 	spinStand(model, L)
 	passPedestals(model, L)
+	skinDisplays(model, L)
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"

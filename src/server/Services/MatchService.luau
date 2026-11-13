@@ -19,7 +19,9 @@ local EnvironmentService = require(script.Parent.EnvironmentService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local LobbyService = require(script.Parent.LobbyService)
 local MapService = require(script.Parent.MapService)
+local CosmeticService = require(script.Parent.CosmeticService)
 local PropService = require(script.Parent.PropService)
+local SaveService = require(script.Parent.SaveService)
 local ShowdownService = require(script.Parent.ShowdownService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RagdollService = require(script.Parent.RagdollService)
@@ -153,11 +155,14 @@ local function sendToArena(player: Player, index: number)
 	character:PivotTo(base * CFrame.new(math.random(-s, s), 3, math.random(-s, s)))
 end
 
-local function onDied(player: Player)
+local function onDied(player: Player, character: Model)
 	if RoleService.MarkEliminated(player) then
+		CosmeticService.Finisher(player, character)
 		-- the round's last survivor: everyone's camera plays the final-kill moment
 		local final = state.Phase == "Active" and survivorsAssigned and #RoleService.GetAliveSurvivors() == 0
+		local cause = ScoringService.GetLastCause(player)
 		ScoringService.OnEliminated(player, final)
+		SaveService.OfferAfterDeath(player, cause)
 		if final then
 			finalKill = true
 			local character = player.Character
@@ -194,7 +199,7 @@ local function onCharacterAdded(player: Player, character: Model)
 	character.DescendantAdded:Connect(group)
 	humanoid.Died:Connect(function()
 		RagdollService.OnDeath(player, character)
-		onDied(player)
+		onDied(player, character)
 	end)
 	-- respawned mid-round in a role that lives outside the lobby
 	if state.Phase == "Active" then
@@ -284,6 +289,10 @@ local function hazardStep(dt: number)
 		setSlowed(player, humanoid, if typeof(slow) == "number" then slow else nil)
 
 		local y = hrp.Position.Y
+		-- an Emergency Glider charge catches the fall / pulls you out of the water
+		if SaveService.TryGlider(player, hrp, fluidTop) then
+			continue
+		end
 		if y < Config.Player.KillPlaneY then
 			ScoringService.NoteHit(player, nil, "Void")
 			humanoid.Health = 0

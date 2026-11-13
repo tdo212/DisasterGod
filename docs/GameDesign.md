@@ -154,6 +154,17 @@ Every control hint matches the device: role cards, the God and spectate hints, t
 - Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
 - Coins buy gear and God kits. Profiles (coins, streaks, gear, welcome-pack flag, recent receipt IDs) persist through DataStore on live servers; Studio sessions stay in memory.
 
+## Cosmetics (`Config.Cosmetics`, CosmeticService / CosmeticController)
+Each category has a free starter, a coin item and Robux items. Bought or equipped in the Shop's Style tab; owned and equipped items persist in the profile.
+
+| Category | Free | Coins | Robux |
+|---|---|---|---|
+| God Skin: a giant avatar hovering 70 studs over the God's reticle for everyone (the God sees their own at 80% transparency) | 👁️ Storm Eye | ✊ Stone Fist (3,000) | 🔥 Magma Claw, 🤖 Cyber Gauntlet, 🌟 Celestial Mask |
+| Disaster FX: recolours the God's bolts, telegraphs, meteors, tornado and lava | ⚡ Classic | ✨ Golden Wrath (2,500) | 🟣 Neon Void, 👾 Pixel Chaos (voxel meteors) |
+| Finisher: plays where you're eliminated | 💨 Poof | 👻 Ghost Rise (2,000) | 🎉 Confetti Pop, 🌀 Cartoon Boing (boing + the body floats off) |
+
+Small statues of all five God skins stand on pedestals either side of the lodge spawn; their prompt opens the Style tab. Skins are part-built models in `src/shared/GodSkins.luau`. The God's client sends its reticle about 6 times a second (`GodAim`).
+
 ## Monetization (Robux)
 Created through Open Cloud for universe 10776039268. The IDs are in `Config.Monetization`.
 
@@ -167,6 +178,15 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | Welcome Pack | R$15 (list R$40) | +1,000 coins + Survival Kit, one-time offer card on the HUD |
 | Second Chance | R$19 | Offered for 10 s after elimination; revives you into the live round (+250 coins if the round already ended) |
 | 1 Wheel Spin / 10 Wheel Spins | R$34 / 149 | +1 / +10 prize wheel spins |
+| 🪂 Emergency Glider | R$9 | One charge. Fires automatically when you're about to fall into the void or sink in the rising fluid: launches you up toward the middle of the map on a 4 s slow glide |
+| 🛡️ Aegis Bubble | R$15 | One charge. Fires automatically on a disaster hit that would kill you: you keep 30 HP inside a 2.5 s force field |
+| God Skins: Magma Claw / Cyber Gauntlet / Celestial Mask | R$149 / 149 / 199 | Permanent cosmetic (see Cosmetics) |
+| Disaster FX: Neon Void / Pixel Chaos | R$99 / 129 | Permanent cosmetic |
+| Finishers: Confetti Pop / Cartoon Boing | R$99 / 99 | Permanent cosmetic |
+
+The products added in the cat-and-mouse update still have **placeholder ids (0)** in `Config.Monetization.Products`: their shop buttons read SOON and `ProcessReceipt` never matches them until the real ids are pasted in. `DevPurchase` grants them in Studio regardless.
+
+**Panic saves instead of mid-danger prompts:** a purchase prompt that opens while you're falling arrives too late and feels predatory, so saves are bought ahead (Specials tab) and fire on their own. After a death a save would have prevented (void or fluid for the Glider, a disaster hit for the Aegis), a one-tap "this would have saved you" card appears for 8 s if you have none. Owned charges show above the gear bar during rounds.
 
 **Game passes:**
 
@@ -177,6 +197,6 @@ Created through Open Cloud for universe 10776039268. The IDs are in `Config.Mone
 | God Priority | R$299 | God Chance grows twice as fast |
 | Quick Dash | R$99 | Dash cooldown halved |
 
-**Where they're sold:** the Shop window has Gear (coins), Coins, Passes and Specials tabs. The Shop also has a God Kits tab (coins). The menu has a Passes shortcut, and each pass has a glowing pedestal in the middle of the lodge that previews it in 3D and prompts the purchase. The prize wheel window sells the spin packs. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
+**Where they're sold:** the Shop window has Gear (coins), God Kits (coins), Style (cosmetics), Coins, Passes and Specials tabs; each page scrolls sideways when the cards don't fit. The menu has a Passes shortcut, and each pass has a glowing pedestal in the middle of the lodge that previews it in 3D and prompts the purchase. The prize wheel window sells the spin packs. The whole God Chance card is a tap target for Be the God Next Round, the Welcome Pack card, and the Second Chance button. In Studio, `ServerStorage.DevPurchase` (a BindableFunction) runs the real receipt path for testing. Note that a game's creator owns all its passes, so pass perks are always on for that account.
 
 All numbers live in `src/shared/Config.luau`.

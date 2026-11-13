@@ -209,6 +209,44 @@ local Products: { [string]: Types.ProductDefinition } = {
 	Revive = { Id = 3730591976, Name = "Second Chance", Price = 19, Icon = "💖", Badge = "" },
 	Spin1 = { Id = 3730754273, Name = "1 Wheel Spin", Price = 34, Icon = "🎡", Spins = 1, Badge = "" },
 	Spin10 = { Id = 3730754283, Name = "10 Wheel Spins", Price = 149, Icon = "🎡", Spins = 10, Badge = "Best Value" },
+	-- PLACEHOLDERS (Id = 0): create these in the Creator Dashboard and paste the ids here.
+	-- Items with Id 0 are hidden from purchase ("coming soon") and skipped by ProcessReceipt.
+	SkinMagmaClaw = { Id = 0, Name = "Magma Claw God Skin", Price = 149, Icon = "🔥", Cosmetic = "MagmaClaw", Badge = "" },
+	SkinCyberGauntlet = { Id = 0, Name = "Cyber Gauntlet God Skin", Price = 149, Icon = "🤖", Cosmetic = "CyberGauntlet", Badge = "" },
+	SkinCelestialMask = { Id = 0, Name = "Celestial Mask God Skin", Price = 199, Icon = "🌟", Cosmetic = "CelestialMask", Badge = "Legendary" },
+	FxNeonVoid = { Id = 0, Name = "Neon Void Disaster FX", Price = 99, Icon = "🟣", Cosmetic = "NeonVoid", Badge = "" },
+	FxPixelChaos = { Id = 0, Name = "Pixel Chaos Disaster FX", Price = 129, Icon = "👾", Cosmetic = "PixelChaos", Badge = "" },
+	FinConfettiPop = { Id = 0, Name = "Confetti Pop Finisher", Price = 99, Icon = "🎉", Cosmetic = "ConfettiPop", Badge = "" },
+	FinCartoonBoing = { Id = 0, Name = "Cartoon Boing Finisher", Price = 99, Icon = "🌀", Cosmetic = "CartoonBoing", Badge = "" },
+	SaveGlider = { Id = 0, Name = "Emergency Glider", Price = 9, Icon = "🪂", Save = "Glider", Badge = "" },
+	SaveAegis = { Id = 0, Name = "Aegis Bubble", Price = 15, Icon = "🛡️", Save = "Aegis", Badge = "" },
+}
+
+-- Cosmetics: one free starter, one coin item and Robux items per category.
+local Cosmetics: { Types.CosmeticDefinition } = {
+	-- God Skins: a giant sky avatar that hovers over the God's reticle for everyone to see
+	{ Id = "StormEye", Category = "GodSkin", Name = "Storm Eye", Icon = "👁️", Description = "The all-seeing storm", Color = Color3.fromRGB(90, 170, 255) },
+	{ Id = "StoneFist", Category = "GodSkin", Name = "Stone Fist", Icon = "✊", Description = "A mountain comes down", Color = Color3.fromRGB(150, 140, 130), Coins = 3000 },
+	{ Id = "MagmaClaw", Category = "GodSkin", Name = "Magma Claw", Icon = "🔥", Description = "Molten talons", Color = Color3.fromRGB(255, 110, 30), Product = "SkinMagmaClaw" },
+	{ Id = "CyberGauntlet", Category = "GodSkin", Name = "Cyber Gauntlet", Icon = "🤖", Description = "Neon steel fist", Color = Color3.fromRGB(60, 230, 255), Product = "SkinCyberGauntlet" },
+	{ Id = "CelestialMask", Category = "GodSkin", Name = "Celestial Mask", Icon = "🌟", Description = "A golden deity watches", Color = Color3.fromRGB(255, 205, 60), Product = "SkinCelestialMask" },
+	-- Disaster FX: recolours / reshapes your disasters as God
+	{ Id = "ClassicFx", Category = "Vfx", Name = "Classic", Icon = "⚡", Description = "Storm blue and fire", Color = Color3.fromRGB(120, 200, 255) },
+	{ Id = "GoldenWrath", Category = "Vfx", Name = "Golden Wrath", Icon = "✨", Description = "Everything in gold", Color = Color3.fromRGB(255, 200, 40), Coins = 2500 },
+	{ Id = "NeonVoid", Category = "Vfx", Name = "Neon Void", Icon = "🟣", Description = "Void bolts, black meteors", Color = Color3.fromRGB(150, 60, 255), Product = "FxNeonVoid" },
+	{ Id = "PixelChaos", Category = "Vfx", Name = "Pixel Chaos", Icon = "👾", Description = "Voxel meteors, arcade bolts", Color = Color3.fromRGB(120, 255, 90), Product = "FxPixelChaos" },
+	-- Finishers: plays where you are eliminated
+	{ Id = "Poof", Category = "Finisher", Name = "Poof", Icon = "💨", Description = "A puff of smoke", Color = Color3.fromRGB(190, 190, 200) },
+	{ Id = "GhostRise", Category = "Finisher", Name = "Ghost Rise", Icon = "👻", Description = "Your ghost floats away", Color = Color3.fromRGB(220, 230, 255), Coins = 2000 },
+	{ Id = "ConfettiPop", Category = "Finisher", Name = "Confetti Pop", Icon = "🎉", Description = "Go out with a party", Color = Color3.fromRGB(255, 120, 200), Product = "FinConfettiPop" },
+	{ Id = "CartoonBoing", Category = "Finisher", Name = "Cartoon Boing", Icon = "🌀", Description = "Boing! Float off like a toon", Color = Color3.fromRGB(255, 220, 60), Product = "FinCartoonBoing" },
+}
+
+local VfxPacks: { [string]: Types.VfxPack } = {
+	ClassicFx = {},
+	GoldenWrath = { Bolt = Color3.fromRGB(255, 225, 120), Telegraph = Color3.fromRGB(255, 200, 40), Meteor = Color3.fromRGB(255, 190, 40), Tornado = Color3.fromRGB(230, 190, 90), Lava = Color3.fromRGB(255, 200, 60) },
+	NeonVoid = { Bolt = Color3.fromRGB(170, 60, 255), Telegraph = Color3.fromRGB(200, 60, 255), Meteor = Color3.fromRGB(40, 10, 60), Tornado = Color3.fromRGB(70, 30, 110), Lava = Color3.fromRGB(150, 40, 255) },
+	PixelChaos = { Bolt = Color3.fromRGB(120, 255, 90), Telegraph = Color3.fromRGB(255, 70, 200), Meteor = Color3.fromRGB(120, 255, 90), MeteorShape = Enum.PartType.Block, Tornado = Color3.fromRGB(255, 90, 210), Lava = Color3.fromRGB(120, 255, 90) },
 }
 
 local Passes: { [string]: Types.PassDefinition } = {
@@ -325,6 +363,34 @@ local Config = {
 		PuddleDuration = 14,
 		WetKnockback = 1.6, -- knockback multiplier while standing in a puddle
 		PuddleSources = { "WaterTower", "PipeGantry" } :: { string },
+	},
+
+	Cosmetics = {
+		Items = Cosmetics,
+		VfxPacks = VfxPacks,
+		Defaults = { GodSkin = "StormEye", Vfx = "ClassicFx", Finisher = "Poof" } :: { [string]: string },
+		SkyHeight = 70, -- studs above the reticle the God skin hovers
+		SkyFollow = 6, -- lerp speed toward the reticle
+		SkyScale = 1, -- skin size multiplier in the sky
+		GodSkyTransparency = 0.8, -- how see-through the God sees their own skin
+		AimSendRate = 6, -- reticle updates per second sent to the server
+		DisplayScale = 0.16, -- lodge display statues
+		BoingUpSpeed = 70, -- Cartoon Boing: the body is flung up and floats
+		BoingFloatSeconds = 3,
+	},
+
+	-- Panic saves: cheap single-use charges that fire automatically.
+	Saves = {
+		GliderDropBelow = 14, -- trigger when this close above the kill plane and falling...
+		GliderFallSpeed = -25, -- ...faster than this, or when sinking into the rising fluid
+		GliderLaunchUp = 110,
+		GliderLaunchForward = 35, -- toward the map centre
+		GliderFloatSeconds = 4,
+		GliderGravityScale = 0.35,
+		AegisShieldSeconds = 2.5,
+		AegisHealth = 30, -- health left after the bubble absorbs a fatal hit
+		Cooldown = 4, -- a charge can't fire twice inside this window
+		OfferSeconds = 8, -- "this would have saved you" card after a preventable death
 	},
 
 	-- Last Stand: the final survivor of a round that started with 2+ gets a showdown.
@@ -606,6 +672,7 @@ local Config = {
 			Heartbeat = 9043365842, -- "HEARTBEAT 02 96BPM" (APM), Last Stand loop
 			Whistle = 9120675895, -- "Whistle Calling 4" (PSE), taunt
 			Scream = 9125652432, -- "Male Scream Short Yelling Bursts" (PSE), taunt
+			Boing = 2772396665, -- cartoon boing (short public clip), Cartoon Boing finisher
 		} :: { [string]: number },
 		-- distinct telegraph cue per disaster so survivors can react by ear
 		AbilityCue = {
@@ -709,6 +776,11 @@ local Config = {
 		LastStand = "LastStand", -- ReplicatedStorage: display name of the last survivor ("" = none)
 		LastStander = "LastStander", -- Player: is the Last Stand survivor (dash + near-miss buffs)
 		DaredevilUntil = "DaredevilUntil", -- Player: server time the taunt coin bonus ends
+		CosmeticPrefix = "Cos_", -- Player: owns cosmetic (bool)
+		EquipPrefix = "Equip_", -- Player: equipped cosmetic id per category
+		SavePrefix = "Save_", -- Player: panic save charges
+		GodAim = "GodAim", -- ReplicatedStorage: the human God's reticle (Vector3), nil when none
+		GodSkin = "GodSkin", -- ReplicatedStorage: the human God's equipped skin id ("" = none)
 	},
 }
 

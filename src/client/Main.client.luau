@@ -15,6 +15,7 @@ local order = {
 	"DebrisController",
 	"StealthController",
 	"FeedController",
+	"CosmeticController",
 	"HUDController",
 	"SurvivorController",
 	"GodController",
@@ -23,6 +24,7 @@ local order = {
 	"QuestController",
 	"MenuController",
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
+	"SaveController",
 }
 
 for _, name in order do

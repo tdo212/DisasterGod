@@ -22,6 +22,8 @@ local NAMES = {
 	"Rubble", -- S->C ({ { CFrame, Size, Color, Material, Transparency, Velocity } }) cosmetic debris, batched per frame
 	"Emote", -- C->S (emoteId) taunt wheel
 	"Feed", -- S->C (text, color) kill feed / clutch callouts
+	"CosmeticAction", -- C->S ("Buy" | "Equip", cosmeticId) coin cosmetics + equipping
+	"GodAim", -- C->S (Vector3) the God's reticle, throttled, drives the sky skin
 }
 
 local Remotes = {}

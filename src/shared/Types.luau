@@ -50,6 +50,31 @@ export type ProductDefinition = {
 	Coins: number?,
 	Spins: number?,
 	Badge: string, -- "Good Value" etc., "" for none
+	Cosmetic: string?, -- unlocks this Config.Cosmetics item
+	Save: string?, -- adds one charge of this panic save ("Glider" | "Aegis")
+}
+
+export type CosmeticCategory = "GodSkin" | "Vfx" | "Finisher"
+
+export type CosmeticDefinition = {
+	Id: string,
+	Category: CosmeticCategory,
+	Name: string,
+	Icon: string,
+	Description: string,
+	Color: Color3,
+	Coins: number?, -- coin price (nil + no Product = free starter)
+	Product: string?, -- Config.Monetization.Products key (Robux)
+}
+
+-- Disaster VFX pack palette (nil fields keep the classic look).
+export type VfxPack = {
+	Bolt: Color3?,
+	Telegraph: Color3?,
+	Meteor: Color3?,
+	MeteorShape: Enum.PartType?,
+	Tornado: Color3?,
+	Lava: Color3?,
 }
 
 export type KitDefinition = {
@@ -130,6 +155,9 @@ export type PlayerProfile = {
 	Gear: { [string]: number },
 	WelcomeClaimed: boolean,
 	Receipts: { string }, -- recent purchase ids (idempotent ProcessReceipt)
+	Cosmetics: { [string]: boolean }, -- owned cosmetic ids
+	Equipped: { [string]: string }, -- category -> cosmetic id
+	Saves: { [string]: number }, -- panic save charges ("Glider", "Aegis")
 }
 
 export type RoundRecord = {

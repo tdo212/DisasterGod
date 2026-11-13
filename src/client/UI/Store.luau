@@ -18,11 +18,20 @@ function Store.robux(price: number): string
 	return ROBUX_GLYPH .. " " .. tostring(price)
 end
 
-function Store.promptProduct(key: string)
+-- Prompt a developer product. Returns false for placeholders (Id 0, not on sale yet).
+function Store.promptProduct(key: string): boolean
 	local def = M.Products[key]
-	if def then
-		MarketplaceService:PromptProductPurchase(player, def.Id)
+	if not def or def.Id == 0 then
+		return false
 	end
+	MarketplaceService:PromptProductPurchase(player, def.Id)
+	return true
+end
+
+-- On sale: the product exists and has a live id.
+function Store.isLive(key: string): boolean
+	local def = M.Products[key]
+	return def ~= nil and def.Id ~= 0
 end
 
 function Store.promptPass(key: string)

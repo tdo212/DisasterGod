@@ -311,12 +311,24 @@ local function aimPoint(): Vector3?
 	return OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 end
 
+-- The reticle drives the God skin in the sky for everyone (CosmeticService), throttled.
+local aimRemote = Remotes.get("GodAim")
+local lastAimSent = 0
+local function sendAim(point: Vector3)
+	local now = os.clock()
+	if now - lastAimSent >= 1 / Config.Cosmetics.AimSendRate then
+		lastAimSent = now
+		aimRemote:FireServer(point)
+	end
+end
+
 local function updateReticle()
 	local def = loadout[selected]
 	local point = aimPoint()
 	if not (def and point and ring and line and beam) then
 		return
 	end
+	sendAim(point)
 	local dir = OrbitCamera.GetLookDirection()
 	local castable = energy() >= def.Cost and readyAt(def.Id) <= workspace:GetServerTimeNow() and ReplicatedStorage:GetAttribute(Attributes.CastingOpen) == true
 	local color = if castable then C.PurpleLight else C.Red

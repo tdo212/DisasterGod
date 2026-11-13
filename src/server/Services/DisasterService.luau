@@ -15,10 +15,12 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local ComboService = require(script.Parent.ComboService)
+local CosmeticService = require(script.Parent.CosmeticService)
 local DestructionService = require(script.Parent.DestructionService)
 local EnvironmentService = require(script.Parent.EnvironmentService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
+local SaveService = require(script.Parent.SaveService)
 local ScoringService = require(script.Parent.ScoringService)
 local StealthService = require(script.Parent.StealthService)
 
@@ -104,6 +106,9 @@ local function hurt(player: Player, damage: number, caster: Player?, cause: stri
 	local _, humanoid = hrpAndHumanoid(player)
 	if humanoid and humanoid.Health > 0 and damage > 0 then
 		ScoringService.NoteHit(player, caster, cause)
+		if SaveService.TryAegis(player, humanoid, damage) then
+			return -- a panic save absorbed a fatal hit
+		end
 		humanoid:TakeDamage(damage)
 	end
 end
@@ -206,6 +211,7 @@ end
 
 -- One bolt: visuals, sound, structure damage and the blast. No telegraph.
 local function strike(def: Ability, ground: Vector3, caster: Player?)
+	local bolt = CosmeticService.VfxOf(caster).Bolt or Color3.fromRGB(200, 235, 255)
 	-- jagged bolt from the sky
 	local top = ground + Vector3.new(0, 140, 0)
 	local prev = top
@@ -216,7 +222,7 @@ local function strike(def: Ability, ground: Vector3, caster: Player?)
 			Name = "Bolt",
 			Size = Vector3.new(1.2, 1.2, (nextPoint - prev).Magnitude),
 			CFrame = CFrame.lookAt((prev + nextPoint) / 2, nextPoint),
-			Color = Color3.fromRGB(200, 235, 255),
+			Color = bolt,
 		})
 		Debris:AddItem(seg, 0.3)
 		prev = nextPoint
@@ -240,14 +246,15 @@ end
 local BOLT_BLUE = Color3.fromRGB(120, 200, 255)
 
 local function lightning(def: Ability, ground: Vector3, caster: Player?)
-	ringTelegraph(ground, def.Radius, def.WarningTime, BOLT_BLUE)
+	ringTelegraph(ground, def.Radius, def.WarningTime, CosmeticService.VfxOf(caster).Telegraph or BOLT_BLUE)
 	task.wait(def.WarningTime)
 	strike(def, ground, caster)
 end
 
 -- Storm Deity: the bolt hops between the nearest survivors.
 local function chainLightning(def: Ability, ground: Vector3, caster: Player?)
-	ringTelegraph(ground, def.Radius, def.WarningTime, BOLT_BLUE)
+	local tele = CosmeticService.VfxOf(caster).Telegraph or BOLT_BLUE
+	ringTelegraph(ground, def.Radius, def.WarningTime, tele)
 	task.wait(def.WarningTime)
 	strike(def, ground, caster)
 	local pos = ground
@@ -283,7 +290,7 @@ local function chainLightning(def: Ability, ground: Vector3, caster: Player?)
 		})
 		TweenService:Create(arc, TweenInfo.new(hop), { Transparency = 1 }):Play()
 		Debris:AddItem(arc, hop + 0.05)
-		ringTelegraph(target, def.Radius, hop, BOLT_BLUE)
+		ringTelegraph(target, def.Radius, hop, tele)
 		task.wait(hop)
 		strike(def, target, caster)
 		pos = target
@@ -307,7 +314,7 @@ local function eruption(def: Ability, ground: Vector3, caster: Player?)
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.6, def.Radius * 2, def.Radius * 2),
 		CFrame = CFrame.new(ground + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(255, 110, 20),
+		Color = CosmeticService.VfxOf(caster).Lava or Color3.fromRGB(255, 110, 20),
 		Transparency = 0.15,
 	})
 	local light = Instance.new("PointLight")
@@ -413,7 +420,8 @@ local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?
 end
 
 local function meteors(def: Ability, ground: Vector3, caster: Player?)
-	ringTelegraph(ground, def.Radius, def.WarningTime, ORANGE)
+	local pal = CosmeticService.VfxOf(caster)
+	ringTelegraph(ground, def.Radius, def.WarningTime, pal.Telegraph or ORANGE)
 	EnvironmentService.Darken(def.WarningTime + 2)
 	task.wait(def.WarningTime * 0.6)
 	local count = def.Count or 5
@@ -423,14 +431,14 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 		local a = math.random() * math.pi * 2
 		local point = MapService.GroundAt(ground + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r))
 		task.spawn(function()
-			ringTelegraph(point, impact, 0.9, RED)
+			ringTelegraph(point, impact, 0.9, pal.Telegraph or RED)
 			local from = point + Vector3.new(40, 130, 30)
 			local rock = fxPart({
 				Name = "Meteor",
-				Shape = Enum.PartType.Ball,
+				Shape = pal.MeteorShape or Enum.PartType.Ball,
 				Size = Vector3.one * 7,
 				CFrame = CFrame.new(from),
-				Color = Color3.fromRGB(255, 90, 30),
+				Color = pal.Meteor or Color3.fromRGB(255, 90, 30),
 			})
 			local fire = Instance.new("Fire")
 			fire.Size = 12
@@ -476,7 +484,8 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		p.Shape = Enum.PartType.Cylinder
 		p.Size = Vector3.new(7, width, width)
 		p.Material = Enum.Material.SmoothPlastic
-		p.Color = Color3.fromRGB(120 + i * 6, 120 + i * 6, 130 + i * 6)
+		local tint = CosmeticService.VfxOf(caster).Tornado
+		p.Color = if tint then tint:Lerp(Color3.new(1, 1, 1), i * 0.05) else Color3.fromRGB(120 + i * 6, 120 + i * 6, 130 + i * 6)
 		p.Transparency = 0.35 + i * 0.04
 		p.Parent = funnel
 		table.insert(rings, { Part = p, Height = i * 6.5 })
@@ -908,6 +917,7 @@ function DisasterService.BeginRound(god: Player?)
 	state.CastingOpen = false
 	state.SuddenDeath = false
 	state.God = god
+	CosmeticService.SetGod(god)
 	ReplicatedStorage:SetAttribute(Attributes.CastingOpen, false)
 	poolFor(DIRECTOR)
 	publish(god)
@@ -916,6 +926,7 @@ end
 
 function DisasterService.SetGod(god: Player?)
 	state.God = god
+	CosmeticService.SetGod(god)
 	publish(god)
 end
 
@@ -938,6 +949,7 @@ function DisasterService.EndRound()
 	state.SuddenDeath = false
 	state.HunterPulse = false
 	state.God = nil
+	CosmeticService.SetGod(nil)
 	ReplicatedStorage:SetAttribute(Attributes.CastingOpen, false)
 	table.clear(pools)
 end

@@ -1,7 +1,8 @@
 --!strict
 -- MonetizationService: developer product receipts (idempotent) and game pass perks.
 --   Products: coin packs, Be the God Next Round, Survival Kit, Welcome Pack, Second Chance,
---             wheel spin packs.
+--             wheel spin packs, cosmetics (God skins, disaster FX, finishers) and panic saves.
+--             Products whose Id is still 0 (placeholders) are never matched by receipts.
 --   Passes:   2x Coins, VIP, God Priority, Quick Dash (flags as Player attributes Pass_<Key>).
 -- Studio only: ServerStorage.DevPurchase (BindableFunction) runs the same grant path so the
 -- flow can be tested without real purchase prompts.
@@ -15,6 +16,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
+local CosmeticService = require(script.Parent.CosmeticService)
 local MatchService = require(script.Parent.MatchService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RoleService = require(script.Parent.RoleService)
@@ -143,7 +145,23 @@ grants.Revive = function(player: Player)
 	end
 end
 
-local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseDecision
+-- cosmetics and panic saves come straight from their product definitions
+for key, def in M.Products do
+	local cosmetic, save = def.Cosmetic, def.Save
+	if cosmetic then
+		grants[key] = function(player: Player)
+			CosmeticService.Grant(player, cosmetic)
+		end
+	elseif save then
+		grants[key] = function(player: Player)
+			PlayerDataService.AddSave(player, save, 1)
+			popup:FireClient(player, string.format("%s %s +1 — FIRES AUTOMATICALLY", def.Icon, string.upper(def.Name)), GOLD)
+		end
+	end
+end
+
+-- `keyOverride`: Studio DevPurchase of a placeholder product (Id 0) names it directly.
+local function processReceipt(receipt: { [string]: any }, keyOverride: string?): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	if not player or not PlayerDataService.Get(player) then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -152,7 +170,7 @@ local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseD
 	if PlayerDataService.HasReceipt(player, purchaseId) then
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
-	local key = productKeyById[receipt.ProductId]
+	local key = keyOverride or productKeyById[receipt.ProductId]
 	local grant = key and grants[key]
 	if not grant then
 		warn("[Monetization] unknown product", receipt.ProductId)
@@ -171,7 +189,9 @@ end
 ---------------------------------------------------------------------------
 
 function MonetizationService.Init()
-	MarketplaceService.ProcessReceipt = processReceipt
+	MarketplaceService.ProcessReceipt = function(receipt)
+		return processReceipt(receipt)
+	end
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
 		local key = passKeyById[passId]
@@ -216,7 +236,7 @@ function MonetizationService.Init()
 				ProductId = def.Id,
 				PurchaseId = purchaseId or ("studio-" .. key .. "-" .. tostring(os.clock())),
 				CurrencySpent = 0,
-			})
+			}, if def.Id == 0 then key else nil)
 			return decision.Name
 		end
 		dev.Parent = ServerStorage
