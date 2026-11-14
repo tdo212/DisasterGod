@@ -185,16 +185,19 @@ end
 -- A giant tree: trunk, root flares and canopy clusters (the leaves can be blasted away).
 local function tree(model: Model, base: Vector3, height: number, rng: Random)
 	local t = Builder.building(model, "AncientTree")
-	Builder.cylinder(t, "Trunk", base + Vector3.new(0, height / 2, 0), height, 14, BARK, Enum.Material.Wood)
+	-- the trunk is the tree's one (very tough) support: fell it and the canopy comes down
+	local trunk = Builder.cylinder(t, "Trunk", base + Vector3.new(0, height / 2, 0), height, 14, BARK, Enum.Material.Wood)
+	Builder.structural(trunk, 1, true, 900)
 	for i = 0, 3 do
 		local a = i * math.pi / 2 + 0.4
-		Builder.part(t, {
+		local root = Builder.part(t, {
 			Name = "Root",
 			Size = Vector3.new(4, 4, 14),
 			CFrame = CFrame.new(base + Vector3.new(math.cos(a) * 8, 1.5, math.sin(a) * 8)) * CFrame.Angles(0, -a + math.pi / 2, 0) * CFrame.Angles(math.rad(-18), 0, 0),
 			Color = BARK,
 			Material = Enum.Material.Wood,
 		})
+		Builder.structural(root, 1, false, 300)
 	end
 	for i = 1, 9 do
 		local a = rng:NextNumber(0, math.pi * 2)

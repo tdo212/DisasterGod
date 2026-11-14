@@ -765,9 +765,15 @@ local Config = {
 		Tries = 60,
 	},
 
+	Performance = {
+		ShadowMinVolume = 24, -- structural parts smaller than this (studs^3) cast no shadow
+	},
+
 	-- Map dressing pass (World/Details.luau) after each builder.
 	Details = {
 		MaxLights = 10, -- PointLights per map from dressing (lamps, holo boards)
+		FurniturePerFloor = 2, -- furnished pieces per floor of each highrise
+		FurnitureMax = 50, -- per map (part budget)
 	},
 
 	-- Enterable interiors dropped onto empty ground on every arena (MapService). Each is a
@@ -788,6 +794,14 @@ local Config = {
 	-- Client presentation: round intro fly-by, end-of-round pan, danger edge pulse.
 	Presentation = {
 		IntroSeconds = 2.5,
+		-- first round in a role: the fly-by continues into a short letterboxed cinematic
+		-- (PolishController) that shows the God / the survivors / a demo strike
+		CinematicBar = 0.15, -- letterbox bar height (screen fraction)
+		CinematicGodShot = 2.4,
+		CinematicDemoShot = 2.6,
+		CinematicYouShot = 1.8,
+		CinematicSurvivorsShot = 3,
+		DemoImpactDelay = 1.3, -- demo red zone -> meteor impact
 		OutroSeconds = 2.2,
 		DangerDot = 0.35, -- telegraphs outside this view cone pulse the screen edge
 		DangerRange = 90,
@@ -866,14 +880,14 @@ local Config = {
 
 	-- Guided tutorial (TutorialController): one step at a time, once per player, skippable.
 	Tutorial = {
+		-- only what a brand-new player needs in their first minute (the cinematic shows the
+		-- rest); menus like the shop and the wheel are left to discover
 		Steps = {
-			{ Id = "Vote", Text = "Click a map card to vote for the next arena", TextTouch = "Tap a map card to vote for the next arena" },
 			{ Id = "Dash", Text = "Press Q (or click DASH) to dash out of danger", TextTouch = "Tap DASH to dash out of danger" },
 			{ Id = "Hide", Text = "Follow the arrows: hide indoors and stand still", TextTouch = "Follow the arrows: hide indoors and stand still" },
 			{ Id = "GodCast", Text = "Pick a disaster (keys 1-5), then click the arena to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
-			{ Id = "Spin", Text = "Free prize! Click SPIN to turn the wheel", TextTouch = "Free prize! Tap SPIN to turn the wheel" },
-			{ Id = "Shop", Text = "Gear keeps you alive: open the SHOP", TextTouch = "Gear keeps you alive: open the SHOP" },
 		} :: { { Id: string, Text: string, TextTouch: string? } },
+		Cinematics = { "IntroSurvivor", "IntroGod" }, -- first-round cinematics (saved like steps)
 		ArrowImage = "rbxassetid://136636775487081", -- yellow pointer arrow (tools/icons/gen_tutorial.py)
 		BeamTexture = "rbxassetid://130409304561613", -- white chevron strip for the ground beam
 		ArrowSize = 64,
@@ -886,6 +900,7 @@ local Config = {
 	},
 
 	Onboarding = {
+		RoleCards = false, -- the old three-bullet text cards (replaced by the first-round cinematic)
 		CardDelay = 3, -- shown after the round-start banner clears
 		CardSeconds = 15,
 	},
@@ -1020,7 +1035,7 @@ local Config = {
 			ChronoSpire = 9112838943, -- refinery fan whir and metal groans (PSE)
 		} :: { [string]: number },
 		Ui = {
-			Click = "rbxasset://sounds/clickfast.wav",
+			Click = 127005215501903, -- crisp UI click (every Components button)
 			Tab = "rbxasset://sounds/button.wav",
 			Open = 9119467553, -- short whoosh (PSE)
 			Coin = 93529351909119,
@@ -1050,6 +1065,7 @@ local Config = {
 			Whistle = 9120675895, -- "Whistle Calling 4" (PSE), taunt
 			Scream = 9125652432, -- "Male Scream Short Yelling Bursts" (PSE), taunt
 			Boing = 2772396665, -- cartoon boing (short public clip), Cartoon Boing finisher
+			Smash = 106506164911023, -- satisfying destruction smash: collapses and big hits
 		} :: { [string]: number },
 		-- distinct telegraph cue per disaster so survivors can react by ear
 		AbilityCue = {
@@ -1093,6 +1109,8 @@ local Config = {
 			Plastic = "Plastic", SmoothPlastic = "Plastic",
 		} :: { [string]: string },
 		BreakVolume = 0.55,
+		SmashMinParts = 4, -- a single hit breaking at least this many parts plays the Smash
+		SmashCooldown = 0.35,
 		BreakCooldown = 0.09, -- per material family, so a collapse is a rumble of distinct cracks, not a wall of noise
 		SirenVolume = 0.3,
 		Volume = {

@@ -6,8 +6,9 @@
 --     it, with one line of text at the bottom (device-aware: "Press Q" vs "Tap DASH").
 --   * World steps draw an animated chevron beam on the ground from you to the goal (the
 --     nearest hideout), like a sat-nav arrow.
--- Steps (Config.Tutorial.Steps): vote for a map -> dash -> follow the arrows to hide ->
--- (as God) pick a disaster and cast -> spin the free wheel -> open the shop.
+-- Steps (Config.Tutorial.Steps), only what the first minute needs: dash -> follow the
+-- arrows to hide -> (as God) pick a disaster and cast. They start after the first-round
+-- cinematic (PolishController), which shows who the God is and what a red zone means.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -23,8 +24,6 @@ local UI = script.Parent.Parent:WaitForChild("UI")
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Analytics = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Analytics") :: ModuleScript)
-local MenuController = require(script.Parent:WaitForChild("MenuController") :: ModuleScript)
-local SpinController = require(script.Parent:WaitForChild("SpinController") :: ModuleScript)
 
 local TU = Config.Tutorial
 local Attributes = Config.Attributes
@@ -47,7 +46,6 @@ local active: Step? = nil
 local activeSince = 0
 local doneLocal: { [string]: boolean } = {}
 local flags: { [string]: boolean } = {} -- events seen this session (dashed, cast, voted...)
-local roundsPlayed = 0
 local skipped = false
 local paused = false
 
@@ -74,8 +72,11 @@ end
 -- Something else holds the player's attention (a role card, a banner, the round summary,
 -- the shop or any other window): the tutorial waits, so nothing ever stacks. Windows are
 -- the direct children of each HUD's scaled layer (Components.window names them "...Window").
-local IGNORE = { TutorialHUD = true, VoteHUD = true }
+local IGNORE = { TutorialHUD = true, VoteHUD = true, CinematicHUD = true }
 local function busy(): boolean
+	if player:GetAttribute("Cinematic") == true then
+		return true
+	end
 	for _, sg in playerGui():GetChildren() do
 		if sg:IsA("ScreenGui") and sg.Enabled and not IGNORE[sg.Name] then
 			for _, layer in sg:GetChildren() do
@@ -117,23 +118,6 @@ local function godSlot(): GuiObject?
 	return best
 end
 
-local function menuTile(name: string): GuiObject?
-	local root = playerGui():FindFirstChild("Menu")
-	if not root then
-		return nil
-	end
-	for _, d in root:GetDescendants() do
-		if d.Name == name and d:IsA("GuiButton") and d.Visible and d.AbsoluteSize.X > 4 and d.AbsoluteSize.X < 200 then
-			return d
-		end
-	end
-	return nil
-end
-
-local function shopOpen(): boolean
-	return MenuController.IsShopOpen()
-end
-
 local function nearestHideout(): Vector3?
 	local arena = workspace:FindFirstChild("Arena")
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -168,17 +152,6 @@ type Rule = {
 }
 
 local RULES: { [string]: Rule } = {
-	Vote = {
-		When = function()
-			return ReplicatedStorage:GetAttribute(Attributes.VoteOpen) == true and findGui("VoteHUD", "Card1") ~= nil
-		end,
-		Target = function()
-			return findGui("VoteHUD", "Card2") or findGui("VoteHUD", "Card1")
-		end,
-		Done = function()
-			return flags.Voted == true or ReplicatedStorage:GetAttribute(Attributes.VoteOpen) ~= true
-		end,
-	},
 	Dash = {
 		When = function()
 			return inRound() and role() == "Survivor" and findGui("SurvivorHUD", "Dash") ~= nil
@@ -212,26 +185,6 @@ local RULES: { [string]: Rule } = {
 		Done = function()
 			return flags.Cast == true
 		end,
-	},
-	Spin = {
-		When = function()
-			return not inRound() and roundsPlayed >= 1 and phase() ~= "Active" and menuTile("Spin") ~= nil
-		end,
-		Target = function()
-			return menuTile("Spin")
-		end,
-		Done = function()
-			return SpinController.IsOpen()
-		end,
-	},
-	Shop = {
-		When = function()
-			return not inRound() and roundsPlayed >= 1 and isDone("Spin") and menuTile("Shop") ~= nil
-		end,
-		Target = function()
-			return menuTile("Shop")
-		end,
-		Done = shopOpen,
 	},
 }
 
@@ -522,25 +475,6 @@ function TutorialController.Start()
 	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string)
 		if kind == "GodCast" and role() == "DisasterGod" then
 			flags.Cast = true
-		end
-	end)
-	Remotes.get("RoundSummary").OnClientEvent:Connect(function()
-		roundsPlayed += 1
-	end)
-	ReplicatedStorage:GetAttributeChangedSignal(Attributes.VoteOpen):Connect(function()
-		flags.Voted = false
-	end)
-	task.spawn(function()
-		local vote = playerGui():WaitForChild("VoteHUD", 20)
-		if vote then
-			for i = 1, 3 do
-				local card = vote:FindFirstChild("Card" .. i, true)
-				if card and card:IsA("GuiButton") then
-					card.Activated:Connect(function()
-						flags.Voted = true
-					end)
-				end
-			end
 		end
 	end)
 

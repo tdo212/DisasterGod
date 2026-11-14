@@ -333,14 +333,18 @@ function StarlightBoardwalk.build(parent: Instance): Types.MapInfo
 
 	-- lamp posts with warm bulbs
 	for _, p in { Vector3.new(-30, 0, -24), Vector3.new(0, 0, -24), Vector3.new(30, 0, -24), Vector3.new(-30, 0, 6), Vector3.new(30, 0, 6) } do
-		Builder.block(model, "LampPost", p + Vector3.new(0, y + 4, 0), Vector3.new(0.5, 8, 0.5), Color3.fromRGB(40, 40, 50), Enum.Material.Metal)
-		Builder.neon(model, p + Vector3.new(0, y + 8.4, 0), Vector3.new(1.2, 1.2, 1.2), Color3.fromRGB(255, 220, 140))
+		local lamp = Builder.building(model, "Lamp")
+		local post = Builder.block(lamp, "LampPost", p + Vector3.new(0, y + 4, 0), Vector3.new(0.5, 8, 0.5), Color3.fromRGB(40, 40, 50), Enum.Material.Metal)
+		Builder.structural(post, 1, true, 40)
+		local bulb = Builder.neon(lamp, p + Vector3.new(0, y + 8.4, 0), Vector3.new(1.2, 1.2, 1.2), Color3.fromRGB(255, 220, 140))
+		Builder.structural(bulb, 2, false, 10)
 	end
 
 	-- little boats bobbing around the pier (decor)
 	for _, p in { Vector3.new(-100, 0, -30), Vector3.new(-40, 0, -70), Vector3.new(60, 0, -72), Vector3.new(105, 0, 20), Vector3.new(0, 0, 90) } do
-		Builder.block(model, "BoatHull", p + Vector3.new(0, 0.2, 0), Vector3.new(8, 2, 4), Color3.fromRGB(200, 90, 60), Enum.Material.Wood)
-		Builder.block(model, "BoatCabin", p + Vector3.new(-1, 2, 0), Vector3.new(3, 2.4, 3), WHITE, Enum.Material.SmoothPlastic)
+		local boat = Builder.building(model, "Boat")
+		Builder.structural(Builder.block(boat, "BoatHull", p + Vector3.new(0, 0.2, 0), Vector3.new(8, 2, 4), Color3.fromRGB(200, 90, 60), Enum.Material.Wood), 1, true, 80)
+		Builder.structural(Builder.block(boat, "BoatCabin", p + Vector3.new(-1, 2, 0), Vector3.new(3, 2.4, 3), WHITE, Enum.Material.SmoothPlastic), 2, false, 40)
 	end
 
 	local spawns = {}

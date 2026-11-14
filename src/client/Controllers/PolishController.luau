@@ -25,6 +25,8 @@ local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 local UI = script.Parent.Parent:WaitForChild("UI")
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
+local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
+local C = Theme.Colors
 local EffectsController = require(script.Parent:WaitForChild("EffectsController") :: ModuleScript)
 
 local PR = Config.Presentation
@@ -55,6 +57,345 @@ local function arenaFocus(): (Vector3, number)
 		return Vector3.new(cf.Position.X, 10, cf.Position.Z), math.clamp(math.max(size.X, size.Z) * 0.4, 80, 140)
 	end
 	return Config.World.ArenaCenter, 150
+end
+
+---------------------------------------------------------------------------
+-- first-round cinematic (show, don't tell): the first time you play each role, the
+-- intro fly-by continues into a short letterboxed sequence instead of a text card.
+--   Survivor: the God's hand in the sky ("a player controls the disasters"), a harmless
+--   demo red zone + meteor right in front of you ("red = get out"), then you ("survive").
+--   God: the survivors, highlighted ("real players hiding from you"), then the arena from
+--   your hand while a demo strike lands ("you control the disasters").
+-- Everything here is client-only and happens during the prep phase, before casting opens.
+
+local CINE_BIND = "DisasterGodCinematic"
+local cineGui: ScreenGui? = nil
+local cineTitle: TextLabel? = nil
+local cineSub: TextLabel? = nil
+
+local function cinematicGui()
+	if cineGui then
+		return
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "CinematicHUD"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 20
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Enabled = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+	for _, top in { true, false } do
+		local bar = Instance.new("Frame")
+		bar.Name = if top then "TopBar" else "BottomBar"
+		bar.BackgroundColor3 = Color3.new(0, 0, 0)
+		bar.BorderSizePixel = 0
+		bar.Size = UDim2.fromScale(1, PR.CinematicBar)
+		bar.Position = if top then UDim2.fromScale(0, 0) else UDim2.fromScale(0, 1 - PR.CinematicBar)
+		bar.Parent = gui
+	end
+	local layer2 = Components.scaledRoot(gui)
+	local title = Components.label({ Name = "Title", Text = "", TextSize = 40, Size = UDim2.new(1, 0, 0, 48), Position = UDim2.new(0, 0, 1, -96), Parent = layer2 })
+	local sub = Components.label({ Name = "Sub", Text = "", TextSize = 21, Color = C.TextDim, Size = UDim2.new(1, 0, 0, 28), Position = UDim2.new(0, 0, 1, -46), Parent = layer2 })
+	cineGui, cineTitle, cineSub = gui, title, sub
+end
+
+local function caption(title: string, sub: string, color: Color3)
+	local t, s = cineTitle, cineSub
+	if not (t and s) then
+		return
+	end
+	t.Text = title
+	t.TextColor3 = color
+	s.Text = sub
+	local scale = t:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Scale = 0.6
+	scale.Parent = t
+	Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+	Sound.play("Banner", 0.6)
+end
+
+-- a client-only demo disaster: a pulsing red zone, then a meteor slams into it
+local function demoStrike(at: Vector3)
+	local ring = Instance.new("Part")
+	ring.Name = "DemoZone"
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Material = Enum.Material.Neon
+	ring.Color = Color3.fromRGB(255, 40, 40)
+	ring.Transparency = 0.35
+	ring.Size = Vector3.new(0.3, 16, 16)
+	ring.CFrame = CFrame.new(at + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Parent = fxFolder
+	TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.7 }):Play()
+	Sound.play("Warning", 0.5)
+	task.delay(PR.DemoImpactDelay, function()
+		local rock = Instance.new("Part")
+		rock.Anchored = true
+		rock.CanCollide = false
+		rock.CanQuery = false
+		rock.Shape = Enum.PartType.Ball
+		rock.Size = Vector3.one * 5
+		rock.Material = Enum.Material.Basalt
+		rock.Color = Color3.fromRGB(70, 50, 45)
+		rock.CFrame = CFrame.new(at + Vector3.new(14, 70, 6))
+		rock.Parent = fxFolder
+		local fire = Instance.new("Fire")
+		fire.Size = 8
+		fire.Parent = rock
+		local fall = TweenService:Create(rock, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = CFrame.new(at + Vector3.new(0, 2, 0)) })
+		fall:Play()
+		fall.Completed:Once(function()
+			rock:Destroy()
+			ring:Destroy()
+			local boom = Instance.new("Part")
+			boom.Anchored = true
+			boom.CanCollide = false
+			boom.CanQuery = false
+			boom.Shape = Enum.PartType.Ball
+			boom.Material = Enum.Material.Neon
+			boom.Color = Color3.fromRGB(255, 150, 50)
+			boom.Size = Vector3.one * 2
+			boom.CFrame = CFrame.new(at + Vector3.new(0, 1, 0))
+			boom.Parent = fxFolder
+			TweenService:Create(boom, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.one * 18, Transparency = 1 }):Play()
+			Debris:AddItem(boom, 0.55)
+			Sound.play("Smash", 0.8)
+			EffectsController.Shake(0.6, 0.4, at)
+		end)
+	end)
+end
+
+local function groundAhead(distance: number): Vector3?
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil
+	end
+	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	look = if look.Magnitude > 0.1 then look.Unit else Vector3.zAxis
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character :: Model, fxFolder }
+	local hit = workspace:Raycast(root.Position + look * distance + Vector3.new(0, 30, 0), Vector3.new(0, -80, 0), params)
+	return if hit then hit.Position else root.Position + look * distance - Vector3.new(0, 3, 0)
+end
+
+-- a list of camera shots, each { Seconds, Shot(t 0..1) -> CFrame, Start() }
+type Shot = { Seconds: number, Camera: (number) -> CFrame, Start: () -> () }
+
+local cinematicRunning = false
+
+local function runShots(shots: { Shot }, done: () -> ())
+	local camera = workspace.CurrentCamera
+	if not camera or cinematicRunning then
+		return -- one at a time: a second bind with the same name would orphan the first
+	end
+	cinematicRunning = true
+	cinematicGui()
+	local gui = cineGui :: ScreenGui
+	gui.Enabled = true
+	player:SetAttribute("Cinematic", true)
+	-- a clean frame: every other HUD hides for the cinematic and comes back after
+	local hidden: { ScreenGui } = {}
+	for _, other in player:WaitForChild("PlayerGui"):GetChildren() do
+		if other:IsA("ScreenGui") and other ~= gui and other.Enabled then
+			other.Enabled = false
+			table.insert(hidden, other)
+		end
+	end
+	local index, elapsed = 0, 0
+	local current: Shot? = nil
+	local from = camera.CFrame
+	local function nextShot()
+		index += 1
+		elapsed = 0
+		current = shots[index]
+		from = camera.CFrame
+		if current then
+			current.Start()
+		end
+	end
+	-- ends exactly once: from the last shot, or from the safety timer if anything stalls
+	local finished = false
+	local function finish()
+		if finished then
+			return
+		end
+		finished = true
+		RunService:UnbindFromRenderStep(CINE_BIND)
+		gui.Enabled = false
+		for _, other in hidden do
+			if other.Parent then
+				other.Enabled = true
+			end
+		end
+		player:SetAttribute("Cinematic", false)
+		cinematicRunning = false
+		done()
+	end
+	local total = 0
+	for _, shot in shots do
+		total += shot.Seconds
+	end
+	task.delay(total + 1.5, finish)
+	nextShot()
+	RunService:BindToRenderStep(CINE_BIND, Enum.RenderPriority.Camera.Value + 3, function(dt)
+		local shot = current
+		if not shot then
+			finish()
+			return
+		end
+		elapsed += dt
+		local a = math.min(1, elapsed / shot.Seconds)
+		-- ease from wherever the camera was into the shot over its first 35%
+		local blend = math.min(1, a / 0.35)
+		blend = 1 - (1 - blend) ^ 3
+		camera.CFrame = from:Lerp(shot.Camera(a), blend)
+		if a >= 1 then
+			nextShot()
+		end
+	end)
+end
+
+local function godRigPosition(center: Vector3): Vector3
+	local cfx = workspace:FindFirstChild("CosmeticFX")
+	local rig = cfx and cfx:FindFirstChildWhichIsA("Model")
+	if rig and string.sub(rig.Name, 1, 8) == "GodSkin_" then
+		return rig:GetPivot().Position
+	end
+	return center + Vector3.new(0, Config.Cosmetics.SkyHeight + 10, 0)
+end
+
+local function markSeen(id: string)
+	Remotes.get("TutorialSeen"):FireServer(id)
+	player:SetAttribute(Attributes.TutorialPrefix .. id, true) -- locally at once; the profile follows
+end
+
+local function survivorCinematic()
+	local center = arenaFocus()
+	local godName = ReplicatedStorage:GetAttribute(Attributes.GodName)
+	local who = if typeof(godName) == "string" and godName ~= "" then godName else "The Storm"
+	local strikeAt: Vector3? = nil
+	runShots({
+		{
+			Seconds = PR.CinematicGodShot,
+			Start = function()
+				caption("😈 THIS IS THE GOD", who .. " controls every disaster, and is hunting you", C.PurpleLight)
+			end,
+			Camera = function(a)
+				local rig = godRigPosition(center)
+				local eye = rig + Vector3.new(math.cos(a * 0.6) * 46, -34, math.sin(a * 0.6) * 46)
+				return CFrame.lookAt(eye, rig)
+			end,
+		},
+		{
+			Seconds = PR.CinematicDemoShot,
+			Start = function()
+				strikeAt = groundAhead(22)
+				if strikeAt then
+					demoStrike(strikeAt)
+				end
+				caption("🔴 RED ZONE = INCOMING DISASTER", "Get out of the red before it lands", C.RedLight)
+			end,
+			Camera = function(a)
+				local at = strikeAt or center
+				local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				local from = if root then root.Position else at + Vector3.new(0, 0, 30)
+				local flat = Vector3.new(at.X - from.X, 0, at.Z - from.Z)
+				local back = if flat.Magnitude > 0.1 then flat.Unit else Vector3.zAxis
+				return CFrame.lookAt(from - back * 14 + Vector3.new(0, 12 + a * 2, 0), at)
+			end,
+		},
+		{
+			Seconds = PR.CinematicYouShot,
+			Start = function()
+				caption("🏃 YOU ARE A SURVIVOR", "Dodge, hide and outlast the God", C.GreenLight)
+			end,
+			Camera = function(a)
+				local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				local p = if root then root.Position else center
+				local look = if root then root.CFrame.LookVector else Vector3.zAxis
+				return CFrame.lookAt(p - look * (9 + a * 3) + Vector3.new(0, 4.5, 0), p + Vector3.new(0, 2, 0))
+			end,
+		},
+	}, function()
+		markSeen("IntroSurvivor")
+	end)
+end
+
+local function godCinematic()
+	local center, radius = arenaFocus()
+	local targets: { Model } = {}
+	for _, p in Players:GetPlayers() do
+		if p ~= player and p:GetAttribute(Attributes.Role) == "Survivor" and p.Character then
+			table.insert(targets, p.Character)
+		end
+	end
+	local marks: { Highlight } = {}
+	runShots({
+		{
+			Seconds = PR.CinematicSurvivorsShot,
+			Start = function()
+				for i, character in targets do
+					if i > 4 then
+						break
+					end
+					local h = Instance.new("Highlight")
+					h.FillColor = C.GreenLight
+					h.FillTransparency = 0.4
+					h.OutlineColor = Color3.new(1, 1, 1)
+					h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+					h.Parent = character
+					table.insert(marks, h)
+				end
+				caption(if #targets > 0 then "🏃 THESE ARE THE SURVIVORS" else "🏃 SURVIVORS HIDE IN HERE", "Real players, scattering and hiding from you", C.GreenLight)
+			end,
+			Camera = function(a)
+				local focus = center
+				if #targets > 0 then
+					local i = math.clamp(math.floor(a * #targets) + 1, 1, #targets)
+					local root = targets[i]:FindFirstChild("HumanoidRootPart") :: BasePart?
+					if root then
+						focus = root.Position
+					end
+				end
+				return CFrame.lookAt(focus + Vector3.new(26, 30, 26), focus)
+			end,
+		},
+		{
+			Seconds = PR.CinematicGodShot,
+			Start = function()
+				for _, h in marks do
+					h:Destroy()
+				end
+				demoStrike(center)
+				caption("😈 YOU ARE THE GOD", "You control the disasters. Wipe them out!", C.PurpleLight)
+			end,
+			Camera = function(a)
+				local eye = center + Vector3.new(math.cos(a * 0.8) * radius * 0.5, 80 - a * 10, math.sin(a * 0.8) * radius * 0.5)
+				return CFrame.lookAt(eye, center)
+			end,
+		},
+	}, function()
+		markSeen("IntroGod")
+	end)
+end
+
+-- after the fly-by: the first time in each role, play its cinematic
+local function firstTimeCinematic()
+	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
+		return
+	end
+	local role = player:GetAttribute(Attributes.Role)
+	if role == "Survivor" and player:GetAttribute(Attributes.TutorialPrefix .. "IntroSurvivor") ~= true then
+		survivorCinematic()
+	elseif role == "DisasterGod" and player:GetAttribute(Attributes.TutorialPrefix .. "IntroGod") ~= true then
+		godCinematic()
+	end
 end
 
 local function playIntro()
@@ -95,6 +436,7 @@ local function playIntro()
 				end
 			end
 			Debris:AddItem(skin, 0.7)
+			firstTimeCinematic()
 		end
 	end)
 end

@@ -527,6 +527,12 @@ local Stage = {
 local STAGE_MAX = 4
 
 local function stageNext()
+	-- the first-round cinematic owns the screen: banners wait until it ends
+	if player:GetAttribute("Cinematic") == true then
+		Stage.busy = true
+		task.delay(0.4, stageNext)
+		return
+	end
 	local item = table.remove(Stage.queue, 1)
 	if not item then
 		Stage.busy = false
@@ -823,6 +829,9 @@ local function roleKind(): string?
 end
 
 local function evaluateRoleCard()
+	if not Config.Onboarding.RoleCards then
+		return -- the first-round cinematic shows this instead
+	end
 	local kind = roleKind()
 	-- the round ended (or the role changed): a leftover tutorial card must not linger
 	if not kind and openCard then

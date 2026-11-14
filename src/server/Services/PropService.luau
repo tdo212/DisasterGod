@@ -74,6 +74,7 @@ local function wireBreaker(b: { Panel: BasePart, Light: BasePart, Prompt: Proxim
 end
 
 local function wirePad(pad: BasePart, center: Vector3)
+	pad.CanTouch = true -- Builder.structural turns touch off for structure
 	table.insert(connections, pad.Touched:Connect(function(hit)
 		if not roundActive or pad:GetAttribute("Broken") == true then
 			return

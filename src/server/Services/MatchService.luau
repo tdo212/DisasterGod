@@ -549,6 +549,9 @@ function MatchService.Init()
 		for _, step in Config.Tutorial.Steps do
 			known = known or step.Id == kind
 		end
+		for _, id in Config.Tutorial.Cinematics do
+			known = known or id == kind
+		end
 		if known then
 			PlayerDataService.MarkTutorial(player, kind)
 		end

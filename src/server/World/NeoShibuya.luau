@@ -1,7 +1,9 @@
 --!strict
 -- Arena 3: Neo-Shibuya Skyline. A neon city block at night: four high-rises stand on a
--- walkable street grid (no void). Every tower has a long ramp from the street to its
--- roof, and fragile glass skybridges link the rooftops. Hologram billboards on the roof
+-- walkable street grid (no void). The towers are real multi-storey buildings (floors,
+-- windows, a stairwell ladder, furnished by World/Details) that collapse floor by floor;
+-- everything on their roofs falls with them. Every tower has a long ramp from the street
+-- to its roof, and fragile glass skybridges link the rooftops. Hologram billboards on the roof
 -- edges topple across the gaps as makeshift planks. Streets have kiosks, cars and vending
 -- machines to hide behind. Sudden death: toxic smog floods the streets — get up high.
 
@@ -62,30 +64,52 @@ local function streets(model: Model)
 	end
 end
 
-local function tower(model: Model, t: Tower, index: number)
+-- A tower is a real building: floors with windows and a stairwell ladder (furnished by
+-- World/Details), neon floor bands and a vertical sign that fall with their floors, and a
+-- parapet rim on the roof. Returns the tower model (rooftop clutter rests on it).
+local function tower(model: Model, t: Tower, index: number): Model
 	local c, roof = t.Center, t.Roof
-	local body = Instance.new("Folder")
-	body.Name = "Tower" .. index
-	body.Parent = model
-	Builder.block(body, "Core", Vector3.new(c.X, roof / 2, c.Z), Vector3.new(HALF * 2, roof, HALF * 2), TOWER, Enum.Material.Metal)
-	Builder.block(body, "Parapet", Vector3.new(c.X, roof + 0.4, c.Z), Vector3.new(HALF * 2 + 1, 0.8, HALF * 2 + 1), TOWER_TRIM, Enum.Material.Metal)
-	-- window bands (decor)
+	local floors = math.max(2, math.floor(roof / 10 + 0.5))
+	local base = Vector3.new(c.X, STREET + 0.4, c.Z)
+	-- floor height chosen so the roof slab's top lands at roof + 0.8 (the old parapet top)
+	local floorHeight = (roof + 0.8 - 1.5 - base.Y) / floors
+	local body, roofY = Builder.highrise(model, "Tower" .. index, base, HALF * 2, HALF * 2, floors, floorHeight, {
+		SlabColor = ROOF,
+		SlabMaterial = Enum.Material.Metal,
+		ColumnColor = TOWER_TRIM,
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = TOWER,
+		WallMaterial = Enum.Material.Metal,
+		WallTransparency = 0,
+		Health = 260,
+		Windows = true,
+		Stairwell = true,
+	})
+	local top = floors + 1 -- the roof slab's level
+	-- parapet rim around the roof edge
+	for _, e in { { Vector3.new(0, 0, HALF), Vector3.new(HALF * 2, 1.2, 0.6) }, { Vector3.new(0, 0, -HALF), Vector3.new(HALF * 2, 1.2, 0.6) }, { Vector3.new(HALF, 0, 0), Vector3.new(0.6, 1.2, HALF * 2) }, { Vector3.new(-HALF, 0, 0), Vector3.new(0.6, 1.2, HALF * 2) } } do
+		local rim = Builder.block(body, "Parapet", Vector3.new(c.X, roofY + 0.6, c.Z) + e[1], e[2], TOWER_TRIM, Enum.Material.Metal)
+		Builder.structural(rim, top, false, 80)
+	end
+	-- neon bands along every floor line (each falls with its floor)
 	local color = if index % 2 == 0 then PINK else CYAN
-	local y = roof - 5
-	while y > 4 do
+	for f = 2, floors + 1 do
+		local y = base.Y + (f - 1) * floorHeight + 0.75
 		for _, face in { Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) } do
-			local size = if face.X ~= 0 then Vector3.new(0.3, 1, HALF * 2 - 6) else Vector3.new(HALF * 2 - 6, 1, 0.3)
-			Builder.neon(body, Vector3.new(c.X, y, c.Z) + face * (HALF + 0.15), size, color)
+			local size = if face.X ~= 0 then Vector3.new(0.3, 0.8, HALF * 2 - 6) else Vector3.new(HALF * 2 - 6, 0.8, 0.3)
+			local band = Builder.neon(body, Vector3.new(c.X, y, c.Z) + face * (HALF + 0.15), size, color)
+			Builder.structural(band, f, false, 20)
 		end
-		y -= 7
 	end
 	-- glowing shop-front entrance on the ground floor
 	local inward = Vector3.new(-math.sign(c.X), 0, 0)
-	Builder.neon(body, Vector3.new(c.X, 3, c.Z) + inward * (HALF + 0.2), Vector3.new(0.3, 5, 10), LIME)
+	local front = Builder.neon(body, Vector3.new(c.X, 3, c.Z) + inward * (HALF + 0.2), Vector3.new(0.3, 5, 10), LIME)
+	Builder.structural(front, 1, false, 20)
 	-- vertical kanji sign on a face without a ramp
 	local signFace = if t.RampDir.X ~= 0 then Vector3.new(0, 0, math.sign(c.Z)) else Vector3.new(math.sign(c.X), 0, 0)
 	local signSize = if signFace.X ~= 0 then Vector3.new(1, 14, 5) else Vector3.new(5, 14, 1)
 	local signPart = Builder.block(body, "VerticalSign", Vector3.new(c.X, roof - 9, c.Z) + signFace * (HALF + 1.2), signSize, Color3.fromRGB(25, 20, 40), Enum.Material.SmoothPlastic)
+	Builder.structural(signPart, floors, false, 60)
 	local normal = if signFace.X > 0 then Enum.NormalId.Right elseif signFace.X < 0 then Enum.NormalId.Left elseif signFace.Z > 0 then Enum.NormalId.Back else Enum.NormalId.Front
 	Builder.sign(signPart, normal, SIGN_WORDS[index] .. "\n" .. SIGN_WORDS[index + 1], if index % 2 == 0 then CYAN else PINK)
 	-- street-to-roof ramp (outer face)
@@ -108,13 +132,15 @@ local function tower(model: Model, t: Tower, index: number)
 		})
 		strip.CastShadow = false
 	end
+	return body
 end
 
-local function rooftop(model: Model, t: Tower, index: number)
+local function rooftop(model: Model, t: Tower, index: number, body: Model)
 	local c, roof = t.Center, t.Roof
 	local top = roof + 0.8
 	for i, off in { Vector3.new(-9, 0, -9), Vector3.new(-2, 0, -10), Vector3.new(9, 0, 8) } do
 		local unit = Builder.building(model, "HVAC")
+		Builder.restsOn(unit, body)
 		local box = Builder.block(unit, "Unit", Vector3.new(c.X + off.X, top + 2, c.Z + off.Z), Vector3.new(6, 4, 5), METAL, Enum.Material.Metal)
 		Builder.structural(box, 1, true, 120)
 		local fan = Builder.cylinder(unit, "Fan", Vector3.new(c.X + off.X, top + 4.2, c.Z + off.Z), 0.4, 4, Color3.fromRGB(30, 30, 36), Enum.Material.Metal)
@@ -123,22 +149,27 @@ local function rooftop(model: Model, t: Tower, index: number)
 			Builder.neon(unit, Vector3.new(c.X + off.X, top + 0.2, c.Z + off.Z - 2.6), Vector3.new(6, 0.3, 0.3), LIME)
 		end
 	end
-	Builder.waterTower(model, Vector3.new(c.X + 9, top, c.Z - 9), 6, Color3.fromRGB(90, 70, 110), Vector3.new(-1, 0, 1))
+	Builder.restsOn(Builder.waterTower(model, Vector3.new(c.X + 9, top, c.Z - 9), 6, Color3.fromRGB(90, 70, 110), Vector3.new(-1, 0, 1)), body)
 	local hasPavilion = index == 1 or index == 2
 	if not hasPavilion then
-		local pad = Builder.block(model, "Helipad", Vector3.new(c.X - 4, top + 0.1, c.Z + 6), Vector3.new(10, 0.2, 10), Color3.fromRGB(30, 30, 40), Enum.Material.SmoothPlastic)
+		local heli = Builder.building(model, "Helipad")
+		Builder.restsOn(heli, body)
+		local pad = Builder.block(heli, "Pad", Vector3.new(c.X - 4, top + 0.1, c.Z + 6), Vector3.new(10, 0.2, 10), Color3.fromRGB(30, 30, 40), Enum.Material.SmoothPlastic)
+		Builder.structural(pad, 1, true, 120)
 		Builder.sign(pad, Enum.NormalId.Top, "H", LIME)
 		for _, e in { Vector3.new(5, 0, 0), Vector3.new(-5, 0, 0), Vector3.new(0, 0, 5), Vector3.new(0, 0, -5) } do
-			Builder.neon(model, pad.Position + e + Vector3.new(0, 0.15, 0), if e.X ~= 0 then Vector3.new(0.4, 0.2, 10) else Vector3.new(10, 0.2, 0.4), LIME)
+			local glow = Builder.neon(heli, pad.Position + e + Vector3.new(0, 0.15, 0), if e.X ~= 0 then Vector3.new(0.4, 0.2, 10) else Vector3.new(10, 0.2, 0.4), LIME)
+			Builder.structural(glow, 1, false, 20)
 		end
 	end
 	local mast = Builder.building(model, "Antenna")
+	Builder.restsOn(mast, body)
 	local pole = Builder.block(mast, "Pole", Vector3.new(c.X - 13, top + 9, c.Z - 13), Vector3.new(0.8, 18, 0.8), METAL, Enum.Material.Metal)
 	Builder.structural(pole, 1, true, 60)
 	local blink = Builder.block(mast, "Beacon", Vector3.new(c.X - 13, top + 18.5, c.Z - 13), Vector3.new(1.2, 1.2, 1.2), Color3.fromRGB(255, 40, 60), Enum.Material.Neon)
 	Builder.structural(blink, 2, false, 20)
 	if hasPavilion then
-		Builder.highrise(model, "Pavilion", Vector3.new(c.X - 4, top, c.Z + 6), 14, 10, 1, 9, {
+		local pavilion = Builder.highrise(model, "Pavilion", Vector3.new(c.X - 4, top, c.Z + 6), 14, 10, 1, 9, {
 			SlabColor = ROOF,
 			SlabMaterial = Enum.Material.Metal,
 			ColumnColor = METAL,
@@ -148,14 +179,15 @@ local function rooftop(model: Model, t: Tower, index: number)
 			WallTransparency = 0.5,
 			OpenSide = "West",
 		})
+		Builder.restsOn(pavilion, body)
 	end
 end
 
-local function edgeBillboard(model: Model, t: Tower, toward: Vector3, text: string, color: Color3, lateral: number)
+local function edgeBillboard(model: Model, t: Tower, toward: Vector3, text: string, color: Color3, lateral: number, body: Model)
 	local dir = Vector3.new(toward.X, 0, toward.Z).Unit
 	local right = Vector3.new(-dir.Z, 0, dir.X)
 	local base = Vector3.new(t.Center.X, t.Roof + 0.8, t.Center.Z) + dir * (HALF - 3) + right * lateral
-	Builder.billboard(model, "HoloBillboard", base, -dir, 12, 22, 4, text, color, Color3.new(1, 1, 1), dir)
+	Builder.restsOn(Builder.billboard(model, "HoloBillboard", base, -dir, 12, 22, 4, text, color, Color3.new(1, 1, 1), dir), body)
 end
 
 -- Street-level cover: kiosks, parked cars, vending machines, lamp posts.
@@ -216,7 +248,7 @@ local function streetProps(model: Model)
 	end
 end
 
--- Neon shophouses on the outer streets: destructible, unlike the four solid towers.
+-- Neon shophouses on the outer streets.
 local function district(model: Model)
 	for i, spec in {
 		{ Vector3.new(-72, STREET, 36), PINK, "West" },
@@ -247,9 +279,10 @@ function NeoShibuya.build(parent: Instance): Types.MapInfo
 
 	streets(model)
 	district(model)
+	local bodies: { Model } = {}
 	for i, t in TOWERS do
-		tower(model, t, i)
-		rooftop(model, t, i)
+		bodies[i] = tower(model, t, i)
+		rooftop(model, t, i, bodies[i])
 	end
 
 	-- skybridges between neighbouring rooftops (sloped where heights differ)
@@ -261,13 +294,13 @@ function NeoShibuya.build(parent: Instance): Types.MapInfo
 		local pb = Vector3.new(b.Center.X, b.Roof + 0.3, b.Center.Z) - dir * (HALF - 1)
 		local lateral = if i % 2 == 0 then 6 else -6
 		local right = Vector3.new(-dir.Z, 0, dir.X)
-		Builder.bridge(model, "GlassSkybridge", pa + right * lateral, pb + right * lateral, 7, GLASS, Enum.Material.Glass, if i % 2 == 0 then PINK else CYAN, METAL, 45)
+		Builder.restsOn(Builder.bridge(model, "GlassSkybridge", pa + right * lateral, pb + right * lateral, 7, GLASS, Enum.Material.Glass, if i % 2 == 0 then PINK else CYAN, METAL, 45), bodies[link[1]])
 	end
 
-	edgeBillboard(model, TOWERS[1], TOWERS[4].Center - TOWERS[1].Center, "NEON\nKOI", PINK, 4)
-	edgeBillboard(model, TOWERS[2], TOWERS[1].Center - TOWERS[2].Center, "DISASTER\nTV", PURPLE, 3)
-	edgeBillboard(model, TOWERS[3], TOWERS[2].Center - TOWERS[3].Center, "CYBER\nRAMEN", CYAN, -4)
-	edgeBillboard(model, TOWERS[2], TOWERS[3].Center - TOWERS[2].Center, "未来", PINK, -5)
+	edgeBillboard(model, TOWERS[1], TOWERS[4].Center - TOWERS[1].Center, "NEON\nKOI", PINK, 4, bodies[1])
+	edgeBillboard(model, TOWERS[2], TOWERS[1].Center - TOWERS[2].Center, "DISASTER\nTV", PURPLE, 3, bodies[2])
+	edgeBillboard(model, TOWERS[3], TOWERS[2].Center - TOWERS[3].Center, "CYBER\nRAMEN", CYAN, -4, bodies[3])
+	edgeBillboard(model, TOWERS[2], TOWERS[3].Center - TOWERS[2].Center, "未来", PINK, -5, bodies[2])
 
 	streetProps(model)
 

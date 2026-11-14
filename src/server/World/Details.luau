@@ -1,7 +1,9 @@
 --!strict
 -- Details: the dressing pass that makes each arena read like its reference art. Runs
--- after a map's builder (MapService): rooftop clutter on the real roofs, set dressing on
--- genuinely clear ground (or decks), signs at the edge facing the middle. Everything is a
+-- after a map's builder (MapService): furnished interiors on every floor of every
+-- highrise and lived-in facades, rooftop clutter on the real roofs (resting on them, so it
+-- falls when they collapse), set dressing on genuinely clear ground (or decks), signs at
+-- the edge facing the middle. Everything is a
 -- small destructible building (Builder.structural), so it adds cover and things to smash
 -- without changing the layout. Budgets are per map (Config.Details) to keep part counts in
 -- check on phones.
@@ -14,7 +16,7 @@ local Builder = require(script.Parent.Builder)
 
 local Details = {}
 
-type Ctx = { Info: Types.MapInfo, Rng: Random, Params: RaycastParams, Overlap: OverlapParams, Lights: number }
+type Ctx = { Info: Types.MapInfo, Rng: Random, Params: RaycastParams, Overlap: OverlapParams, Lights: number, Furniture: number }
 
 local rgb = Color3.fromRGB
 local METAL = Enum.Material.Metal
@@ -413,6 +415,7 @@ end
 
 function Kit.snowCap(ctx: Ctx, roof: Roof)
 	local m = Builder.building(ctx.Info.Model, "SnowCap")
+	Builder.restsOn(m, roof.Model)
 	local top = roof.Center.Y + roof.Size.Y / 2
 	piece(m, "Snow", CFrame.new(roof.Center.X, top + 0.5, roof.Center.Z), Vector3.new(roof.Size.X * 0.92, 1, roof.Size.Z * 0.92), rgb(245, 250, 255), Enum.Material.Snow)
 	for i = 1, 5 do
@@ -459,6 +462,303 @@ function Kit.sign(ctx: Ctx, at: Vector3, yaw: CFrame, text: string, panel: Color
 end
 
 ---------------------------------------------------------------------------
+-- interiors: every highrise (towers, works, labs, hideouts...) is furnished floor by
+-- floor from its map's theme, pushed against the walls so the middle stays walkable.
+-- Furniture belongs to the building at its floor's level: it is cover, it breaks, and it
+-- falls with the floor. Facades get a door awning, window planters and a per-building
+-- colour shift so neighbouring buildings stop looking identical.
+
+type Furnish = (Ctx, Model, CFrame, number) -> ()
+
+-- one furniture part: belongs to the building, at the floor's level, never a support
+local function fp(m: Model, name: string, cf: CFrame, size: Vector3, color: Color3, material: Enum.Material?, level: number, props: { [string]: any }?): BasePart
+	local p = Builder.part(m, { Name = name, Size = size, CFrame = cf, Color = color, Material = material or Enum.Material.SmoothPlastic })
+	if props then
+		for k, v in props do
+			(p :: any)[k] = v
+		end
+	end
+	Builder.structural(p, level, false, 35)
+	p.CastShadow = false
+	return p
+end
+
+local WOOD = Enum.Material.WoodPlanks
+local FABRIC = Enum.Material.Fabric
+
+local F: { [string]: Furnish } = {}
+
+-- cf: on the floor, facing into the room (LookVector points away from the wall)
+F.bed = function(ctx, m, cf, lvl)
+	local sheet = ({ rgb(90, 140, 220), rgb(220, 90, 110), rgb(110, 190, 120), rgb(240, 200, 90) })[ctx.Rng:NextInteger(1, 4)]
+	fp(m, "BedFrame", cf * CFrame.new(0, 0.6, -3), Vector3.new(4.4, 1.2, 6.4), rgb(120, 80, 50), WOOD, lvl)
+	fp(m, "Mattress", cf * CFrame.new(0, 1.45, -3), Vector3.new(4.2, 0.6, 6.2), rgb(245, 245, 240), FABRIC, lvl)
+	fp(m, "Blanket", cf * CFrame.new(0, 1.8, -2.2), Vector3.new(4.3, 0.2, 4.4), sheet, FABRIC, lvl)
+	fp(m, "Pillow", cf * CFrame.new(0, 1.95, -5.3), Vector3.new(3, 0.5, 1.2), rgb(250, 250, 250), FABRIC, lvl)
+end
+
+F.sofa = function(ctx, m, cf, lvl)
+	local c = ({ rgb(160, 60, 70), rgb(70, 110, 160), rgb(90, 90, 100), rgb(200, 150, 80) })[ctx.Rng:NextInteger(1, 4)]
+	fp(m, "Seat", cf * CFrame.new(0, 0.9, -1.4), Vector3.new(6, 1.8, 2.8), c, FABRIC, lvl)
+	fp(m, "Back", cf * CFrame.new(0, 2.2, -2.6), Vector3.new(6, 2.2, 0.8), c, FABRIC, lvl)
+	fp(m, "Rug", cf * CFrame.new(0, 0.08, -5.2), Vector3.new(7, 0.15, 4.5), ({ rgb(180, 60, 60), rgb(60, 120, 150), rgb(200, 170, 110) })[ctx.Rng:NextInteger(1, 3)], FABRIC, lvl, { CanCollide = false })
+	fp(m, "CoffeeTable", cf * CFrame.new(0, 0.8, -5.2), Vector3.new(3, 0.3, 1.8), rgb(110, 75, 45), WOOD, lvl)
+end
+
+F.dining = function(ctx, m, cf, lvl)
+	fp(m, "Table", cf * CFrame.new(0, 1.7, -3.5), Vector3.new(4.5, 0.3, 3), rgb(140, 95, 55), WOOD, lvl)
+	fp(m, "TableLeg", cf * CFrame.new(0, 0.8, -3.5), Vector3.new(0.6, 1.6, 0.6), rgb(90, 60, 35), WOOD, lvl)
+	for _, x in { -2.8, 2.8 } do
+		fp(m, "Chair", cf * CFrame.new(x, 0.9, -3.5), Vector3.new(1.4, 1.8, 1.4), rgb(110, 75, 45), WOOD, lvl)
+	end
+	fp(m, "Plate", cf * CFrame.new(0, 1.9, -3.5), Vector3.new(1, 0.1, 1), rgb(245, 245, 245), Enum.Material.SmoothPlastic, lvl, { CanCollide = false })
+end
+
+F.shelf = function(ctx, m, cf, lvl)
+	fp(m, "Shelf", cf * CFrame.new(0, 3, -0.8), Vector3.new(4.5, 6, 1.4), rgb(110, 75, 45), WOOD, lvl)
+	for row = 0, 2 do
+		local books = ({ rgb(200, 60, 60), rgb(60, 100, 200), rgb(220, 180, 60), rgb(80, 160, 90) })[(row % 4) + 1]
+		fp(m, "Books", cf * CFrame.new(ctx.Rng:NextNumber(-0.6, 0.6), 1.2 + row * 1.8, -1.55), Vector3.new(3, 1.1, 0.2), books, Enum.Material.SmoothPlastic, lvl, { CanCollide = false })
+	end
+end
+
+F.desk = function(ctx, m, cf, lvl)
+	fp(m, "Desk", cf * CFrame.new(0, 1.7, -1.4), Vector3.new(4.5, 0.3, 2.2), rgb(225, 225, 230), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "DeskLegs", cf * CFrame.new(0, 0.8, -0.6), Vector3.new(4.3, 1.6, 0.4), rgb(80, 80, 90), Enum.Material.Metal, lvl)
+	fp(m, "Monitor", cf * CFrame.new(0, 2.7, -0.7), Vector3.new(2.2, 1.4, 0.2), rgb(25, 25, 30), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "Screen", cf * CFrame.new(0, 2.7, -0.82), Vector3.new(1.9, 1.1, 0.05), rgb(90, 200, 255), Enum.Material.Neon, lvl, { CanCollide = false })
+	fp(m, "Chair", cf * CFrame.new(0, 1, -3.4), Vector3.new(1.6, 2, 1.6), rgb(40, 40, 50), FABRIC, lvl)
+end
+
+F.kitchen = function(ctx, m, cf, lvl)
+	fp(m, "Counter", cf * CFrame.new(0, 1.6, -1.2), Vector3.new(6, 3.2, 2.2), rgb(235, 235, 230), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "Worktop", cf * CFrame.new(0, 3.3, -1.2), Vector3.new(6.2, 0.25, 2.4), rgb(70, 70, 80), Enum.Material.Marble, lvl)
+	fp(m, "Fridge", cf * CFrame.new(4.2, 3, -1.2), Vector3.new(2.2, 6, 2.2), rgb(225, 230, 235), Enum.Material.Metal, lvl)
+	fp(m, "Pot", cf * CFrame.new(-1.5, 3.8, -1.2), Vector3.new(1, 0.8, 1), rgb(60, 60, 70), Enum.Material.Metal, lvl, { CanCollide = false })
+end
+
+F.plant = function(ctx, m, cf, lvl)
+	fp(m, "PlantPot", cf * CFrame.new(0, 0.8, -1), Vector3.new(1.6, 1.6, 1.6), rgb(170, 90, 60), Enum.Material.Slate, lvl)
+	fp(m, "Leaves", cf * CFrame.new(0, 2.8, -1), Vector3.new(2.6, 2.8, 2.6), rgb(70, 160, 70), Enum.Material.LeafyGrass, lvl, { Shape = Enum.PartType.Ball, CanCollide = false })
+end
+
+F.lamp = function(ctx, m, cf, lvl)
+	fp(m, "LampPole", cf * CFrame.new(0, 2.5, -1), Vector3.new(0.3, 5, 0.3), rgb(40, 40, 46), Enum.Material.Metal, lvl)
+	local shade = fp(m, "Shade", cf * CFrame.new(0, 5.2, -1), Vector3.new(1.6, 1, 1.6), rgb(255, 225, 170), Enum.Material.Neon, lvl, { CanCollide = false })
+	light(ctx, shade, rgb(255, 210, 150), 14)
+end
+
+F.tv = function(ctx, m, cf, lvl)
+	fp(m, "TVStand", cf * CFrame.new(0, 0.8, -1), Vector3.new(5, 1.6, 1.6), rgb(60, 45, 35), WOOD, lvl)
+	fp(m, "TV", cf * CFrame.new(0, 3.2, -0.7), Vector3.new(4.4, 2.6, 0.3), rgb(20, 20, 24), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "Picture", cf * CFrame.new(0, 3.2, -0.88), Vector3.new(4, 2.2, 0.05), ({ rgb(80, 200, 255), rgb(255, 120, 200), rgb(140, 255, 120) })[ctx.Rng:NextInteger(1, 3)], Enum.Material.Neon, lvl, { CanCollide = false })
+end
+
+F.crates = function(ctx, m, cf, lvl)
+	fp(m, "Crate", cf * CFrame.new(0, 1.5, -1.8), Vector3.new(3, 3, 3), rgb(170, 120, 70), WOOD, lvl)
+	fp(m, "Crate", cf * CFrame.new(3.2, 1.2, -1.6), Vector3.new(2.4, 2.4, 2.4), rgb(150, 105, 60), WOOD, lvl)
+	fp(m, "Crate", cf * CFrame.new(0.6, 3.9, -1.7), Vector3.new(2.2, 1.8, 2.2), rgb(190, 140, 85), WOOD, lvl)
+end
+
+F.barrels = function(ctx, m, cf, lvl)
+	for i, x in { -1.4, 1.4 } do
+		local b = fp(m, "Barrel", cf * CFrame.new(x, 1.5, -1.4) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(3, 2.4, 2.4), if i == 1 then rgb(60, 110, 170) else rgb(180, 70, 50), Enum.Material.Metal, lvl)
+		b.Shape = Enum.PartType.Cylinder
+	end
+end
+
+F.workbench = function(ctx, m, cf, lvl)
+	fp(m, "Bench", cf * CFrame.new(0, 1.8, -1.4), Vector3.new(6, 0.5, 2.4), rgb(120, 80, 50), WOOD, lvl)
+	fp(m, "BenchLegs", cf * CFrame.new(0, 0.8, -1.4), Vector3.new(5.6, 1.6, 2), rgb(70, 50, 35), WOOD, lvl)
+	fp(m, "Vice", cf * CFrame.new(-2, 2.4, -1.4), Vector3.new(1, 0.8, 1), rgb(90, 90, 100), Enum.Material.Metal, lvl, { CanCollide = false })
+	fp(m, "Cog", cf * CFrame.new(1.4, 2.15, -1.4) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(0.3, 2, 2), rgb(200, 150, 60), Enum.Material.Metal, lvl, { Shape = Enum.PartType.Cylinder, CanCollide = false })
+	fp(m, "ToolBoard", cf * CFrame.new(0, 4.2, -0.2), Vector3.new(5, 2.4, 0.2), rgb(150, 110, 70), WOOD, lvl, { CanCollide = false })
+end
+
+F.bunk = function(ctx, m, cf, lvl)
+	for _, y in { 0.9, 3.6 } do
+		fp(m, "Bunk", cf * CFrame.new(0, y, -2.2), Vector3.new(6.2, 0.5, 2.8), rgb(110, 115, 125), Enum.Material.Metal, lvl)
+		fp(m, "Mattress", cf * CFrame.new(0, y + 0.45, -2.2), Vector3.new(5.8, 0.4, 2.5), rgb(80, 100, 70), FABRIC, lvl, { CanCollide = false })
+	end
+	fp(m, "Post", cf * CFrame.new(3, 2.2, -2.2), Vector3.new(0.3, 4.4, 2.8), rgb(80, 85, 95), Enum.Material.Metal, lvl)
+end
+
+F.lockers = function(ctx, m, cf, lvl)
+	for i = 0, 2 do
+		fp(m, "Locker", cf * CFrame.new(-2.2 + i * 2.2, 3, -0.9), Vector3.new(2, 6, 1.6), ({ rgb(90, 110, 140), rgb(70, 90, 120) })[(i % 2) + 1], Enum.Material.Metal, lvl)
+	end
+end
+
+F.arcade = function(ctx, m, cf, lvl)
+	local c = ({ rgb(240, 60, 150), rgb(60, 200, 90), rgb(60, 140, 240), rgb(160, 80, 230) })[ctx.Rng:NextInteger(1, 4)]
+	for i, x in { -1.5, 1.5 } do
+		fp(m, "Cabinet", cf * CFrame.new(x, 2.6, -1.4), Vector3.new(2.6, 5.2, 2.4), if i == 1 then c else c:Lerp(rgb(255, 255, 255), 0.25), Enum.Material.SmoothPlastic, lvl)
+		fp(m, "Screen", cf * CFrame.new(x, 3.6, -2.62), Vector3.new(2, 1.6, 0.1), rgb(110, 240, 255), Enum.Material.Neon, lvl, { CanCollide = false })
+	end
+end
+
+F.vending = function(ctx, m, cf, lvl)
+	fp(m, "Vending", cf * CFrame.new(0, 3, -1.2), Vector3.new(3, 6, 2.4), rgb(230, 60, 80), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "Glow", cf * CFrame.new(0, 3.6, -2.45), Vector3.new(2.4, 3.6, 0.1), rgb(200, 240, 255), Enum.Material.Neon, lvl, { CanCollide = false })
+end
+
+F.labBench = function(ctx, m, cf, lvl)
+	fp(m, "LabBench", cf * CFrame.new(0, 1.7, -1.3), Vector3.new(6, 0.4, 2.4), rgb(240, 245, 245), Enum.Material.SmoothPlastic, lvl)
+	fp(m, "Cabinet", cf * CFrame.new(0, 0.8, -1.3), Vector3.new(5.6, 1.6, 2), rgb(200, 210, 215), Enum.Material.SmoothPlastic, lvl)
+	for i, x in { -1.8, 0, 1.8 } do
+		fp(m, "Flask", cf * CFrame.new(x, 2.4, -1.3), Vector3.new(0.6, 1, 0.6), ({ rgb(120, 255, 140), rgb(90, 200, 255), rgb(255, 140, 220) })[i], Enum.Material.Neon, lvl, { CanCollide = false })
+	end
+	fp(m, "Sprout", cf * CFrame.new(2.6, 2.6, -1.3), Vector3.new(1.4, 1.4, 1.4), rgb(80, 180, 80), Enum.Material.LeafyGrass, lvl, { Shape = Enum.PartType.Ball, CanCollide = false })
+end
+
+F.stove = function(ctx, m, cf, lvl)
+	fp(m, "Stove", cf * CFrame.new(0, 1.5, -1.3), Vector3.new(2.6, 3, 2.4), rgb(50, 50, 55), Enum.Material.Metal, lvl)
+	local fire = fp(m, "Embers", cf * CFrame.new(0, 1.3, -2.52), Vector3.new(1.6, 1, 0.1), rgb(255, 140, 50), Enum.Material.Neon, lvl, { CanCollide = false })
+	light(ctx, fire, rgb(255, 150, 70), 12)
+	fp(m, "Flue", cf * CFrame.new(0, 4.5, -1.3), Vector3.new(0.8, 3, 0.8), rgb(40, 40, 45), Enum.Material.Metal, lvl)
+end
+
+-- what each map's rooms are made of (repeats make the common things common)
+local THEMES: { [string]: { string } } = {
+	FractureBay = { "bed", "sofa", "dining", "kitchen", "plant", "tv", "shelf", "lamp" },
+	NeoShibuya = { "arcade", "desk", "sofa", "vending", "bed", "tv", "plant", "desk" },
+	MagmaCore = { "desk", "lockers", "crates", "barrels", "bunk", "workbench" },
+	SunscorchedMirage = { "crates", "barrels", "dining", "plant", "shelf", "bed" },
+	OutpostZero = { "bunk", "lockers", "desk", "stove", "crates", "kitchen", "labBench" },
+	StarlightBoardwalk = { "arcade", "vending", "dining", "kitchen", "sofa", "crates" },
+	ChronoSpire = { "workbench", "shelf", "crates", "barrels", "stove", "dining", "bed" },
+	VerdantDome = { "labBench", "desk", "plant", "plant", "shelf", "bunk" },
+	IroncladArmada = { "bunk", "lockers", "crates", "desk", "barrels", "kitchen" },
+}
+
+-- facade accents per map (awnings, planters)
+local ACCENTS: { [string]: { Color3 } } = {
+	FractureBay = { rgb(240, 90, 90), rgb(60, 160, 220), rgb(250, 200, 70) },
+	NeoShibuya = { rgb(255, 70, 200), rgb(70, 220, 255), rgb(150, 90, 255) },
+	MagmaCore = { rgb(255, 190, 30), rgb(60, 60, 66) },
+	SunscorchedMirage = { rgb(200, 80, 60), rgb(60, 120, 170), rgb(230, 190, 100) },
+	OutpostZero = { rgb(240, 120, 30), rgb(40, 90, 170) },
+	StarlightBoardwalk = { rgb(230, 50, 60), rgb(40, 150, 230), rgb(250, 200, 40) },
+	ChronoSpire = { rgb(120, 40, 35), rgb(40, 70, 60), rgb(190, 140, 60) },
+	VerdantDome = { rgb(90, 170, 90), rgb(240, 240, 240) },
+	IroncladArmada = { rgb(230, 170, 40), rgb(70, 76, 86) },
+}
+
+type Floor = { Y: number, Level: number }
+
+local function floorsOf(m: Model): { Floor }
+	local out: { Floor } = {}
+	local raw = m:GetAttribute("FloorYs")
+	if typeof(raw) ~= "string" then
+		return out
+	end
+	for entry in string.gmatch(raw, "[^,]+") do
+		local y, l = string.match(entry, "([%-%d%.]+):(%d+)")
+		if y and l then
+			table.insert(out, { Y = tonumber(y) :: number, Level = tonumber(l) :: number })
+		end
+	end
+	return out
+end
+
+-- Wall-hugging furniture slots for a room: (offset from the centre, the wall's inward normal)
+local function slots(hx: number, hz: number): { { Vector3 } }
+	local list: { { Vector3 } } = {}
+	local inset = 0.9
+	for _, x in { -hx * 0.45, hx * 0.45 } do
+		table.insert(list, { Vector3.new(x, 0, hz - inset), Vector3.new(0, 0, -1) }) -- north wall
+	end
+	table.insert(list, { Vector3.new(hx - inset, 0, 0), Vector3.new(-1, 0, 0) }) -- east wall
+	table.insert(list, { Vector3.new(-hx + inset, 0, -hz * 0.3), Vector3.new(1, 0, 0) }) -- west wall (clear of the stairwell)
+	table.insert(list, { Vector3.new(hx * 0.4, 0, -hz + inset), Vector3.new(0, 0, 1) }) -- south wall, beside the door
+	return list
+end
+
+local function furnish(ctx: Ctx, m: Model, key: string)
+	local theme = THEMES[key]
+	local footprint = m:GetAttribute("Footprint")
+	local base = m:GetAttribute("BaseCenter")
+	if not theme or typeof(footprint) ~= "Vector3" or typeof(base) ~= "Vector3" then
+		return
+	end
+	local hx, hz = footprint.X / 2 - 2, footprint.Z / 2 - 2
+	if hx < 4 or hz < 4 then
+		return
+	end
+	for _, floor in floorsOf(m) do
+		local placed = 0
+		local list = slots(hx, hz)
+		-- shuffle so rooms differ
+		for i = #list, 2, -1 do
+			local j = ctx.Rng:NextInteger(1, i)
+			list[i], list[j] = list[j], list[i]
+		end
+		for _, slot in list do
+			if placed >= Config.Details.FurniturePerFloor or ctx.Furniture >= Config.Details.FurnitureMax then
+				break
+			end
+			local at = Vector3.new(base.X, floor.Y, base.Z) + slot[1]
+			local inward = slot[2]
+			-- the furniture's back is against the wall; it faces into the room
+			local cf = CFrame.lookAt(at, at - inward) * CFrame.Angles(0, math.pi, 0)
+			local probe = CFrame.new(at + inward * 2.6 + Vector3.new(0, 3.3, 0))
+			if #workspace:GetPartBoundsInBox(probe, Vector3.new(5, 5.6, 5), ctx.Overlap) > 0 then
+				continue -- a column, ladder, wall, crate or earlier furniture is in the way
+			end
+			local kind = theme[ctx.Rng:NextInteger(1, #theme)]
+			F[kind](ctx, m, cf, floor.Level)
+			placed += 1
+			ctx.Furniture += 1
+		end
+	end
+end
+
+local function facade(ctx: Ctx, m: Model, key: string)
+	local footprint = m:GetAttribute("Footprint")
+	local base = m:GetAttribute("BaseCenter")
+	if typeof(footprint) ~= "Vector3" or typeof(base) ~= "Vector3" then
+		return
+	end
+	local accents = ACCENTS[key] or { rgb(200, 80, 60) }
+	local accent = accents[ctx.Rng:NextInteger(1, #accents)]
+	-- a slight colour shift per building
+	local shift = ctx.Rng:NextNumber(-0.1, 0.1)
+	for _, d in m:GetChildren() do
+		if d:IsA("BasePart") and d.Name == "Wall" then
+			local c = d.Color
+			d.Color = if shift > 0 then c:Lerp(rgb(255, 255, 255), shift) else c:Lerp(rgb(0, 0, 0), -shift)
+		end
+	end
+	local floors = floorsOf(m)
+	if #floors == 0 then
+		return
+	end
+	-- door awning over the ground-floor doorway (middle of the south wall)
+	local door = Vector3.new(base.X, floors[1].Y, base.Z - footprint.Z / 2)
+	local awning = fp(m, "Awning", CFrame.new(door + Vector3.new(0, 8, -1.6)) * CFrame.Angles(math.rad(-18), 0, 0), Vector3.new(9, 0.3, 3.4), accent, Enum.Material.Fabric, 1)
+	awning.CanCollide = false
+	fp(m, "DoorMat", CFrame.new(door + Vector3.new(0, 0.08, -1.4)), Vector3.new(4, 0.15, 2), accent:Lerp(rgb(0, 0, 0), 0.3), Enum.Material.Fabric, 1, { CanCollide = false })
+	-- planters under the upper-floor windows on the south face
+	for i = 2, math.min(#floors, 4) do
+		local f = floors[i]
+		for _, x in { -footprint.X * 0.25, footprint.X * 0.25 } do
+			local at = Vector3.new(base.X + x, f.Y + 0.6, base.Z - footprint.Z / 2 - 0.9)
+			fp(m, "Planter", CFrame.new(at), Vector3.new(4, 1, 1.2), rgb(110, 75, 45), WOOD, f.Level)
+			fp(m, "Flowers", CFrame.new(at + Vector3.new(0, 0.8, 0)), Vector3.new(3.6, 0.8, 1), accents[(i % #accents) + 1], Enum.Material.LeafyGrass, f.Level, { CanCollide = false })
+		end
+	end
+end
+
+local function dressBuildings(ctx: Ctx, key: string)
+	for _, m in ctx.Info.Model:GetDescendants() do
+		if m:IsA("Model") and m:GetAttribute("FloorYs") ~= nil then
+			furnish(ctx, m, key)
+			facade(ctx, m, key)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
 -- per-map passes
 
 local function randomYaw(ctx: Ctx): CFrame
@@ -473,7 +773,7 @@ local function edgeSign(ctx: Ctx, text: string, panel: Color3, textColor: Color3
 	end
 end
 
-local function onRoofs(ctx: Ctx, count: number, clearance: Vector3, fn: (Vector3, Roof) -> ())
+local function onRoofs(ctx: Ctx, count: number, clearance: Vector3, fn: (Vector3, Roof) -> Model?)
 	local list = roofs(ctx)
 	local placed = 0
 	for i = 1, #list * 3 do
@@ -484,7 +784,10 @@ local function onRoofs(ctx: Ctx, count: number, clearance: Vector3, fn: (Vector3
 		local at = roofSpot(ctx, roof, clearance)
 		if at then
 			placed += 1
-			fn(at, roof)
+			local prop = fn(at, roof)
+			if prop then
+				Builder.restsOn(prop, roof.Model)
+			end
 		end
 	end
 end
@@ -512,20 +815,20 @@ local PASSES: { [string]: (Ctx) -> () } = {
 			end
 			local at = roofSpot(ctx, roof, Vector3.new(11, 15, 3))
 			if at then
-				Kit.holoBoard(ctx, at, yawTo(at, ctx.Info.Center), NEON[i % #NEON + 1], KANJI[i % #KANJI + 1])
+				Builder.restsOn(Kit.holoBoard(ctx, at, yawTo(at, ctx.Info.Center), NEON[i % #NEON + 1], KANJI[i % #KANJI + 1]), roof.Model)
 			end
 		end
 		onRoofs(ctx, 12, Vector3.new(6, 4, 5), function(at)
-			Kit.acUnit(ctx, at, randomYaw(ctx))
+			return Kit.acUnit(ctx, at, randomYaw(ctx))
 		end)
 		onRoofs(ctx, 4, Vector3.new(6, 10, 6), function(at)
-			Kit.waterTank(ctx, at, rgb(90, 80, 100))
+			return Kit.waterTank(ctx, at, rgb(90, 80, 100))
 		end)
 		onRoofs(ctx, 5, Vector3.new(4, 6, 4), function(at)
-			Kit.dish(ctx, at, randomYaw(ctx))
+			return Kit.dish(ctx, at, randomYaw(ctx))
 		end)
 		onRoofs(ctx, 3, Vector3.new(10, 2, 10), function(at)
-			Kit.helipad(ctx, at)
+			return Kit.helipad(ctx, at)
 		end)
 		onGround(ctx, 8, Vector3.new(3, 10, 3), "Terrain", function(at)
 			Kit.lamp(ctx, at, NEON[ctx.Rng:NextInteger(1, #NEON)], 10)
@@ -538,7 +841,7 @@ local PASSES: { [string]: (Ctx) -> () } = {
 	ChronoSpire = function(ctx)
 		-- chimneys on every works roof, wall gears, copper pipes, lamps and crates
 		onRoofs(ctx, 10, Vector3.new(4, 14, 4), function(at)
-			Kit.chimney(ctx, at, ctx.Rng:NextNumber(7, 12))
+			return Kit.chimney(ctx, at, ctx.Rng:NextNumber(7, 12))
 		end)
 		for i, roof in roofs(ctx) do
 			if i > 6 then
@@ -546,10 +849,10 @@ local PASSES: { [string]: (Ctx) -> () } = {
 			end
 			-- a big gear on a wall face, spinning
 			local face = roof.Center + Vector3.new(0, ctx.Rng:NextNumber(-0.2, 0.2) * roof.Size.Y, -roof.Size.Z / 2 - 0.6)
-			Kit.gear(ctx, CFrame.new(face), ctx.Rng:NextNumber(5, 9), if i % 2 == 0 then 0.6 else -0.8)
+			Builder.restsOn(Kit.gear(ctx, CFrame.new(face), ctx.Rng:NextNumber(5, 9), if i % 2 == 0 then 0.6 else -0.8), roof.Model)
 			-- a copper pipe running down the side
 			local x = roof.Center.X + roof.Size.X / 2 + 0.8
-			Kit.pipe(ctx, Vector3.new(x, roof.Center.Y + roof.Size.Y / 2 - 1, roof.Center.Z), Vector3.new(x, roof.Center.Y - roof.Size.Y / 2 + 1, roof.Center.Z), 1.2, rgb(190, 110, 60))
+			Builder.restsOn(Kit.pipe(ctx, Vector3.new(x, roof.Center.Y + roof.Size.Y / 2 - 1, roof.Center.Z), Vector3.new(x, roof.Center.Y - roof.Size.Y / 2 + 1, roof.Center.Z), 1.2, rgb(190, 110, 60)), roof.Model)
 		end
 		onGround(ctx, 10, Vector3.new(3, 9, 3), "Terrain", function(at)
 			Kit.lamp(ctx, at, rgb(255, 190, 90), 8)
@@ -568,10 +871,10 @@ local PASSES: { [string]: (Ctx) -> () } = {
 			Kit.solarPanel(ctx, at, randomYaw(ctx))
 		end)
 		onRoofs(ctx, 6, Vector3.new(4, 4, 4), function(at)
-			Kit.solarPanel(ctx, at, randomYaw(ctx))
+			return Kit.solarPanel(ctx, at, randomYaw(ctx))
 		end)
 		onRoofs(ctx, 3, Vector3.new(4, 6, 4), function(at)
-			Kit.dish(ctx, at, randomYaw(ctx))
+			return Kit.dish(ctx, at, randomYaw(ctx))
 		end)
 		onGround(ctx, 10, Vector3.new(7, 6, 7), "Terrain", function(at)
 			Kit.rock(ctx, at, ctx.Rng:NextNumber(3, 5), rgb(110, 120, 105), Enum.Material.Slate)
@@ -592,7 +895,7 @@ local PASSES: { [string]: (Ctx) -> () } = {
 			Kit.scaffold(ctx, at, 18, rgb(150, 105, 60), Enum.Material.Wood)
 		end)
 		onRoofs(ctx, 5, Vector3.new(4, 6, 4), function(at)
-			Kit.dish(ctx, at, randomYaw(ctx))
+			return Kit.dish(ctx, at, randomYaw(ctx))
 		end)
 		onGround(ctx, 6, Vector3.new(3, 9, 3), "Top", function(at)
 			Kit.lamp(ctx, at, rgb(255, 230, 170), 7)
@@ -723,8 +1026,11 @@ function Details.apply(key: string, info: Types.MapInfo)
 	local overlap = OverlapParams.new()
 	overlap.FilterType = Enum.RaycastFilterType.Include
 	overlap.FilterDescendantsInstances = { info.Model }
-	local ctx: Ctx = { Info = info, Rng = Random.new(), Params = params, Overlap = overlap, Lights = 0 }
-	local ok, err = pcall(pass, ctx)
+	local ctx: Ctx = { Info = info, Rng = Random.new(), Params = params, Overlap = overlap, Lights = 0, Furniture = 0 }
+	local ok, err = pcall(function()
+		dressBuildings(ctx, key)
+		pass(ctx)
+	end)
 	if not ok then
 		warn("[Details]", key, err)
 	end

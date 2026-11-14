@@ -62,8 +62,11 @@ local restingFor: { [BasePart]: number } = {}
 local pendingRubble: { { any } } = {}
 local rubbleRemote = Remotes.get("Rubble")
 
+local dependents: { [any]: { Model } }? = nil -- BuildingId -> models resting on it (lazy)
+
 function DestructionService.SetArena(folder: Instance?)
 	arenaFolder = folder
+	dependents = nil
 	table.clear(debrisList)
 	table.clear(restingFor)
 end
@@ -273,6 +276,44 @@ local function tiltBuilding(building: Model)
 	end)
 end
 
+-- Everything resting on `building` (Builder.restsOn: rooftop clutter, pavilions, props on a
+-- deck) falls when it collapses or lists, instead of hanging in the air.
+local function dropDependents(building: Model, from: Vector3?)
+	local id = building:GetAttribute("BuildingId")
+	local root = arenaFolder
+	if id == nil or not root then
+		return
+	end
+	if not dependents then
+		local index: { [any]: { Model } } = {}
+		for _, m in root:GetDescendants() do
+			if m:IsA("Model") then
+				local base = m:GetAttribute("RestsOn")
+				if base ~= nil then
+					index[base] = index[base] or {}
+					table.insert(index[base], m)
+				end
+			end
+		end
+		dependents = index
+	end
+	local list = (dependents :: { [any]: { Model } })[id]
+	if not list then
+		return
+	end
+	for _, m in list do
+		if m.Parent and m:GetAttribute("Dropped") ~= true then
+			m:SetAttribute("Dropped", true)
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") and isIntact(d) then
+					release(d, from, DC.BuckleImpulse * 0.5)
+				end
+			end
+			dropDependents(m, from)
+		end
+	end
+end
+
 local function checkStability(building: Model, from: Vector3?): number
 	local total: { [number]: number } = {}
 	local intact: { [number]: number } = {}
@@ -320,6 +361,7 @@ local function checkStability(building: Model, from: Vector3?): number
 		building:SetAttribute("Tilted", true)
 		tiltBuilding(building)
 		local cf0, size0 = building:GetBoundingBox()
+		dropDependents(building, from)
 		collapsed:Fire(building, cf0.Position, size0)
 		return 0
 	end
@@ -341,6 +383,8 @@ local function checkStability(building: Model, from: Vector3?): number
 	end
 	if count > 0 then
 		AudioService.playAt("Collapse", cf.Position, 2.4, 0.8 + math.random() * 0.3, Config.Audio.CollapseSoundCooldown)
+		AudioService.playAt("Smash", cf.Position, 1.8, 0.9 + math.random() * 0.15, Config.Audio.SmashCooldown)
+		dropDependents(building, from)
 		collapsed:Fire(building, cf.Position, size)
 	end
 	return count
@@ -401,6 +445,10 @@ local function applyDamage(parts: { BasePart }, damage: number, from: Vector3?, 
 		if building.Parent then
 			destroyed += checkStability(building, from)
 		end
+	end
+	-- a hit that really wrecks something gets the satisfying smash on top of the cracks
+	if from and destroyed >= Config.Audio.SmashMinParts then
+		AudioService.playAt("Smash", from, 1.4, 0.95 + math.random() * 0.15, Config.Audio.SmashCooldown)
 	end
 	return destroyed
 end

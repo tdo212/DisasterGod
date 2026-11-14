@@ -109,12 +109,29 @@ end
 
 -- Mark a part as destructible structure.
 function Builder.structural(part: BasePart, level: number, isSupport: boolean?, healthOverride: number?): BasePart
+	-- performance: structure never needs Touched events (pads re-enable it), and small
+	-- pieces don't cast shadows (fewer shadow-map updates when things move or break)
+	part.CanTouch = false
+	local s = part.Size
+	if s.X * s.Y * s.Z < Config.Performance.ShadowMinVolume then
+		part.CastShadow = false
+	end
 	part:SetAttribute("Structural", true)
 	part:SetAttribute("Level", level)
 	part:SetAttribute("Support", isSupport == true)
 	part:SetAttribute("Health", healthOverride or Builder.healthFor(part.Material))
 	CollectionService:AddTag(part, Builder.STRUCTURAL_TAG)
 	return part
+end
+
+-- `model` sits on `base` (rooftop clutter, a pavilion on a tower): when the base building
+-- collapses, DestructionService drops everything resting on it instead of leaving it
+-- floating.
+function Builder.restsOn(model: Instance, base: Instance)
+	local id = base:GetAttribute("BuildingId")
+	if id ~= nil then
+		model:SetAttribute("RestsOn", id)
+	end
 end
 
 -- Text sign on a part face.
@@ -351,6 +368,7 @@ function Builder.highrise(
 		level += 1
 	end
 
+	local floorTops: { string } = {}
 	for floor = 1, floors do
 		local floorTop = y
 		if y > base.Y then
@@ -358,6 +376,7 @@ function Builder.highrise(
 			floorTop = y + 1.5
 		end
 		floorBelow = floorTop
+		table.insert(floorTops, string.format("%.2f:%d", floorTop, level))
 		local wallHeight = floorHeight - 1.5
 		columnGrid(floorTop, wallHeight, level, 2)
 		walls(floorTop, wallHeight, level, floor == 1)
@@ -381,6 +400,13 @@ function Builder.highrise(
 	end
 
 	model:SetAttribute("RoofY", roofY)
+	-- interior furnishing (World/Details) reads the floor heights and the footprint
+	model:SetAttribute("FloorYs", table.concat(floorTops, ","))
+	model:SetAttribute("Footprint", Vector3.new(width, 0, depth))
+	model:SetAttribute("BaseCenter", base)
+	if style.Stairwell then
+		model:SetAttribute("Stairwell", true)
+	end
 	return model, roofY
 end
 
