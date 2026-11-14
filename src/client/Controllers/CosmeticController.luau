@@ -65,6 +65,50 @@ local function refreshSky()
 		clearSky()
 		skyId = id
 		local model = GodSkins.build(id, CO.SkyScale)
+		-- high quality from below: crisp edges, a coloured outline and a glow that lights
+		-- the arena under the hand, plus a slow sparkle aura
+		local tint = Color3.fromRGB(255, 255, 255)
+		for _, def in CO.Items do
+			if def.Id == id and def.Color then
+				tint = def.Color
+			end
+		end
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CastShadow = false
+				if d.Material == Enum.Material.SmoothPlastic then
+					d.Reflectance = 0.08
+				end
+			end
+		end
+		local outline = Instance.new("Highlight")
+		outline.FillTransparency = 1
+		outline.OutlineColor = tint
+		outline.OutlineTransparency = CO.SkyOutline
+		outline.DepthMode = Enum.HighlightDepthMode.Occluded
+		outline.Parent = model
+		local core = model.PrimaryPart
+		if core then
+			local light = Instance.new("PointLight")
+			light.Color = tint
+			light.Range = CO.SkyLightRange
+			light.Brightness = 1.4
+			light.Shadows = false
+			light.Parent = core
+			if not touch then
+				local aura = Instance.new("ParticleEmitter")
+				aura.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+				aura.Color = ColorSequence.new(tint)
+				aura.LightEmission = 1
+				aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0) })
+				aura.Transparency = NumberSequence.new(0.3)
+				aura.Lifetime = NumberRange.new(1, 1.8)
+				aura.Rate = 14
+				aura.Speed = NumberRange.new(2, 5)
+				aura.SpreadAngle = Vector2.new(180, 180)
+				aura.Parent = core
+			end
+		end
 		model.Parent = fxFolder
 		sky = model
 	end
@@ -72,6 +116,10 @@ local function refreshSky()
 	if model then
 		local isGod = player:GetAttribute(Attributes.Role) == "DisasterGod"
 		setTransparency(model, if isGod then CO.GodSkyTransparency else 0)
+		local outline = model:FindFirstChildOfClass("Highlight")
+		if outline then
+			outline.OutlineTransparency = if isGod then 0.9 else CO.SkyOutline
+		end
 	end
 end
 

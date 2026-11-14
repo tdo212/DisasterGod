@@ -24,12 +24,13 @@ The round ends early as soon as no survivors are left.
 
 | Ability | Tier | Cost | Cooldown | Telegraph | Effect |
 |---|---|---|---|---|---|
-| ⚡ Lightning | Minor | 12 | 2.5 s | 1.5 s | Precision strike, heavy damage, small radius |
-| 🌬️ Gust | Minor | 10 | 4 s | 1.5 s | Wide knockback along the camera direction; shatters glass and leaves |
+| ⚡ Lightning | Minor | 12 | 3 s | 1.5 s | Precision strike, heavy damage, small radius |
+| 🌬️ Gust | Minor | 10 | 4 s | 1.5 s | Wide knockback along the camera direction; shatters glass, leaves and thin walls |
 | ☄️ Meteors | Major | 40 | 10 s | 2 s | 6 staggered impacts across a 28-stud zone |
-| 🌪️ Tornado | Major | 55 | 16 s | 2 s | 8 s funnel that chases the nearest survivor, shreds structures and swirls debris |
+| 🌪️ Tornado | Major | 50 | 15 s | 2 s | 9 s, 20-stud funnel that chases the nearest survivor, tears through the ground floor and the floor above (170 structure/s), flings survivors and swirls debris |
 | 💥 Fault Cleave | Major | 65 | 18 s | 2.5 s | 120-stud, 10-wide fault line through bedrock that shears every support on the line |
 
+- **Balance pass (Nov 2026):** the Tornado was the weakest Major (90 structure/s at ground level only, so it rarely dropped a building) and is now a real building-shredder; Maelstrom Vortex matches it. The strongest picks were trimmed: Tectonic Spire 420 → 320 structure damage and 13 → 15 s, Meteor Barrage 11 → 13 s and 35 → 30 player damage, Chain Arc 9 → 10 s, Glitch 6 → 7 s, Lightning 2.5 → 3 s (it was spammable). Gust now breaks thin walls (45 → 70 structure).
 - Ability areas and structure damage are tuned for the bigger, more numerous buildings (about +15-25% over launch), while player damage is unchanged so survivors aren't hit harder. Destructible parts per map rose from 182-589 to 330-789 (Fracture Bay 393 to 623); in testing a Meteor plus a Lightning knocked a quarter of the parts off the 4-storey Bay Hotel.
 - Anti-camp radar (outdoors only): a survivor who stays within 6 studs for 8 s in the open gets pinged. They're highlighted, a ripple shows their position, and the God is notified. Survivors hiding indoors or inside a jammed zone are exempt.
 - 📡 **Seismic Ping** (every kit, slot 6 / key 6; a separate round radar button offset from the five disasters on phones): 15 energy, 14 s cooldown. After a 0.5 s ring, every survivor within 70 studs who isn't in a jammed zone glows through walls for 2 s, and they get a "PINGED" warning.
@@ -69,7 +70,7 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 ## World
 ### Sky Lodge (lobby)
 A big timber great hall floating beside the arena at (0, 150, -232), built to feel wide, warm and calm: 160 x 120 studs inside, a 34-stud beamed ceiling under a pitched roof, tall side windows, candle chandeliers, a red runner rug and potted plants. It is enclosed, so nobody falls out.
-- **Hall of Legends** (back wall, centre): a gold/silver/bronze podium where the all-time top three for `Config.Leaderboards.Hall` (rounds survived) stand as statues of their real avatars (a clone of the live character when that player is in the server), with name and record above. Places the all-time list can't fill are taken by the best players in the server, so the podium always shows someone. It refreshes when a profile loads, after each round and every minute. There is no per-round winners podium in the lodge any more; the round summary still shows the round's top three.
+- **Hall of Legends** (back wall, centre): a gold/silver/bronze podium where the all-time top three for `Config.Leaderboards.Hall` (rounds survived) stand as statues of their real avatars (a clone of the live character when that player is in the server), with name and record above. Places the all-time list can't fill are taken by the best players in the server, then by the game's owner (`Config.Leaderboards.PlaceholderUserId` for a group-owned place, labelled "Creator · beat me!"), and any place still open holds a gold, silver or bronze metal mannequin, so the podium is never bare. The boards add the same owner row while they have room. It refreshes when a profile loads, after each round and every minute. There is no per-round winners podium in the lodge any more; the round summary still shows the round's top three.
 - **Leaderboards:** four boards along the back wall, two either side of the Hall of Legends.
 - **Centre:** spawn pad on the runner, daily quest board and prize wheel either side, and the four game pass pedestals.
 - **West:** the gear shop stall and a fireside lounge (hearth, sofas, rug).
@@ -90,7 +91,9 @@ Nine arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vo
 | Ironclad Armada | Stormy fleet: rain, lightning, black cliffs (~1,100 parts) | An aircraft carrier with four hangar halls under the flight deck (hatch ladders), a command island and radar lattice, parked jets and container stacks, flanked by two destroyers. Wooden gangplanks join the ships; the sea is deadly. **Set-piece:** break a destroyer section's bulkheads and it **lists** 16° toward the water (a second hit sinks it); yellow cranes topple across onto the carrier | Hurricane swell to Y 21 |
 | Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent; four 2-3 storey pavilions on their own piles, so they stay up when the pier around them breaks | Tide to Y 12 |
 
-Every arena also gets up to five small enterable **hideout sheds** dropped onto genuinely empty ground after it builds (`Config.Hideouts`, styled to the map's lighting).
+Every arena also gets up to eight enterable **interiors** dropped onto genuinely empty ground after it builds (`Config.Hideouts`, styled to the map's lighting): sheds, two-storey houses with a stairwell ladder and windows, low concrete bunkers and lookout towers, each with crates inside to crouch behind. They are ordinary destructible buildings, and doorways and windows let the God see in, so they buy time but are never safe rooms.
+
+**Skies and ambience.** Each lighting preset has its own stylised skybox (`Config.Skies`): cartoon blue for Fracture Bay and the lodge, a purple skyline for Neo-Shibuya, a burning sky for Magma Core, storm clouds for the Armada, green hills for the Bio-Dome, sunsets for the Boardwalk and Chrono-Spire. Client-only ambient emitters (`Config.Weather.Ambient`, MapFxController) add chimney smoke and smokestack ash on the tallest roofs, steam vents and sparks in the city, sea spray, low mist, dust devils and fireflies, a handful of low-rate emitters per map and none in Low-FX mode.
 
 The three newest arenas are about 40% wider than the originals and lean on hiding: every highrise can have a ladder shaft (`Stairwell`) and half-height window walls (`Windows`), so upper floors are reachable and survivors can duck below the sills. `Builder.launchPad`, `Builder.spin`, `Builder.tilt` and `Builder.canopy` mark steam vents, spinning parts, listing ship sections and see-through glass roofs. Casts are allowed up to 55 studs past a map's own radius.
 
@@ -102,7 +105,9 @@ The three newest arenas are about 40% wider than the originals and lean on hidin
 - **Weather** (`Config.Weather`, MapFxController): client particles that follow the camera while it is down in the arena. Rain on the Armada (with lightning flashes and thunder every 7-15 s) and a lighter rain in Neo-Shibuya, snow on Outpost Zero, pollen in the Bio-Dome, embers on Chrono-Spire and Magma Core, drifting dust on Sunscorched Mirage.
 - **Round cues:** countdown ticks with rising pitch in the last 5 s of intermission, tocks before casting opens, ticks in the last 5 s of the round, a round-start hit, a God stinger, a sudden-death alarm, and win/lose stingers.
 - **UI** (`UI/Sound.luau`): every Components button, tab and window plays a click, tab or open sound; popups play coin, purchase or error sounds.
-- **Disasters** (`AudioService`, server): positional, replicated sounds for telegraphs, lightning and thunder, meteors, tornado loops, gusts, quakes, collapses, glass breaks and explosions.
+- **Disasters** (`AudioService`, server): positional, replicated sounds for telegraphs, lightning and thunder, meteors, tornado loops, gusts, quakes, collapses and explosions.
+- **Breaking materials** (`Config.Audio.Break`): every broken part plays a random crack, clang or shatter for its material family: splintering wood, metal clangs, crumbling stone and brick, glass shatters, ice cracks, foliage, plastic and sand (about 35 sounds from the Creator Store).
+- **Mix** (`Config.Audio.Mix`): world sounds are scaled down and clamped, the disaster group runs through a compressor, at most 14 world sounds play at once and the break sounds are throttled per material, so a collapse is loud and layered but never deafening. The sound-effects toggle in Settings mutes this group too.
 
 ### Lighting and glow
 `EnvironmentService` owns the only post effects. The place file's own Bloom, SunRays and DepthOfField are disabled at start and its Atmosphere removed; stacked on ours they doubled the glow. Bloom is softer (threshold 2.4, size 18, Neon-night intensity 0.22, down from 0.7), exposure is -0.15, and bridge rails are metal rather than neon. Between rounds the lodge uses its own warm `Lodge` preset, so avatars and statues keep their colour; the board spotlights on the dancers are turned down from 10 to 1.6 and the lodge's candle, podium and display lights are softer. Presets per map: Day, Night, Desert, Arctic, Sunset, Volcanic, Foundry (golden haze), Conservatory (bright and green) and Tempest (overcast storm).
@@ -150,8 +155,8 @@ Every destructible part has health (from its material), a level, and a support f
 
 ## Showdowns, taunts and the kill feed
 - **Last Stand** (`Config.Showdown`, ShowdownService): when a round that had 2+ survivors is down to one with at least 15 s left, everyone gets a LAST STAND banner and feed line, a heartbeat loops and the music switches to the boss track. The God sees a 40-stud zone around the survivor (offset up to 22 studs, refreshed every 5 s), and the survivor's dash recharges twice as fast and near misses pay double.
-- **Daredevil taunts** (`Config.Emotes`, EmoteService / EmoteController): a 😜 button above DASH (T on keyboard) opens Wave, Whistle, Scream and Dance (8 s cooldown, a bubble over your head, and noise). Emoting while HIDDEN is a Daredevil taunt: the God sees your silhouette for 1.5 s and gets a callout, and every coin you earn for 10 s is multiplied by 1.5. The button turns 😈 while you're hidden.
-- **Event feed** (`Config.Feed`, FeedController): top-right, under the coin counter, each line with a sticker icon. Near misses, escapes, kill credits and combos go here instead of the middle of the screen.
+- **Daredevil taunts** (`Config.Emotes`, EmoteService / EmoteController): a 😜 button just left of DASH (T on keyboard) opens Wave, Whistle, Scream and Dance (8 s cooldown, a bubble over your head, and noise). Emoting while HIDDEN is a Daredevil taunt: the God sees your silhouette for 1.5 s and gets a callout, and every coin you earn for 10 s is multiplied by 1.5. The button turns 😈 while you're hidden.
+- **Event feed** (`Config.Feed`, FeedController): the top-right corner (under the wallet on phones), each line with a sticker icon. Near misses, escapes, kill credits and combos go here instead of the middle of the screen.
 - **Kill feed**: eliminations name what got you. "Flattened by Bay Hotel" if a building collapsed on you in the last 4 s, otherwise the last hit within 6 s ("was crushed by Meteors", "was electrocuted", "was swallowed by the rising lava", "fell into the void"...). Clutch callouts: "escaped Meteors by 2 studs!" for near misses within 3 studs, and "escaped the collapsing Fish Market!".
 - **Final kill:** the round's last elimination is posted as FINAL KILL, and every camera glides in on it with a desaturated grade and narrowed FOV for 2.4 s before everyone returns to the lodge.
 
@@ -195,6 +200,8 @@ Three quests a day, the same for everyone: two drawn from `Config.Quests.Pool` p
 - **Danger edges**: a telegraph that lands outside your view pulses a red glow on that edge of the screen.
 - **Arena Cam**: a holographic screen in the lodge shows a live miniature of the match (big parts only, refreshed once a second, with survivors as green dots), so the lobby can watch buildings fall.
 - **UI juice**: spring-bounce buttons, a coin counter that rolls up, click / whoosh sounds.
+- **One thing at a time** (HUDController stage queue): banners, first-time tutorial cards and centre popups wait their turn instead of stacking. While a banner or card is up, short popups go to the feed.
+- **Action buttons**: on PC, DASH and the taunt button sit side by side in the bottom-right corner with white key chips (Q, T); the God hotbar and gear slots use the same chips. On phones DASH sits above and left of the jump button, never on it.
 - **Quick settings** (gear tile, SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
 
 ## Prize wheel
@@ -220,7 +227,7 @@ The first time a player is the God, and the first time they are a survivor, a th
 ## Mobile
 The UI is authored against a smaller canvas on touch devices so everything is larger, the menu sits top-left and the wallet top-right to keep the thumbstick clear, and the dash button sits beside the jump button at the same size. As God, drag pans the camera, pinch zooms, a two-finger twist rotates, the reticle stays at screen centre with a CAST button, and tapping the arena casts at the tap.
 
-Every control hint matches the device: role cards, the God and spectate hints, the dash button (`DASH` vs `DASH [Q]`), gear hotbar keys (hidden on touch) and the shop's gear text. Server banners write `{tap}` / `{Tap}` / `{TAP}` and the client swaps in tap or click (`Components.inputText`).
+Every control hint matches the device: role cards, the God and spectate hints, the key chips on DASH, taunt and hotbar buttons (PC only), gear hotbar keys (hidden on touch) and the shop's gear text. Server banners write `{tap}` / `{Tap}` / `{TAP}` and the client swaps in tap or click (`Components.inputText`).
 
 ## Economy
 - Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
@@ -235,7 +242,7 @@ Each category has a free starter, a coin item and Robux items. Bought or equippe
 | Disaster FX: recolours the God's bolts, telegraphs, meteors, tornado and lava | ⚡ Classic | ✨ Golden Wrath (2,500) | 🟣 Neon Void, 👾 Pixel Chaos (voxel meteors) |
 | Finisher: plays where you're eliminated | 💨 Poof | 👻 Ghost Rise (2,000) | 🎉 Confetti Pop, 🌀 Cartoon Boing (boing + the body floats off) |
 
-Small statues of all six God skins stand on pedestals either side of the lodge spawn; their prompt opens the Style tab. Skins are part-built models in `src/shared/GodSkins.luau`. The God's client sends its reticle about 6 times a second (`GodAim`).
+Small statues of all six God skins stand on pedestals either side of the lodge spawn; their prompt opens the Style tab. Skins are part-built models in `src/shared/GodSkins.luau`. The God's client sends its reticle about 6 times a second (`GodAim`). In the sky the skin is drawn 1.7x size, 84 studs up, with an outline in its colour, a glow light and (not on phones) a sparkle aura, so survivors can read it from the ground; the God sees it nearly transparent.
 
 ## Monetization (Robux)
 Created through Open Cloud for universe 10776039268. The IDs are in `Config.Monetization`.

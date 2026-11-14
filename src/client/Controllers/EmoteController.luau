@@ -68,14 +68,14 @@ function EmoteController.Start()
 		return
 	end
 	local touch = Components.isTouch()
-	local size = if touch then 0.72 else 0.8
+	-- a sibling square just left of DASH (same row), so the two never stack
 	toggle = Components.button({
 		Name = "Emote",
 		Text = "😜",
-		TextSize = if touch then 26 else 24,
-		Size = UDim2.new(size, 0, size, 0),
-		Position = UDim2.new(0.5, 0, 0, -10),
-		AnchorPoint = Vector2.new(0.5, 1),
+		TextSize = if touch then 26 else 28,
+		Size = UDim2.fromScale(1, 1),
+		Position = UDim2.new(0, -12, 0, 0),
+		AnchorPoint = Vector2.new(1, 0),
 		Color = C.Pink,
 		ColorLight = C.PinkLight,
 		Parent = dash,
@@ -85,14 +85,15 @@ function EmoteController.Start()
 	})
 	toggle.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	if not touch then
-		Components.label({ Name = "Key", Text = "T", TextSize = 14, Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(3, 1), XAlign = Enum.TextXAlignment.Left, Parent = toggle })
+		Components.keyChip(toggle, "T")
 	end
 
 	wheel = Instance.new("Frame")
 	wheel.Name = "EmoteWheel"
 	wheel.BackgroundTransparency = 1
-	wheel.AnchorPoint = Vector2.new(1, 0.5)
-	wheel.Position = UDim2.new(0, -8, 0.5, 0)
+	-- opens upward-left above the button row, clear of the gear bar
+	wheel.AnchorPoint = Vector2.new(1, 1)
+	wheel.Position = UDim2.new(1, 0, 0, -12)
 	wheel.Size = UDim2.new(#E.List, 8 * #E.List, 1, 0)
 	wheel.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	wheel.Visible = false

@@ -11,13 +11,13 @@ local Theme = {
 
 	Colors = {
 		Text = Color3.fromRGB(255, 255, 255),
-		TextDim = Color3.fromRGB(200, 205, 220),
+		TextDim = Color3.fromRGB(214, 220, 234),
 		Outline = Color3.fromRGB(0, 0, 0),
-		Panel = Color3.fromRGB(34, 38, 50),
+		Panel = Color3.fromRGB(26, 30, 40),
 		PanelLight = Color3.fromRGB(62, 66, 84),
-		Slot = Color3.fromRGB(26, 28, 38),
-		Window = Color3.fromRGB(28, 32, 42), -- window body: dark, slightly see-through (UIReference MainFrame)
-		WindowLight = Color3.fromRGB(44, 50, 64),
+		Slot = Color3.fromRGB(18, 20, 28),
+		Window = Color3.fromRGB(22, 25, 34), -- window body: near-opaque dark (UIReference MainFrame), high contrast under white text
+		WindowLight = Color3.fromRGB(40, 46, 60),
 		Header = Color3.fromRGB(40, 190, 225), -- cyan studded header
 		HeaderLight = Color3.fromRGB(80, 225, 250),
 
@@ -49,9 +49,10 @@ local Theme = {
 	},
 
 	Stroke = {
-		Thin = 2,
-		Thick = 3,
-		Heavy = 4,
+		-- bold black outlines everywhere (the reference's defining feature)
+		Thin = 2.5,
+		Thick = 3.5,
+		Heavy = 4.5,
 		Window = 5,
 	},
 
@@ -65,8 +66,8 @@ local Theme = {
 	Textures = {
 		Studs = "rbxassetid://7447638591",
 		StudSize = 30, -- px per stud tile
-		StudTransparency = 0.6, -- on bright buttons / tiles
-		StudTransparencyPanel = 0.86, -- on dark panels
+		StudTransparency = 0.7, -- on bright buttons / tiles (subtle: clean, not noisy)
+		StudTransparencyPanel = 0.92, -- on dark panels
 	},
 
 	-- Glossy gradient: light top, base colour, then a darker lip along the bottom edge.

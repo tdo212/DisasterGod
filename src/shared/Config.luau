@@ -10,7 +10,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "⚡",
 		Tier = "Minor",
 		Cost = 12,
-		Cooldown = 2.5,
+		Cooldown = 3,
 		WarningTime = 1.5,
 		Radius = 10,
 		PlayerDamage = 55,
@@ -26,7 +26,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		WarningTime = 1.5,
 		Radius = 30,
 		PlayerDamage = 5,
-		StructureDamage = 45,
+		StructureDamage = 70,
 		Knockback = 85,
 	},
 	{
@@ -48,16 +48,16 @@ local Abilities: { Types.AbilityDefinition } = {
 		DisplayName = "Tornado",
 		Icon = "🌪️",
 		Tier = "Major",
-		Cost = 55,
-		Cooldown = 16,
+		Cost = 50,
+		Cooldown = 15,
 		WarningTime = 2,
-		Radius = 17,
+		Radius = 20,
 		PlayerDamage = 0,
-		StructureDamage = 90, -- per second
-		Duration = 8,
-		Speed = 16,
-		TickDamage = 8,
-		Knockback = 60,
+		StructureDamage = 170, -- per second
+		Duration = 9,
+		Speed = 19,
+		TickDamage = 11,
+		Knockback = 70,
 	},
 	{
 		Id = "FaultCleave",
@@ -110,7 +110,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "👾",
 		Tier = "Minor",
 		Cost = 18,
-		Cooldown = 6,
+		Cooldown = 7,
 		WarningTime = 1.3,
 		Radius = 16,
 		PlayerDamage = 15,
@@ -140,11 +140,11 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "🗻",
 		Tier = "Major",
 		Cost = 45,
-		Cooldown = 13,
+		Cooldown = 15,
 		WarningTime = 1.4,
 		Radius = 14,
 		PlayerDamage = 30,
-		StructureDamage = 420, -- smashes up through floors
+		StructureDamage = 320, -- smashes up through floors
 		Knockback = 95, -- straight up
 		Count = 5, -- pillars
 		Length = 46, -- pillar height
@@ -155,7 +155,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "🔗",
 		Tier = "Major",
 		Cost = 35,
-		Cooldown = 9,
+		Cooldown = 10,
 		WarningTime = 0.8,
 		Radius = 10,
 		PlayerDamage = 30,
@@ -170,10 +170,10 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "🎯",
 		Tier = "Major",
 		Cost = 40,
-		Cooldown = 11,
+		Cooldown = 13,
 		WarningTime = 1.6,
 		Radius = 9,
-		PlayerDamage = 35,
+		PlayerDamage = 30,
 		StructureDamage = 230,
 		Count = 7, -- impacts rolling along the line
 		ImpactRadius = 9,
@@ -236,16 +236,16 @@ local Abilities: { Types.AbilityDefinition } = {
 		Icon = "🌀",
 		Tier = "Major",
 		Signature = true,
-		Cost = 55,
-		Cooldown = 16,
+		Cost = 50,
+		Cooldown = 15,
 		WarningTime = 2,
-		Radius = 17,
+		Radius = 20,
 		PlayerDamage = 0,
-		StructureDamage = 90,
-		Duration = 8,
-		Speed = 20, -- follows your reticle instead of chasing survivors
-		TickDamage = 8,
-		Knockback = 60,
+		StructureDamage = 170,
+		Duration = 9,
+		Speed = 23, -- follows your reticle instead of chasing survivors
+		TickDamage = 11,
+		Knockback = 70,
 	},
 	-- every kit also gets this one (Disasters.UniversalAbilities)
 	{
@@ -508,9 +508,11 @@ local Config = {
 		Items = Cosmetics,
 		VfxPacks = VfxPacks,
 		Defaults = { GodSkin = "StormEye", Vfx = "ClassicFx", Finisher = "Poof" } :: { [string]: string },
-		SkyHeight = 70, -- studs above the reticle the God skin hovers
+		SkyHeight = 84, -- studs above the reticle the God skin hovers
 		SkyFollow = 6, -- lerp speed toward the reticle
-		SkyScale = 1, -- skin size multiplier in the sky
+		SkyScale = 1.7, -- skin size multiplier in the sky (big enough to read from the ground)
+		SkyOutline = 0.2, -- outline highlight transparency so the silhouette reads against any sky
+		SkyLightRange = 60,
 		GodSkyTransparency = 0.8, -- how see-through the God sees their own skin
 		AimSendRate = 6, -- reticle updates per second sent to the server
 		DisplayScale = 0.16, -- lodge display statues
@@ -570,7 +572,8 @@ local Config = {
 
 	-- Kill feed and clutch callouts.
 	Feed = {
-		TopOffset = 112, -- feed starts this far down the right edge (under the coin counter)
+		TopOffset = 8, -- PC: feed hugs the top-right corner (the wallet is bottom-left)
+		TopOffsetTouch = 84, -- phones: just under the top-right wallet and streak line
 		MaxLines = 5,
 		LineSeconds = 6,
 		CauseWindow = 6, -- a hit this recent names the cause of death
@@ -735,11 +738,19 @@ local Config = {
 		{ Id = "Menace", Name = "Menace", Icon = "😜", Stat = "Taunts", Text = "most Daredevil taunts" },
 	} :: { { Id: string, Name: string, Icon: string, Stat: string, Text: string } },
 
-	-- Small hideout sheds scattered into open ground on every arena (MapService).
+	-- Enterable interiors dropped onto empty ground on every arena (MapService). Each is a
+	-- normal destructible building: walls break, the God can see in through doorways and
+	-- windows, so hiding inside buys time but is never a safe room.
 	Hideouts = {
-		PerMap = 5,
-		Size = Vector3.new(14, 12, 12),
-		Tries = 40,
+		PerMap = 8,
+		Tries = 90,
+		Variants = {
+			-- Floors / FloorHeight follow Builder.highrise; Weight picks how often
+			{ Name = "Shed", Width = 14, Depth = 12, Floors = 1, FloorHeight = 11, Weight = 3, Crates = 2 },
+			{ Name = "House", Width = 20, Depth = 16, Floors = 2, FloorHeight = 10, Weight = 2, Windows = true, Stairwell = true, Crates = 3 },
+			{ Name = "Bunker", Width = 18, Depth = 14, Floors = 1, FloorHeight = 8, Weight = 2, Health = 260, Crates = 2 },
+			{ Name = "Lookout", Width = 12, Depth = 12, Floors = 2, FloorHeight = 9, Weight = 1, Windows = true, Stairwell = true, Crates = 1 },
+		},
 	},
 
 	-- Client presentation: round intro fly-by, end-of-round pan, danger edge pulse.
@@ -788,6 +799,10 @@ local Config = {
 		DancerLight = 1.6, -- board spotlight brightness on the dancer (template ships 10)
 		-- Hall of Legends podium in the lodge: the all-time top three of this stat stand on it
 		Hall = { Stat = "RoundsSurvived", Unit = "rounds", Subtitle = "Most rounds survived · all time" },
+		-- empty boards / podium places: the game's owner stands in (game.CreatorId for a
+		-- user-owned place; this id when group-owned), then metallic mannequins hold the rest
+		PlaceholderUserId = 7892599940,
+		HallPlaceholderColors = { Color3.fromRGB(255, 205, 70), Color3.fromRGB(200, 206, 218), Color3.fromRGB(205, 128, 60) },
 		Boards = {
 			{ Stat = "RoundsSurvived", Title = "TOP SURVIVORS", Unit = "rounds" },
 			{ Stat = "GodKills", Title = "DEADLIEST GODS", Unit = "kills" },
@@ -979,13 +994,40 @@ local Config = {
 			AstralCollapse = { Key = "Rumble", Volume = 1.6, Speed = 0.4 },
 			MaelstromVortex = { Key = "Gust", Volume = 1.6, Speed = 0.5 },
 		} :: { [string]: { Key: string, Volume: number, Speed: number } },
-		SirenVolume = 0.35,
+		-- material break one-shots (AudioService.playBreak): a random pick per break, so a
+		-- collapsing wooden pier sounds different from a steel deck or a glass dome
+		Break = {
+			Wood = { 9120805690, 9120805470, 9120805478, 9120963881, 9113581598, 9120861709 },
+			Metal = { 9125819197, 9116771817, 9116537007, 9118064969, 9117180300, 9116536883 },
+			Stone = { 9118588165, 9118692384, 9118690959, 9118691272, 9114221795 },
+			Glass = { 132535085898211, 139826391278483, 118987440163311, 74769245504800, 132457128699700 },
+			Ice = { 9114858583, 1571353871 },
+			Foliage = { 9114514958, 9114519078, 9113581598 },
+			Plastic = { 9117624703, 9116146300, 9125819216 },
+			Sand = { 9118770617, 9118690959 },
+		} :: { [string]: { number } },
+		BreakMaterials = {
+			Wood = "Wood", WoodPlanks = "Wood", Fabric = "Foliage",
+			Metal = "Metal", DiamondPlate = "Metal", CorrodedMetal = "Metal", Foil = "Metal",
+			Concrete = "Stone", Brick = "Stone", Slate = "Stone", Rock = "Stone", Cobblestone = "Stone", Granite = "Stone", Marble = "Stone", Basalt = "Stone", Pavement = "Stone", Limestone = "Stone", Asphalt = "Stone", CrackedLava = "Stone", Pebble = "Stone",
+			Sandstone = "Sand", Sand = "Sand", Ground = "Sand", Mud = "Sand", Salt = "Sand",
+			Glass = "Glass", Neon = "Glass", ForceField = "Glass",
+			Ice = "Ice", Glacier = "Ice", Snow = "Ice",
+			Grass = "Foliage", LeafyGrass = "Foliage",
+			Plastic = "Plastic", SmoothPlastic = "Plastic",
+		} :: { [string]: string },
+		BreakVolume = 0.55,
+		BreakCooldown = 0.09, -- per material family, so a collapse is a rumble of distinct cracks, not a wall of noise
+		SirenVolume = 0.3,
 		Volume = {
 			Music = 0.3,
 			Ambience = 0.45,
 			Ui = 0.6,
-			Disaster = 1,
+			Disaster = 0.55, -- the DisasterSounds group (was 1: impacts drowned out everything)
 		},
+		-- every world one-shot is scaled by Scale and clamped to Max before the group volume,
+		-- and at most MaxVoices play at once (extra ones are dropped, never queued)
+		Mix = { Scale = 0.6, Max = 1.1, MaxVoices = 14, RollOffMin = 14, RollOffMax = 420 },
 		CrossfadeSeconds = 2.5,
 		CountdownTicks = 5, -- intermission seconds that tick
 		CollapseSoundCooldown = 0.4,
@@ -1050,6 +1092,20 @@ local Config = {
 		BuildYieldEvery = 150, -- parts created before yielding a frame
 	},
 
+	-- stylised skyboxes per lighting preset (Bk, Dn, Ft, Lf, Rt, Up), applied by EnvironmentService
+	Skies = {
+		Day = { 13523725319, 13523743919, 13523725319, 13523725319, 13523725319, 13523746141 }, -- cartoon blue sky, puffy clouds
+		Night = { 119731751, 50282196, 119731771, 119731809, 119731823, 119731844 }, -- purple skyline
+		Desert = { 161319957, 161319965, 161319970, 161319983, 161319989, 161319996 }, -- dusty desert horizon
+		Arctic = { 122076196453002, 129469057577973, 139156344241065, 122849389458893, 92579064446840, 96364407339806 }, -- stylized snowy mountain range
+		Sunset = { 600830446, 600831635, 600832720, 600886090, 600833862, 600835177 }, -- orange sunset with sun
+		Foundry = { 600830446, 600831635, 600832720, 600886090, 600833862, 600835177 }, -- golden sunset
+		Conservatory = { 13588936210, 13588937487, 13588939141, 13588942813, 13588945061, 13588947580 }, -- stylized green hills
+		Tempest = { 4498828382, 4498828812, 4498829917, 4498830911, 4498830417, 4498831746 }, -- dark storm clouds
+		Volcanic = { 157785163, 157785059, 157785081, 157785128, 157785104, 157785145 }, -- burning red apocalypse
+		Lodge = { 13523725319, 13523743919, 13523725319, 13523725319, 13523725319, 13523746141 }, -- cartoon blue sky
+	} :: { [string]: { number } },
+
 	-- Client weather per map (MapFxController). Kinds: Rain | Snow | Pollen | Embers | Dust.
 	Weather = {
 		Maps = {
@@ -1061,6 +1117,21 @@ local Config = {
 			MagmaCore = { Kind = "Embers", Rate = 60 },
 			SunscorchedMirage = { Kind = "Dust", Rate = 14 },
 		} :: { [string]: { Kind: string, Rate: number, Lightning: boolean? } },
+		-- Ambient set dressing per map (MapFxController, client-only, skipped in Low-FX):
+		-- "Roof" emitters sit on the tallest buildings (chimneys, smokestacks, vents),
+		-- "Ground" ones on open ground (mist, steam vents, fireflies, sea spray).
+		Ambient = {
+			FractureBay = { { Kind = "Smoke", Count = 2, On = "Roof" }, { Kind = "Spray", Count = 4, On = "Ground" } },
+			NeoShibuya = { { Kind = "Steam", Count = 5, On = "Ground" }, { Kind = "Sparks", Count = 3, On = "Roof" } },
+			MagmaCore = { { Kind = "Ash", Count = 4, On = "Roof" }, { Kind = "Steam", Count = 4, On = "Ground" } },
+			SunscorchedMirage = { { Kind = "DustDevil", Count = 3, On = "Ground" }, { Kind = "Smoke", Count = 1, On = "Roof" } },
+			OutpostZero = { { Kind = "Steam", Count = 3, On = "Roof" }, { Kind = "Mist", Count = 3, On = "Ground" } },
+			StarlightBoardwalk = { { Kind = "Fireflies", Count = 5, On = "Ground" }, { Kind = "Smoke", Count = 1, On = "Roof" } },
+			ChronoSpire = { { Kind = "Smoke", Count = 5, On = "Roof" }, { Kind = "Steam", Count = 3, On = "Ground" } },
+			VerdantDome = { { Kind = "Mist", Count = 5, On = "Ground" }, { Kind = "Fireflies", Count = 3, On = "Ground" } },
+			IroncladArmada = { { Kind = "Ash", Count = 4, On = "Roof" }, { Kind = "Mist", Count = 3, On = "Ground" } },
+		} :: { [string]: { { Kind: string, Count: number, On: string } } },
+		AmbientDelay = 1.5, -- seconds after the map key changes before emitters are placed
 		Area = 140, -- emitter footprint over the camera
 		Height = 45, -- studs above the camera
 		MaxCameraHeight = 130, -- above this the camera is at the Sky Lodge: no weather

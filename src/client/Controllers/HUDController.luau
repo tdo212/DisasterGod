@@ -516,7 +516,52 @@ end
 ---------------------------------------------------------------------------
 -- popups + banners
 
-local popupLane = 0
+-- One thing at a time in the middle of the screen. Banners, tutorial cards and center
+-- popups each wait their turn (Stage), so they never stack or overlap. While a banner
+-- or card holds the stage, short popups go to the top-right feed instead of piling up.
+local Stage = {
+	busy = false,
+	queue = {} :: { { Key: string, Show: (done: () -> ()) -> () } },
+}
+local STAGE_MAX = 4
+
+local function stageNext()
+	local item = table.remove(Stage.queue, 1)
+	if not item then
+		Stage.busy = false
+		return
+	end
+	Stage.busy = true
+	local finished = false
+	local function done()
+		if finished then
+			return
+		end
+		finished = true
+		task.delay(0.15, stageNext)
+	end
+	task.spawn(item.Show, done)
+end
+
+-- `key` coalesces duplicates (the same banner fired twice only shows once).
+local function stagePush(key: string, show: (done: () -> ()) -> (), front: boolean?)
+	for _, item in Stage.queue do
+		if item.Key == key then
+			return
+		end
+	end
+	if #Stage.queue >= STAGE_MAX then
+		table.remove(Stage.queue, 1) -- drop the stalest, keep the newest
+	end
+	table.insert(Stage.queue, if front then 1 else #Stage.queue + 1, { Key = key, Show = show })
+	if not Stage.busy then
+		stageNext()
+	end
+end
+
+local popupQueue: { { Text: string, Color: Color3? } } = {}
+local popupBusy = false
+local showNextPopup: () -> ()
 
 -- Round events go to the top-right feed instead of the middle of the screen.
 local FEED_WORDS = { "NEAR MISS", "ESCAPE", "ELIMINATED", "DESTRUCTION", "COMBO", "PING", "CLOSE CALL", "TAUNT", "BEACON", "STREAK" }
@@ -541,14 +586,39 @@ function HUDController.Popup(text: string, color: Color3?)
 	else
 		Sound.play("Open", 0.4, 1.3)
 	end
-	popupLane = (popupLane + 1) % 4
+	if Stage.busy then
+		FeedController.Push(text, color)
+		return
+	end
+	for _, q in popupQueue do
+		if q.Text == text then
+			return
+		end
+	end
+	if #popupQueue >= 3 then
+		table.remove(popupQueue, 1)
+	end
+	table.insert(popupQueue, { Text = text, Color = color })
+	if not popupBusy then
+		showNextPopup()
+	end
+end
+
+showNextPopup = function()
+	local item = table.remove(popupQueue, 1)
+	if not item then
+		popupBusy = false
+		return
+	end
+	popupBusy = true
+	local text, color = item.Text, item.Color
 	local label = Components.label({
 		Name = "Popup",
 		Text = text,
 		TextSize = 30,
 		Color = color or C.Gold,
-		Size = UDim2.fromOffset(520, 38),
-		Position = UDim2.new(0.5, 0, 0.4, popupLane * 34),
+		Size = UDim2.fromOffset(560, 38),
+		Position = UDim2.new(0.5, 0, 0.44, 0),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		StrokeThickness = Theme.Stroke.Heavy,
 		Parent = layer,
@@ -558,7 +628,9 @@ function HUDController.Popup(text: string, color: Color3?)
 	scale.Scale = 0.3
 	scale.Parent = label
 	Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
-	task.delay(0.6, function()
+	task.delay(0.75, function()
+		-- the next one may start as soon as this one begins to float away
+		task.delay(0.25, showNextPopup)
 		Components.tween(label, Theme.Tweens.Float, {
 			Position = label.Position - UDim2.fromOffset(0, 60),
 			TextTransparency = 1,
@@ -594,7 +666,7 @@ local function buildBanner()
 	bannerScale.Parent = bannerFrame
 end
 
-function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
+local function showBanner(title: string, subtitle: string?, color: Color3?, done: () -> ())
 	bannerToken += 1
 	local token = bannerToken
 	Sound.play("Banner", 0.8)
@@ -611,8 +683,9 @@ function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 	bannerFrame.Visible = true
 	bannerScale.Scale = 0.4
 	Components.tween(bannerScale, Theme.Tweens.Pop, { Scale = 1 })
-	task.delay(2.8, function()
+	task.delay(2.6, function()
 		if token ~= bannerToken then
+			done()
 			return
 		end
 		for _, label in { bannerTitle, bannerSub } do
@@ -626,7 +699,15 @@ function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
 			if token == bannerToken then
 				bannerFrame.Visible = false
 			end
+			done()
 		end)
+	end)
+end
+
+-- Queued: a banner never replaces or overlaps the one on screen.
+function HUDController.Banner(title: string, subtitle: string?, color: Color3?)
+	stagePush("Banner:" .. title, function(done)
+		showBanner(title, subtitle, color, done)
 	end)
 end
 
@@ -652,7 +733,7 @@ local function roleCards(): { [string]: RoleCard }
 			Bullets = {
 				"🔴 Red zones mean a disaster is about to hit",
 				if touch then "💨 Tap DASH to dodge out of danger" else "💨 Press Q to DASH out of danger",
-				"🫥 Stand still indoors to hide · jumping is loud",
+				"🙈 Stand still indoors to hide · jumping is loud",
 			},
 		},
 	}
@@ -660,6 +741,7 @@ end
 
 local cardShown: { [string]: boolean } = {}
 local openCard: Frame? = nil
+local cardDone: (() -> ())? = nil
 
 local function showRoleCard(kind: string)
 	local spec = roleCards()[kind]
@@ -710,6 +792,11 @@ local function showRoleCard(kind: string)
 		if openCard == card then
 			openCard = nil
 		end
+		if cardDone then
+			local d = cardDone
+			cardDone = nil
+			d()
+		end
 	end
 	Components.button({
 		Name = "GotIt",
@@ -739,12 +826,29 @@ local function evaluateRoleCard()
 	if not kind and openCard then
 		openCard:Destroy()
 		openCard = nil
+		if cardDone then
+			local d = cardDone
+			cardDone = nil
+			d()
+		end
 	end
 	if kind and not cardShown[kind] and player:GetAttribute(Attributes.TutorialPrefix .. kind) ~= true then
 		-- wait for the round-start banner to clear, then show the card if the role still holds
 		task.delay(Config.Onboarding.CardDelay, function()
-			if roleKind() == kind then
-				showRoleCard(kind)
+			if roleKind() == kind and not cardShown[kind] then
+				-- waits behind any banner already on screen (round start, Chaos Twist)
+				stagePush("Card:" .. kind, function(done)
+					if roleKind() ~= kind then
+						done()
+						return
+					end
+					cardDone = done
+					showRoleCard(kind)
+					if not openCard then
+						cardDone = nil
+						done()
+					end
+				end)
 			end
 		end)
 	end

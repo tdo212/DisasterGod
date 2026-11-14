@@ -192,12 +192,12 @@ function FeedController.Start()
 	gui.DisplayOrder = 2
 	gui.Parent = player:WaitForChild("PlayerGui")
 	local layer = Components.scaledRoot(gui)
-	-- top-right corner, under the coin counter
+	-- top-right corner (under the wallet on phones)
 	list = Instance.new("Frame")
 	list.Name = "Feed"
 	list.BackgroundTransparency = 1
 	list.AnchorPoint = Vector2.new(1, 0)
-	list.Position = UDim2.new(1, -14, 0, F.TopOffset)
+	list.Position = UDim2.new(1, -14, 0, if Components.isTouch() then F.TopOffsetTouch else F.TopOffset)
 	list.Size = UDim2.fromOffset(WIDTH, F.MaxLines * 34)
 	list.Parent = layer
 	local layout = Instance.new("UIListLayout")

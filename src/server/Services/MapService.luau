@@ -98,9 +98,10 @@ function MapService.Clear()
 	DestructionService.SetArena(nil)
 end
 
--- Small enterable sheds dropped onto genuinely empty ground (more places to hide on every
--- arena). A spot counts if the ground there is not a building and a box the size of the
--- shed is clear.
+-- Enterable interiors (sheds, two-storey houses with a stairwell, bunkers, lookouts)
+-- dropped onto genuinely empty ground: more places to hide on every arena. A spot counts
+-- if the ground there is not a building and a box the size of the building is clear.
+-- Each gets crates inside to crouch behind.
 local function addHideouts(info: Types.MapInfo)
 	local H = Config.Hideouts
 	local look = HIDEOUT_LOOK[info.Lighting] or DEFAULT_LOOK
@@ -108,31 +109,55 @@ local function addHideouts(info: Types.MapInfo)
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { info.Model }
 	local rng = Random.new()
+	local totalWeight = 0
+	for _, v in H.Variants do
+		totalWeight += v.Weight
+	end
+	local function pick(): any
+		local roll = rng:NextNumber(0, totalWeight)
+		for _, v in H.Variants do
+			roll -= v.Weight
+			if roll <= 0 then
+				return v
+			end
+		end
+		return H.Variants[1]
+	end
 	local placed = 0
 	for _ = 1, H.Tries do
 		if placed >= H.PerMap then
 			break
 		end
+		local v = pick()
 		local a = rng:NextNumber(0, math.pi * 2)
 		local d = rng:NextNumber(20, info.Radius * 0.85)
 		local ground = MapService.TerrainAt(info.Center + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d))
 		if ground.Y < info.FluidStartY + 2 then
 			continue -- in the water
 		end
-		local box = CFrame.new(ground + Vector3.new(0, H.Size.Y / 2 + 0.6, 0))
-		if #workspace:GetPartBoundsInBox(box, H.Size + Vector3.new(4, 0, 4), params) > 0 then
+		local height = v.Floors * v.FloorHeight + 2
+		local size = Vector3.new(v.Width + 4, height, v.Depth + 4)
+		local box = CFrame.new(ground + Vector3.new(0, height / 2 + 0.6, 0))
+		if #workspace:GetPartBoundsInBox(box, size, params) > 0 then
 			continue
 		end
 		placed += 1
-		Builder.highrise(info.Model, "Hideout", ground, H.Size.X, H.Size.Z, 1, H.Size.Y - 2, {
+		Builder.highrise(info.Model, "Hideout" .. v.Name, ground, v.Width, v.Depth, v.Floors, v.FloorHeight, {
 			SlabColor = look[2] :: Color3,
 			SlabMaterial = look[3] :: Enum.Material,
 			ColumnColor = look[2] :: Color3,
 			ColumnMaterial = Enum.Material.Metal,
 			WallColor = look[1] :: Color3,
-			WallMaterial = look[3] :: Enum.Material,
+			WallMaterial = if v.Name == "Bunker" then Enum.Material.Concrete else look[3] :: Enum.Material,
 			WallTransparency = 0,
+			Windows = v.Windows,
+			Stairwell = v.Stairwell,
+			Health = v.Health,
 		})
+		-- cover inside: crates against the back wall (crouch behind them, peek over)
+		if v.Crates > 0 then
+			Builder.crates(info.Model, ground + Vector3.new(-v.Width / 2 + 4, 0, v.Depth / 2 - 4), v.Crates)
+		end
 	end
 end
 

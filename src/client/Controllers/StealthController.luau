@@ -177,7 +177,7 @@ function StealthController.Start()
 	local layer = Components.scaledRoot(gui)
 	badge = Components.label({
 		Name = "Hidden",
-		Text = "🫥 HIDDEN",
+		Text = "🙈 HIDDEN",
 		TextSize = 24,
 		Color = Color3.fromRGB(170, 255, 200),
 		Size = UDim2.fromOffset(220, 32),

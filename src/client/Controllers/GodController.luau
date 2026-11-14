@@ -134,7 +134,7 @@ local function buildSlots()
 
 		local icon = Components.icon({ Name = "Icon", Icon = def.Id, TextSize = 38, Size = UDim2.fromScale(0.8, 0.8), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = slot })
 		if not touch then
-			Components.label({ Name = "Key", Text = tostring(i), TextSize = 18, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = slot })
+			Components.keyChip(slot, tostring(i))
 		end
 		local cost = Components.label({ Name = "Cost", Text = tostring(def.Cost), TextSize = 18, Color = C.GoldLight, Size = UDim2.fromOffset(30, 20), Position = UDim2.new(1, -4, 1, -8), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = slot })
 		cost.ZIndex = 3

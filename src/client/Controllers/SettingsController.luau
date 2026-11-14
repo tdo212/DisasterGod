@@ -48,7 +48,9 @@ local function applyAudio()
 	end
 	local on = SettingsController.Get("Sfx") == true
 	sfxGroup.Volume = if on then 1 else 0
-	for _, name in { "UiSounds", "Ambience", "AmbienceLayer" } do
+	-- DisasterSounds is the server's world group (replicated); a local Volume write only
+	-- affects this client, which is exactly what a personal mute needs
+	for _, name in { "UiSounds", "Ambience", "AmbienceLayer", "DisasterSounds" } do
 		local g = SoundService:FindFirstChild(name)
 		if g and g:IsA("SoundGroup") then
 			if g:GetAttribute("BaseVolume") == nil then
@@ -129,6 +131,11 @@ function SettingsController.Start()
 	sfxGroup.Name = "Sfx"
 	sfxGroup.Volume = 1
 	sfxGroup.Parent = SoundService
+	for _, d in workspace:GetDescendants() do
+		if d:IsA("Sound") and d.SoundGroup == nil then
+			d.SoundGroup = sfxGroup
+		end
+	end
 	-- world / disaster sounds have no group: route them through Sfx so they can be muted
 	workspace.DescendantAdded:Connect(function(d)
 		if d:IsA("Sound") and d.SoundGroup == nil then

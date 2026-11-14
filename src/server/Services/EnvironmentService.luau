@@ -4,13 +4,17 @@
 -- red sudden-death tint).
 
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local EnvironmentService = {}
 
 local correction: ColorCorrectionEffect
 local atmosphere: Atmosphere
 local bloom: BloomEffect
+local sky: Sky? = nil
 
 type Preset = {
 	ClockTime: number,
@@ -251,7 +255,10 @@ function EnvironmentService.Init()
 	local rays: SunRaysEffect = ensure("SunRaysEffect", "DGSunRays")
 	rays.Intensity = 0.06
 	rays.Spread = 0.6
-	ensure("Sky", "DGSky")
+	local s: Sky = ensure("Sky", "DGSky")
+	s.SunAngularSize = 14
+	s.MoonAngularSize = 9
+	sky = s
 
 	EnvironmentService.ApplyPreset("Lodge", 0)
 end
@@ -261,6 +268,17 @@ function EnvironmentService.ApplyPreset(name: string, seconds: number?)
 	local p = PRESETS[name] or PRESETS.Day
 	preset = p
 	currentMood = "Calm"
+	local faces = Config.Skies[name] or Config.Skies.Day
+	local sk = sky
+	if sk and faces then
+		local function id(n: number): string
+			return "rbxassetid://" .. tostring(n)
+		end
+		sk.SkyboxBk, sk.SkyboxDn, sk.SkyboxFt = id(faces[1]), id(faces[2]), id(faces[3])
+		sk.SkyboxLf, sk.SkyboxRt, sk.SkyboxUp = id(faces[4]), id(faces[5]), id(faces[6])
+		sk.StarCount = if name == "Night" or name == "Tempest" then 3000 else 600
+		sk.CelestialBodiesShown = name ~= "Volcanic" and name ~= "Tempest"
+	end
 	local t = seconds or 2
 	if t <= 0 then
 		Lighting.ClockTime = p.ClockTime

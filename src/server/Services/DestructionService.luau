@@ -345,9 +345,10 @@ local function breakPart(part: BasePart, from: Vector3?): boolean
 		return false
 	end
 	if part.Material == Enum.Material.Glass then
-		AudioService.playAt("Glass", part.Position, 1.4, 0.9 + math.random() * 0.3, Config.Audio.GlassSoundCooldown)
 		glassBroken:Fire(part.Position)
 	end
+	-- material-aware crack / clang / shatter (throttled per material family)
+	AudioService.playBreak(part.Material, part.Position, if part.Size.Magnitude > 12 then 1.2 else 0.85)
 	if isCosmetic(part) then
 		shatter(part, from)
 		return true

@@ -32,7 +32,7 @@ local TEMPLATE_MAIN_ATTRIBUTE = "TopTimePlayedLeaderboard_IsMainBoard"
 local TEST_THUMBNAIL = "rbxassetid://1146888101"
 local STATUE_SETTLE = 0.5 -- seconds for accessory welds to seat before freezing a statue
 
-type Row = { UserId: number, Value: number }
+type Row = { UserId: number, Value: number, Placeholder: boolean? }
 type Board = { Model: Model, Stat: string, Unit: string, Store: OrderedDataStore?, Rig: any }
 type HallSlot = { Spot: CFrame, Label: TextLabel, UserId: number?, Statue: Model? }
 
@@ -135,6 +135,32 @@ local function fetch(stat: string, store: OrderedDataStore?): { Row }
 	return rows
 end
 
+-- The place's creator stands in on any board or podium that has room, until real
+-- players fill it (a board is never blank on a brand-new server or datastore).
+local function creatorId(): number
+	if game.CreatorType == Enum.CreatorType.User and game.CreatorId > 0 then
+		return game.CreatorId
+	end
+	return L.PlaceholderUserId
+end
+
+local function withPlaceholder(rows: { Row }, stat: string, limit: number): { Row }
+	local id = creatorId()
+	if id <= 0 or #rows >= limit then
+		return rows
+	end
+	for _, row in rows do
+		if row.UserId == id then
+			return rows
+		end
+	end
+	local live = Players:GetPlayerByUserId(id)
+	local profile = live and PlayerDataService.Get(live)
+	local value = profile and (profile :: any)[stat]
+	table.insert(rows, { UserId = id, Value = if typeof(value) == "number" then value else 0, Placeholder = true })
+	return rows
+end
+
 local function render(board: Board, rows: { Row })
 	local scoreBlock = (board.Model :: any).ScoreBlock
 	local gui = scoreBlock.Leaderboard
@@ -152,7 +178,7 @@ local function render(board: Board, rows: { Row })
 		photo.Visible = row ~= nil
 		if row then
 			name.Text = nameOf(row.UserId)
-			score.Text = string.format("%s %s", formatNumber(row.Value), board.Unit)
+			score.Text = if row.Placeholder and row.Value <= 0 then "Creator · beat me!" else string.format("%s %s", formatNumber(row.Value), board.Unit)
 			photo.Image = thumbOf(row.UserId)
 		end
 	end
@@ -169,7 +195,7 @@ end
 
 local function refresh(board: Board)
 	local ok, err = pcall(function()
-		render(board, fetch(board.Stat, board.Store))
+		render(board, withPlaceholder(fetch(board.Stat, board.Store), board.Stat, ROWS))
 	end)
 	if not ok then
 		warn("[Leaderboard] render failed for", board.Stat, err)
@@ -430,15 +456,39 @@ local function updateHall(rows: { Row })
 	for rank, slot in hallSlots do
 		local row = rows[rank]
 		if not row then
-			if slot.Statue then
-				slot.Statue:Destroy()
-				slot.Statue = nil
-			end
-			slot.UserId = nil
+			-- an open place: a metallic mannequin holds it (silver / bronze) until someone claims it
 			slot.Label.Text = string.format("#%d\n<font color=\"#C8C8D2\">Your name here?</font>", rank)
+			if slot.UserId ~= -rank or not slot.Statue then
+				if slot.Statue then
+					slot.Statue:Destroy()
+					slot.Statue = nil
+				end
+				slot.UserId = -rank
+				local statue = buildStatue(0, slot.Spot, "Open" .. rank, folder)
+				if slot.UserId ~= -rank then
+					if statue then
+						statue:Destroy()
+					end
+					continue
+				end
+				if statue then
+					local tint = L.HallPlaceholderColors[rank] or L.HallPlaceholderColors[#L.HallPlaceholderColors]
+					for _, d in statue:GetDescendants() do
+						if d:IsA("BasePart") then
+							d.Color = tint
+							d.Material = Enum.Material.Metal
+						elseif d:IsA("Decal") or d:IsA("Clothing") or d:IsA("ShirtGraphic") then
+							d:Destroy()
+						end
+					end
+				end
+				slot.Statue = statue
+			end
 			continue
 		end
-		slot.Label.Text = string.format("#%d %s\n<font color=\"#FFD23C\">%s %s</font>", rank, nameOf(row.UserId), formatNumber(row.Value), L.Hall.Unit)
+		slot.Label.Text = if row.Placeholder and row.Value <= 0
+			then string.format("#%d %s\n<font color=\"#FFD23C\">Creator · beat me!</font>", rank, nameOf(row.UserId))
+			else string.format("#%d %s\n<font color=\"#FFD23C\">%s %s</font>", rank, nameOf(row.UserId), formatNumber(row.Value), L.Hall.Unit)
 		if slot.UserId ~= row.UserId or not slot.Statue then
 			slot.UserId = row.UserId
 			local statue = buildStatue(row.UserId, slot.Spot, "Legend" .. rank, folder)
@@ -482,7 +532,7 @@ local function hallRows(): { Row }
 		end
 		table.insert(rows, row)
 	end
-	return rows
+	return withPlaceholder(rows, L.Hall.Stat, #hallSlots)
 end
 
 local hallBusy = false

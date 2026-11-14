@@ -586,7 +586,9 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		tickTimer += dt
 		if tickTimer >= 0.25 then
 			tickTimer = 0
+			-- a column of wind: rips the ground floor and the floors above it
 			creditDestruction(caster, DestructionService.DamageArea(pos + Vector3.new(0, 8, 0), radius, def.StructureDamage * 0.25))
+			creditDestruction(caster, DestructionService.DamageArea(pos + Vector3.new(0, 24, 0), radius * 0.8, def.StructureDamage * 0.18))
 			if steered then
 				if ComboService.Extinguish(pos, radius) > 0 then
 					sound("Gust", pos, 1.4, 0.7)

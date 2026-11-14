@@ -171,29 +171,46 @@ end
 ---------------------------------------------------------------------------
 -- UI
 
-local TOUCH_DASH_SIZE = 84
-local TOUCH_DASH_GAP = 14
+local TOUCH_DASH_SIZE = 76
+local TOUCH_DASH_GAP = 10
 
--- Keep the touch dash button glued to the left of Roblox's jump button, at its size.
+-- Touch: the dash sits up and to the left of Roblox's jump button (never on top of it),
+-- at 80% of its size. TouchGui is rebuilt on some respawns / rotations, so re-find it.
 local function followJumpButton()
-	local touchGui = player:WaitForChild("PlayerGui"):WaitForChild("TouchGui", 10)
-	local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
-	local jump = frame and frame:FindFirstChild("JumpButton")
-	if not (jump and jump:IsA("GuiObject")) then
-		return
-	end
-	local function apply()
-		if jump.AbsoluteSize.X < 1 then
+	local playerGui = player:WaitForChild("PlayerGui")
+	local bound: Instance? = nil
+	local conns: { RBXScriptConnection } = {}
+	local function bind()
+		local touchGui = playerGui:FindFirstChild("TouchGui")
+		local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+		local jump = frame and frame:FindFirstChild("JumpButton")
+		if not (jump and jump:IsA("GuiObject")) or jump == bound then
 			return
 		end
-		local size = jump.AbsoluteSize.X * 0.9
-		dashButton.Size = UDim2.fromOffset(size, size)
-		dashButton.AnchorPoint = Vector2.new(1, 0.5)
-		dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y + jump.AbsoluteSize.Y / 2)
+		bound = jump
+		for _, c in conns do
+			c:Disconnect()
+		end
+		table.clear(conns)
+		local function apply()
+			if jump.AbsoluteSize.X < 1 then
+				return
+			end
+			local size = math.max(60, jump.AbsoluteSize.X * 0.8)
+			dashButton.Size = UDim2.fromOffset(size, size)
+			dashButton.AnchorPoint = Vector2.new(1, 1)
+			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X + jump.AbsoluteSize.X * 0.2, jump.AbsolutePosition.Y - TOUCH_DASH_GAP)
+		end
+		apply()
+		table.insert(conns, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
+		table.insert(conns, jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
 	end
-	apply()
-	jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply)
-	jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+	bind()
+	playerGui.DescendantAdded:Connect(function(d)
+		if d.Name == "JumpButton" then
+			task.defer(bind)
+		end
+	end)
 end
 
 local function buildGui()
@@ -207,11 +224,12 @@ local function buildGui()
 	local touch = Components.isTouch()
 	dashButton = Components.button({
 		Name = "Dash",
-		Text = if touch then "DASH" else "DASH [Q]",
-		TextSize = 20,
-		-- touch: real pixels beside the jump button (not in the scaled layer)
-		Size = if touch then UDim2.fromOffset(TOUCH_DASH_SIZE, TOUCH_DASH_SIZE) else UDim2.fromOffset(124, 56),
-		Position = if touch then UDim2.new(1, -130, 1, -30) else UDim2.new(1, -16, 1, -16),
+		Text = "DASH",
+		TextSize = if touch then 18 else 24,
+		-- touch: real pixels above-left of the jump button (not in the scaled layer);
+		-- fallback spot (no TouchGui yet) is clear of where the jump button sits
+		Size = if touch then UDim2.fromOffset(TOUCH_DASH_SIZE, TOUCH_DASH_SIZE) else UDim2.fromOffset(150, 66),
+		Position = if touch then UDim2.new(1, -40, 1, -150) else UDim2.new(1, -24, 1, -24),
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Blue,
 		ColorLight = C.BlueLight,
@@ -220,6 +238,8 @@ local function buildGui()
 	})
 	if touch then
 		task.spawn(followJumpButton)
+	else
+		Components.keyChip(dashButton, "Q")
 	end
 	dashCooldown = Instance.new("Frame")
 	dashCooldown.Name = "Cooldown"
@@ -261,7 +281,7 @@ local function buildGui()
 		b.Parent = gearBar
 		Components.icon({ Name = "Icon", Icon = def.Id, TextSize = 34, Size = UDim2.fromScale(0.78, 0.78), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = b })
 		if not Components.isTouch() then
-			Components.label({ Name = "Key", Text = def.Key, TextSize = 16, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = b })
+			Components.keyChip(b, def.Key)
 		end
 		local count = Components.label({ Name = "Count", Text = "x0", TextSize = 18, Size = UDim2.fromOffset(40, 20), Position = UDim2.new(1, -4, 1, -2), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = b })
 		local function refresh()

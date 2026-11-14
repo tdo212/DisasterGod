@@ -296,6 +296,24 @@ function Components.button(props: ButtonProps): TextButton
 	return button
 end
 
+-- Keyboard hint chip ("Q", "T", "1"): a small white key cap with a black outline,
+-- pinned to a button's top-left corner. PC only; callers skip it on touch.
+function Components.keyChip(parent: GuiObject, key: string): Frame
+	local chip = Instance.new("Frame")
+	chip.Name = "KeyChip"
+	chip.Size = UDim2.fromOffset(math.max(24, 12 + #key * 11), 24)
+	chip.Position = UDim2.fromOffset(-8, -8)
+	chip.BackgroundColor3 = Color3.fromRGB(245, 247, 250)
+	chip.BorderSizePixel = 0
+	chip.ZIndex = 6
+	Components.corner(chip, Theme.Radius.Small)
+	Components.stroke(chip, 3)
+	local label = Components.label({ Name = "Key", Text = key, TextSize = 16, Color = Color3.fromRGB(20, 22, 30), StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = chip })
+	label.ZIndex = 7
+	chip.Parent = parent
+	return chip
+end
+
 function Components.setText(button: GuiObject, text: string)
 	local label = button:FindFirstChild("Text")
 	if label and label:IsA("TextLabel") then

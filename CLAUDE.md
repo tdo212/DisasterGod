@@ -55,6 +55,7 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 - The look follows `StarterGui.UIReference` (disabled reference ScreenGui, keep it): heavy Montserrat with thick black outlines, square-cut studded blocks, cyan window headers with a separate red X block, black-outlined dark windows.
 - Icons are sticker images from `UI/Icons.luau` (three 1024px sprite sheets; regenerate with `tools/icons/gen_icons.py` and re-upload). Use `Components.icon` / `Components.tile`: they take an icon name ("Shop") or a config emoji ("⚡") and fall back to text for anything unmapped.
 - New ScreenGuis set `ZIndexBehavior = Sibling`, or a window's background draws over its own content.
+- Centre-screen messages go through HUDController (`Banner` / `Popup`), which queues them so nothing overlaps; don't build a separate centre-screen toast. PC key hints use `Components.keyChip`.
 
 ## Audio
 - All sound IDs and volumes live in `Config.Audio`. World/disaster sounds go through `AudioService` (server, positional); UI sounds through `UI/Sound.luau`; music and ambience through `AudioController`.

@@ -4,6 +4,9 @@
 --     the camera while it is down in the arena; storm maps flash lightning with thunder.
 --   * Spinning parts (Builder.spin): clock hands, gear spokes, radar dishes, propellers.
 --   * Launch pads (Builder.launchPad): steam vents throw you up to the catwalks.
+--   * Ambient set dressing (Config.Weather.Ambient): chimney smoke, smokestack ash,
+--     street steam, sea spray, mist, fireflies and sparks placed on the arena's tallest
+--     roofs / open ground. A few low-rate emitters per map; none in Low-FX mode.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -224,6 +227,221 @@ local function launchCheck()
 	end
 end
 
+---------------------------------------------------------------------------
+-- ambient set dressing
+
+local AMBIENT: { [string]: (ParticleEmitter) -> () } = {
+	Smoke = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(95, 92, 90), Color3.fromRGB(150, 148, 145))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 14) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(6, 9)
+		p.Speed = NumberRange.new(5, 8)
+		p.Acceleration = Vector3.new(2.5, 1, 0.8)
+		p.SpreadAngle = Vector2.new(12, 12)
+		p.Rate = 5
+		p.RotSpeed = NumberRange.new(-20, 20)
+	end,
+	Ash = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(40, 36, 36), Color3.fromRGB(90, 80, 78))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 20) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(7, 10)
+		p.Speed = NumberRange.new(7, 11)
+		p.Acceleration = Vector3.new(3, 0.5, 1)
+		p.SpreadAngle = Vector2.new(10, 10)
+		p.Rate = 6
+		p.RotSpeed = NumberRange.new(-15, 15)
+	end,
+	Steam = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(235, 240, 245))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.5), NumberSequenceKeypoint.new(1, 7) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(2.5, 4)
+		p.Speed = NumberRange.new(6, 10)
+		p.SpreadAngle = Vector2.new(8, 8)
+		p.Rate = 7
+	end,
+	Mist = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(225, 232, 236))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 10), NumberSequenceKeypoint.new(1, 22) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.82), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(10, 14)
+		p.Speed = NumberRange.new(0.5, 1.5)
+		p.SpreadAngle = Vector2.new(90, 10)
+		p.Acceleration = Vector3.new(0.6, 0, 0.3)
+		p.Rate = 2
+	end,
+	Spray = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(240, 250, 255))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 6) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(1.5, 2.5)
+		p.Speed = NumberRange.new(4, 9)
+		p.SpreadAngle = Vector2.new(40, 40)
+		p.Acceleration = Vector3.new(4, -4, 0)
+		p.Rate = 4
+	end,
+	DustDevil = function(p)
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(225, 190, 140))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 8) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(3, 4)
+		p.Speed = NumberRange.new(5, 9)
+		p.SpreadAngle = Vector2.new(15, 15)
+		p.RotSpeed = NumberRange.new(150, 260)
+		p.Rotation = NumberRange.new(0, 360)
+		p.Acceleration = Vector3.new(6, 0, 2)
+		p.Rate = 8
+	end,
+	Fireflies = function(p)
+		p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(255, 240, 140), Color3.fromRGB(190, 255, 120))
+		p.LightEmission = 1
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 0.45), NumberSequenceKeypoint.new(1, 0) })
+		p.Transparency = NumberSequence.new(0.1)
+		p.Lifetime = NumberRange.new(4, 7)
+		p.Speed = NumberRange.new(0.5, 2)
+		p.SpreadAngle = Vector2.new(180, 180)
+		p.Acceleration = Vector3.new(0, 0.3, 0)
+		p.Rate = 3
+	end,
+	Sparks = function(p)
+		p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(120, 230, 255), Color3.fromRGB(255, 120, 230))
+		p.LightEmission = 1
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+		p.Lifetime = NumberRange.new(0.6, 1.1)
+		p.Speed = NumberRange.new(8, 14)
+		p.SpreadAngle = Vector2.new(60, 60)
+		p.Acceleration = Vector3.new(0, -30, 0)
+		p.Rate = 0 -- bursts, see ambientTick
+	end,
+}
+
+local ambientFolder: Folder? = nil
+local sparkEmitters: { ParticleEmitter } = {}
+local ambientToken = 0
+
+local function clearAmbient()
+	if ambientFolder then
+		ambientFolder:Destroy()
+		ambientFolder = nil
+	end
+	table.clear(sparkEmitters)
+end
+
+local function lowFx(): boolean
+	return player:GetAttribute(Attributes.SettingPrefix .. "LowFx") == true
+end
+
+-- the tops of the tallest building models (where smokestacks and chimneys would be)
+local function roofSpots(arena: Instance, count: number): { Vector3 }
+	local tops: { { Y: number, P: Vector3 } } = {}
+	for _, child in arena:GetChildren() do
+		if child:IsA("Model") and not string.find(child.Name, "Crates", 1, true) then
+			local cf, size = child:GetBoundingBox()
+			if size.Magnitude < 260 then
+				local top = cf.Position + Vector3.new(0, size.Y / 2, 0)
+				table.insert(tops, { Y = top.Y, P = top })
+			end
+		end
+	end
+	table.sort(tops, function(a, b)
+		return a.Y > b.Y
+	end)
+	local out: { Vector3 } = {}
+	for i = 1, math.min(count, #tops) do
+		table.insert(out, tops[i].P)
+	end
+	return out
+end
+
+local function groundSpots(arena: Instance, count: number): { Vector3 }
+	local out: { Vector3 } = {}
+	local center = Config.World.ArenaCenter
+	local radius = Config.World.ArenaRadius * 0.8
+	rayParams.FilterDescendantsInstances = { arena }
+	for _ = 1, count * 6 do
+		if #out >= count then
+			break
+		end
+		local a = rng:NextNumber(0, math.pi * 2)
+		local d = rng:NextNumber(10, radius)
+		local origin = center + Vector3.new(math.cos(a) * d, 200, math.sin(a) * d)
+		local hit = workspace:Raycast(origin, Vector3.new(0, -400, 0), rayParams)
+		if hit and hit.Instance.Name ~= "Sea" and hit.Normal.Y > 0.7 then
+			table.insert(out, hit.Position)
+		end
+	end
+	return out
+end
+
+local function buildAmbient()
+	ambientToken += 1
+	local token = ambientToken
+	clearAmbient()
+	local spec = W.Ambient[mapKey()]
+	if not spec or lowFx() then
+		return
+	end
+	task.delay(W.AmbientDelay, function()
+		local arena = workspace:FindFirstChild("Arena")
+		if token ~= ambientToken or not arena or #arena:GetChildren() == 0 or lowFx() then
+			return
+		end
+		local folder = Instance.new("Folder")
+		folder.Name = "AmbientFx"
+		for _, entry in spec do
+			local setup = AMBIENT[entry.Kind]
+			if not setup then
+				continue
+			end
+			local spots = if entry.On == "Roof" then roofSpots(arena, entry.Count) else groundSpots(arena, entry.Count)
+			for _, at in spots do
+				local holder = Instance.new("Part")
+				holder.Name = entry.Kind
+				holder.Anchored = true
+				holder.CanCollide = false
+				holder.CanQuery = false
+				holder.CanTouch = false
+				holder.Transparency = 1
+				holder.Size = if entry.Kind == "Mist" then Vector3.new(30, 1, 30) else Vector3.new(2, 1, 2)
+				holder.CFrame = CFrame.new(at + Vector3.new(0, 0.6, 0))
+				local p = Instance.new("ParticleEmitter")
+				p.EmissionDirection = Enum.NormalId.Top
+				setup(p)
+				p.Parent = holder
+				if entry.Kind == "Sparks" then
+					table.insert(sparkEmitters, p)
+				end
+				holder.Parent = folder
+			end
+		end
+		folder.Parent = workspace
+		ambientFolder = folder
+	end)
+end
+
+local nextSpark = 0
+local function ambientTick()
+	if #sparkEmitters == 0 or os.clock() < nextSpark then
+		return
+	end
+	nextSpark = os.clock() + rng:NextNumber(1.2, 3.5)
+	local p = sparkEmitters[rng:NextInteger(1, #sparkEmitters)]
+	if p.Parent then
+		p:Emit(rng:NextInteger(8, 16))
+	end
+end
+
+
 function MapFxController.Start()
 	weatherPart = Instance.new("Part")
 	weatherPart.Name = "WeatherEmitter"
@@ -273,6 +491,10 @@ function MapFxController.Start()
 		spin()
 	end)
 	RunService.Heartbeat:Connect(launchCheck)
+	RunService.Heartbeat:Connect(ambientTick)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.MapKey):Connect(buildAmbient)
+	player:GetAttributeChangedSignal(Attributes.SettingPrefix .. "LowFx"):Connect(buildAmbient)
+	buildAmbient()
 end
 
 return MapFxController
