@@ -168,6 +168,17 @@ export type PlayerProfile = {
 	Cosmetics: { [string]: boolean }, -- owned cosmetic ids
 	Equipped: { [string]: string }, -- category -> cosmetic id
 	Saves: { [string]: number }, -- panic save charges ("Glider", "Aegis")
+	Mastery: { [string]: number }, -- mastery counters (Config.Mastery stats)
+	LoginDay: number, -- last day index played (unix days)
+	LoginStreak: number,
+	StreakClaimedDay: number,
+	FirstSurviveDay: number,
+	FirstGodWinDay: number,
+	GoldenTrail: boolean,
+	Set_LowFx: boolean,
+	Set_Shake: number,
+	Set_Music: boolean,
+	Set_Sfx: boolean,
 }
 
 export type RoundRecord = {
@@ -178,6 +189,8 @@ export type RoundRecord = {
 	Escapes: number,
 	Kills: number,
 	Destroyed: number,
+	Taunts: number,
+	HiddenBest: number, -- longest hidden streak (seconds)
 }
 
 export type SummaryLine = { Text: string, Amount: number }
@@ -191,6 +204,8 @@ export type RoundSummary = {
 	Survived: boolean,
 	Lines: { SummaryLine },
 	Total: number,
+	Awards: { { Name: string, Icon: string, Player: string, Text: string } }?,
+	Mutator: string?,
 }
 
 export type PlayerState = {

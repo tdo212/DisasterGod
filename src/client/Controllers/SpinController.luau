@@ -57,7 +57,20 @@ local dim: TextButton
 local rootScale: UIScale
 local halves: { { Slice } } = {}
 local separators: { Frame } = {}
-local icons: { TextLabel } = {}
+-- The prize in words on every slice, next to its odds.
+local function prizeText(reward: any): string
+	if reward.Kind == "Coins" then
+		return reward.Label .. " COINS"
+	elseif reward.Kind == "God" then
+		return "BE THE GOD"
+	elseif reward.Kind == "Kit" then
+		return "FREE GOD KIT"
+	end
+	return string.upper(tostring(reward.Label))
+end
+
+local icons: { GuiObject } = {}
+local prizes: { TextLabel } = {} -- what the slice wins, in words ("1,500 COINS")
 local odds: { TextLabel } = {}
 local spinTag: TextLabel
 local timerLabel: TextLabel
@@ -116,9 +129,11 @@ local function render()
 		local mid = boundary + THETA / 2
 		onCircle(separators[i], boundary, RADIUS / 2)
 		separators[i].Rotation = boundary
-		onCircle(icons[i], mid, RADIUS * 0.5)
+		onCircle(icons[i], mid, RADIUS * 0.4)
 		icons[i].Rotation = mid
-		onCircle(odds[i], mid, RADIUS * 0.82)
+		onCircle(prizes[i], mid, RADIUS * 0.63)
+		prizes[i].Rotation = mid
+		onCircle(odds[i], mid, RADIUS * 0.85)
 		odds[i].Rotation = mid
 	end
 end
@@ -193,7 +208,16 @@ local function buildWheel(parent: Frame): TextButton
 		line.BorderSizePixel = 0
 		line.Parent = overlay
 		separators[i] = line
-		icons[i] = Components.label({ Name = "Icon" .. i, Text = reward.Icon, TextSize = 46, StrokeThickness = 0, Size = UDim2.fromOffset(70, 60), AnchorPoint = Vector2.new(0.5, 0.5), Parent = overlay })
+		icons[i] = Components.icon({ Name = "Icon" .. i, Icon = reward.Icon, TextSize = 40, Size = UDim2.fromOffset(52, 52), AnchorPoint = Vector2.new(0.5, 0.5), Parent = overlay })
+		prizes[i] = Components.label({
+			Name = "Prize" .. i,
+			Text = prizeText(reward),
+			TextSize = 18,
+			Size = UDim2.fromOffset(130, 22),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Color = C.GoldLight,
+			Parent = overlay,
+		})
 		odds[i] = Components.label({
 			Name = "Odds" .. i,
 			Text = string.format("%.2f%%", reward.Weight / totalWeight * 100),

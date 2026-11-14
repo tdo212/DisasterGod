@@ -18,6 +18,7 @@ local Theme = require(ClientRoot:WaitForChild("UI"):WaitForChild("Theme") :: Mod
 local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Components") :: ModuleScript)
 local Store = require(ClientRoot:WaitForChild("UI"):WaitForChild("Store") :: ModuleScript)
 local SpectateController = require(script.Parent:WaitForChild("SpectateController") :: ModuleScript)
+local SettingsController = require(script.Parent:WaitForChild("SettingsController") :: ModuleScript)
 local HUDController = require(script.Parent:WaitForChild("HUDController") :: ModuleScript)
 local SpinController = require(script.Parent:WaitForChild("SpinController") :: ModuleScript)
 local QuestController = require(script.Parent:WaitForChild("QuestController") :: ModuleScript)
@@ -93,7 +94,7 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 		badge.Parent = frame
 		Components.label({ Name = "Text", Text = spec.Badge, TextSize = 18, Size = UDim2.fromScale(1, 1), Parent = badge })
 	end
-	Components.label({ Name = "Icon", Text = spec.Icon, TextSize = 52, StrokeThickness = 0, Size = UDim2.new(1, 0, 0, 72), Position = UDim2.fromOffset(0, 38), Parent = frame })
+	Components.icon({ Name = "Icon", Icon = spec.Icon, TextSize = 52, Size = UDim2.fromOffset(72, 72), Position = UDim2.new(0.5, 0, 0, 38), AnchorPoint = Vector2.new(0.5, 0), Parent = frame })
 	Components.label({ Name = "Title", Text = spec.Title, TextSize = 20, Size = UDim2.new(1, -10, 0, 26), Position = UDim2.fromOffset(5, 112), Parent = frame })
 	local pill = Components.panel({
 		Name = "Info",
@@ -620,7 +621,7 @@ function MenuController.Start()
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
 	sidebar.BackgroundTransparency = 1
-	sidebar.Size = UDim2.fromOffset(160, 250)
+	sidebar.Size = UDim2.fromOffset(160, 336)
 	if Components.isTouch() then
 		sidebar.Position = UDim2.fromOffset(12, 6)
 	else
@@ -637,12 +638,12 @@ function MenuController.Start()
 
 	buildShop()
 
-	local shopTile = Components.tile(sidebar, "🛒", "Shop", C.Red, 1)
+	local shopTile = Components.tile(sidebar, "Shop", "Shop", C.Red, 1)
 	shopTile.Activated:Connect(function()
 		MenuController.OpenShop()
 	end)
 
-	local spinTile = Components.tile(sidebar, "🎡", "Spin", C.Pink, 2)
+	local spinTile = Components.tile(sidebar, "Spin", "Spin", C.Pink, 2)
 	spinTile.Activated:Connect(SpinController.Toggle)
 	local function refreshSpinBadge()
 		local n = player:GetAttribute(Attributes.Spins) :: number? or 0
@@ -651,7 +652,7 @@ function MenuController.Start()
 	player:GetAttributeChangedSignal(Attributes.Spins):Connect(refreshSpinBadge)
 	refreshSpinBadge()
 
-	local questTile = Components.tile(sidebar, "📜", "Quests", C.Orange, 3)
+	local questTile = Components.tile(sidebar, "Quests", "Quests", C.Orange, 3)
 	questTile.Activated:Connect(QuestController.Toggle)
 	local function refreshQuestBadge()
 		Components.setBadge(questTile, if QuestController.ClaimableCount() > 0 then "!" else nil)
@@ -659,26 +660,29 @@ function MenuController.Start()
 	QuestController.Changed:Connect(refreshQuestBadge)
 	refreshQuestBadge()
 
-	local passTile = Components.tile(sidebar, "👑", "Passes", C.Gold, 4)
+	local passTile = Components.tile(sidebar, "Passes", "Passes", C.Gold, 4)
 	passTile.Activated:Connect(function()
 		MenuController.OpenShop("Passes")
 	end)
 
-	local spectateTile = Components.tile(sidebar, "👁️", "Spectate", C.Blue, 5)
+	local spectateTile = Components.tile(sidebar, "Spectate", "Spectate", C.Blue, 5)
 	spectateTile.Activated:Connect(SpectateController.Toggle)
 
-	local roleTile = Components.tile(sidebar, "😈", "Play God", C.Purple, 6)
+	local roleTile = Components.tile(sidebar, "PlayGod", "Play God", C.Purple, 6)
 	local function refreshRoleTile()
 		local solo = #Players:GetPlayers() == 1 and Config.Match.AllowSoloRoleToggle
 		roleTile.Visible = solo
 		local wantsGod = player:GetAttribute(Attributes.PreferredRole) == "DisasterGod"
-		local icon = roleTile:FindFirstChild("Icon") :: TextLabel?
+		local icon = roleTile:FindFirstChild("Icon")
 		local caption = roleTile:FindFirstChild("Caption") :: TextLabel?
 		if icon and caption then
-			icon.Text = if wantsGod then "🏃" else "😈"
+			Components.setIcon(icon, if wantsGod then "Dash" else "PlayGod")
 			caption.Text = if wantsGod then "Survivor" else "Play God"
 		end
 	end
+	local settingsTile = Components.tile(sidebar, "Settings", "Settings", C.Green, 7)
+	settingsTile.Activated:Connect(SettingsController.Toggle)
+
 	roleTile.Activated:Connect(function()
 		local wantsGod = player:GetAttribute(Attributes.PreferredRole) == "DisasterGod"
 		Remotes.get("SetSoloRole"):FireServer(if wantsGod then "Survivor" else "DisasterGod")

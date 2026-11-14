@@ -76,7 +76,7 @@ A big timber great hall floating beside the arena at (0, 150, -232), built to fe
 - **East: Neon Climb obby.** 11 evenly spaced pads (8 studs apart, 1.5 studs higher each, alternating 2 studs left/right) on glowing stems up the east wall to a loft in the front corner (+15 coins, 20 s cooldown), with a neon ramp back down. A glass divider separates the course from the ramp and the hall so it can't be skipped; falling lands you on the lodge floor next to the start.
 - **Observation deck:** past the wide front opening, 112 x 34 studs with a glass-floor strip at the edge, a low glass rail with no neon on the front (so nothing glares across the view), invisible walls above the rails, and the telescopes and benches kept to the sides so the middle stays clear for looking down on the arena.
 
-Nine arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vote** (VoteService / VoteController): a compact strip of three map cards appears under the round bar (never the map just played), players tap or click a card and can change their mind, live counts show on the cards, then the winner flashes and the strip tucks away. Ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event. The round bar carries the countdown, so the strip only says "Tap a map to vote". It replaced the lobby vote pads, which only worked if you walked over to them. Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
+Nine arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vote** (VoteService / VoteController) as a cinematic "CHOOSE A MAP" window: three tall cards, each a slowly pushing-in shot of the arena (`Config.World.MapThumbnails`, captured in Studio), the live vote count in a bubble, a NEW! tag on the newest arenas, the countdown and a close button. Voting is optional: close it to keep exploring and reopen it from the pill under the round bar. Every ballot is fresh: never the map just played, and none of the previous ballot's maps while enough others exist (with nine maps, always three new ones). Ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event. Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
@@ -89,6 +89,8 @@ Nine arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vo
 | Verdant Bio-Dome | Solarpunk conservatory, bright sunbeams (~1,270 parts) | Four ancient trees, each with a low and a high white-steel glass lab on stilts (ladder shafts inside, a rope ramp between them); rope bridges between trees (cut them to strand the far side); a tiered greenhouse; a waterfall cliff with climbable ledges; hedges and pools. **Set-piece:** a 24-bay steel-and-glass dome. The God aims straight through the glass, impacts underneath crack the panels above, and breaking a bay's ribs drops its whole sheet of glass | Toxic spores to Y 18 |
 | Ironclad Armada | Stormy fleet: rain, lightning, black cliffs (~1,100 parts) | An aircraft carrier with four hangar halls under the flight deck (hatch ladders), a command island and radar lattice, parked jets and container stacks, flanked by two destroyers. Wooden gangplanks join the ships; the sea is deadly. **Set-piece:** break a destroyer section's bulkheads and it **lists** 16° toward the water (a second hit sinks it); yellow cranes topple across onto the carrier | Hurricane swell to Y 21 |
 | Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent; four 2-3 storey pavilions on their own piles, so they stay up when the pier around them breaks | Tide to Y 12 |
+
+Every arena also gets up to five small enterable **hideout sheds** dropped onto genuinely empty ground after it builds (`Config.Hideouts`, styled to the map's lighting).
 
 The three newest arenas are about 40% wider than the originals and lean on hiding: every highrise can have a ladder shaft (`Stairwell`) and half-height window walls (`Windows`), so upper floors are reachable and survivors can duck below the sills. `Builder.launchPad`, `Builder.spin`, `Builder.tilt` and `Builder.canopy` mark steam vents, spinning parts, listing ship sections and see-through glass roofs. Casts are allowed up to 55 studs past a map's own radius.
 
@@ -123,10 +125,34 @@ Every destructible part has health (from its material), a level, and a support f
 - **Audio cues:** each disaster has its own telegraph sound (`Config.Audio.AbilityCue`), and an air raid siren loops through Sudden Death.
 - **Hunter's Pulse:** in the last 20 s, if exactly one survivor is left and a human is God, that survivor is highlighted every 4 s so the round ends in a chase.
 
+## Chaos Twists, the Emergency Flare and God combos
+- **Chaos Twist** (`Config.Mutators`, MutatorService): right after the map vote, 20% of rounds roll one of six free mutators (equal odds). A banner announces it once the vote winner flashes, and a badge under the round bar shows it all round. Everything resets at round end.
+
+| Twist | Effect |
+|---|---|
+| Bouncy Rubble | Broken debris gets 0.85 restitution and bounces chaotically |
+| Gold Rush | Coins fall across the arena every 4 s (6 each) and round payouts are x1.5 |
+| Brittle Timber | Wood and glass take 2x structure damage; metal and stone are normal |
+| Twilight Storm | Darker sky and fog; telegraphs, pings and outlines stay bright neon |
+| Hyperdrive | Survivor dash and God Chaos Energy recharge 25% faster |
+| Air Drops | 2-3 glowing supply crates land mid-round: speed boost, a one-hit shield, or 40 coins |
+
+- **Emergency Flare** (`Config.Beacon`): with 30 s left a flare lights on the highest exposed rooftop. Survivors who stay within 9 studs of it for 4 s earn +150 coins (once each). The God can see it too, so hiding forever isn't the only play.
+- **God combos** (`Config.GodCombo`): destructive hits from different disasters chained within 5 s pay +6 Chaos Energy and +8 coins per extra link (up to x5); a whole building or floor collapsing pays +10 energy and +12 coins.
+- **Stress cues** (`Config.Stress`): when a damaged building is within 15% of collapsing, it groans loudly, dust sifts out and nearby cameras tremble, a split-second warning to dash out.
+- **Spectator cheers** (`Config.Cheers`): eliminated or waiting players pick a survivor in the spectate panel and spend coins on a Cheer (fireworks, 10), a Speed Berry (25) or a Bandage (+30 HP, 25).
+
+## Progression
+- **Mastery titles** (`Config.Mastery`, ProgressionService): profile counters unlock tiered titles: Runner I-V (rounds survived), Ghost Walker I-III (rounds survived without a single noise ripple), Daredevil I-III (taunts), Demolisher I-III (parts destroyed), and a God track per kit (Architect, Storm Herald, Magma Lord, Glitch King, World Ender I-V). The best one floats over your head in its colour, and new tiers pop a TITLE UNLOCKED toast.
+- **Daily streak chest** (`Config.Daily`): play on consecutive days to build a 7-day streak; the chest in the lodge pays today's reward once (day 3 adds a free spin token, day 7 the exclusive Golden Trail dash). Its label shows your own streak.
+- **First win of the day**: the first survived round and the first God win each day pay double.
+- **Play of the Match**: the round summary hands out superlative badges: Demolitionist (most parts broken), Closest Call (most near misses), Phantom (longest stealth streak) and Menace (most Daredevil taunts).
+
 ## Showdowns, taunts and the kill feed
 - **Last Stand** (`Config.Showdown`, ShowdownService): when a round that had 2+ survivors is down to one with at least 15 s left, everyone gets a LAST STAND banner and feed line, a heartbeat loops and the music switches to the boss track. The God sees a 40-stud zone around the survivor (offset up to 22 studs, refreshed every 5 s), and the survivor's dash recharges twice as fast and near misses pay double.
 - **Daredevil taunts** (`Config.Emotes`, EmoteService / EmoteController): a 😜 button above DASH (T on keyboard) opens Wave, Whistle, Scream and Dance (8 s cooldown, a bubble over your head, and noise). Emoting while HIDDEN is a Daredevil taunt: the God sees your silhouette for 1.5 s and gets a callout, and every coin you earn for 10 s is multiplied by 1.5. The button turns 😈 while you're hidden.
-- **Kill feed** (`Config.Feed`, FeedController): eliminations name what got you. "Flattened by Bay Hotel" if a building collapsed on you in the last 4 s, otherwise the last hit within 6 s ("was crushed by Meteors", "was electrocuted", "was swallowed by the rising lava", "fell into the void"...). Clutch callouts: "escaped Meteors by 2 studs!" for near misses within 3 studs, and "escaped the collapsing Fish Market!".
+- **Event feed** (`Config.Feed`, FeedController): top-right, under the coin counter, each line with a sticker icon. Near misses, escapes, kill credits and combos go here instead of the middle of the screen.
+- **Kill feed**: eliminations name what got you. "Flattened by Bay Hotel" if a building collapsed on you in the last 4 s, otherwise the last hit within 6 s ("was crushed by Meteors", "was electrocuted", "was swallowed by the rising lava", "fell into the void"...). Clutch callouts: "escaped Meteors by 2 studs!" for near misses within 3 studs, and "escaped the collapsing Fish Market!".
 - **Final kill:** the round's last elimination is posted as FINAL KILL, and every camera glides in on it with a desaturated grade and narrowed FOV for 2.4 s before everyone returns to the lodge.
 
 ## God kits
@@ -164,7 +190,15 @@ Chain Bolt hops between the nearest survivors, Eruption leaves a burning lava po
 ## Daily quests
 Three quests a day, the same for everyone: two drawn from `Config.Quests.Pool` plus "survive a round on the map of the day" (which gives the map vote a purpose). Claiming pays coins; claiming all three grants a wheel spin and extends a daily streak. Open them from the Quests tile or the lobby quest board.
 
+## Presentation and settings
+- **Round intro**: a 2.5 s swooping fly-by of the arena while the God's sky avatar fades in overhead. **Outro**: the camera sweeps up to the Hall of Legends.
+- **Danger edges**: a telegraph that lands outside your view pulses a red glow on that edge of the screen.
+- **Arena Cam**: a holographic screen in the lodge shows a live miniature of the match (big parts only, refreshed once a second, with survivors as green dots), so the lobby can watch buildings fall.
+- **UI juice**: spring-bounce buttons, a coin counter that rolls up, click / whoosh sounds.
+- **Quick settings** (gear tile, SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
+
 ## Prize wheel
+Every slice shows its icon, the prize in words ("1,500 COINS", "BE THE GOD", "FREE GOD KIT") and its odds.
 Players bank spins: one to start, a free one every 10 minutes (5 for VIP, banking stops at 3), one for finishing the daily quests, and Robux packs of 1 or 10. The server rolls the weighted reward and the wheel shows the real odds on every segment.
 
 | Reward | Odds |

@@ -30,6 +30,14 @@ end
 
 -- Adds trauma-style shake; falls off with distance from the camera when a centre is given.
 function EffectsController.Shake(intensity: number, _duration: number, center: Vector3?)
+	-- quick setting: camera shake strength (0 / 0.5 / 1)
+	local pref = game:GetService("Players").LocalPlayer:GetAttribute(Config.Attributes.SettingPrefix .. "Shake")
+	if typeof(pref) == "number" then
+		intensity *= pref
+		if intensity <= 0 then
+			return
+		end
+	end
 	local scale = 1
 	local camera = workspace.CurrentCamera
 	if center and camera then

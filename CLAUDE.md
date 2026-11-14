@@ -52,6 +52,9 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 - Set `UIListLayout.SortOrder = LayoutOrder` explicitly; the default sorts by name.
 - Each controller's ScreenGui gets `layer = Components.scaledRoot(gui)`; parent all content to `layer` (not `gui`) so the UI scales with the viewport.
 - Surfaces use the stud texture and lipped gradient from Components (`studs`, `gradient(..., lip)`); branch layout on `Components.isTouch()` for phones. Set the workspace attribute `ForceTouchUI = true` in Studio to preview the touch layout.
+- The look follows `StarterGui.UIReference` (disabled reference ScreenGui, keep it): heavy Montserrat with thick black outlines, square-cut studded blocks, cyan window headers with a separate red X block, black-outlined dark windows.
+- Icons are sticker images from `UI/Icons.luau` (three 1024px sprite sheets; regenerate with `tools/icons/gen_icons.py` and re-upload). Use `Components.icon` / `Components.tile`: they take an icon name ("Shop") or a config emoji ("⚡") and fall back to text for anything unmapped.
+- New ScreenGuis set `ZIndexBehavior = Sibling`, or a window's background draws over its own content.
 
 ## Audio
 - All sound IDs and volumes live in `Config.Audio`. World/disaster sounds go through `AudioService` (server, positional); UI sounds through `UI/Sound.luau`; music and ambience through `AudioController`.

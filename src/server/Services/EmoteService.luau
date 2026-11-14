@@ -13,6 +13,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local AudioService = require(script.Parent.AudioService)
 local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
+local ProgressionService = require(script.Parent.ProgressionService)
 local StealthService = require(script.Parent.StealthService)
 
 local E = Config.Emotes
@@ -76,6 +77,8 @@ local function onEmote(player: Player, id: any)
 	if wasHidden then
 		-- Daredevil: give yourself away for a coin multiplier
 		player:SetAttribute(Attributes.DaredevilUntil, workspace:GetServerTimeNow() + E.DaredevilSeconds)
+		ScoringService.GetRecord(player).Taunts += 1
+		ProgressionService.AddMastery(player, "Taunts", 1)
 		StealthService.Noise(player, 2)
 		local god = RoleService.GetGod()
 		if god then

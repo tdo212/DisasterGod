@@ -28,6 +28,9 @@ type Jam = { Position: Vector3, Radius: number, Until: number }
 local clientEffect = Remotes.get("ClientEffect")
 local stillFor: { [Player]: number } = {}
 local lastNoise: { [Player]: number } = {}
+local ripples: { [Player]: number } = {} -- noise ripples made this round (Ghost Walker)
+local hiddenFor: { [Player]: number } = {} -- current hidden streak (seconds)
+local hiddenBest: { [Player]: number } = {} -- longest hidden streak this round (Phantom)
 local indoors: { [Player]: boolean } = {}
 local jams: { Jam } = {}
 local rayParams = RaycastParams.new()
@@ -84,6 +87,7 @@ function StealthService.Noise(player: Player, strength: number?)
 		return
 	end
 	lastNoise[player] = now
+	ripples[player] = (ripples[player] or 0) + 1
 	if god and not StealthService.IsJammed(hrp.Position) then
 		clientEffect:FireClient(god, "Noise", hrp.Position, strength or 1)
 	end
@@ -141,6 +145,8 @@ local function tick()
 		if player:GetAttribute(HIDDEN) ~= hidden then
 			player:SetAttribute(HIDDEN, hidden)
 		end
+		hiddenFor[player] = if hidden then (hiddenFor[player] or 0) + S.CheckInterval else 0
+		hiddenBest[player] = math.max(hiddenBest[player] or 0, hiddenFor[player])
 	end
 	-- anyone no longer an alive survivor is never hidden
 	for _, player in Players:GetPlayers() do
@@ -150,10 +156,23 @@ local function tick()
 	end
 end
 
+-- Noise ripples this player made this round.
+function StealthService.Ripples(player: Player): number
+	return ripples[player] or 0
+end
+
+-- Longest hidden streak this round, in seconds.
+function StealthService.HiddenBest(player: Player): number
+	return hiddenBest[player] or 0
+end
+
 function StealthService.Reset()
 	table.clear(jams)
 	table.clear(stillFor)
 	table.clear(indoors)
+	table.clear(ripples)
+	table.clear(hiddenFor)
+	table.clear(hiddenBest)
 end
 
 function StealthService.Init()
@@ -170,6 +189,9 @@ function StealthService.Init()
 		stillFor[player] = nil
 		lastNoise[player] = nil
 		indoors[player] = nil
+		ripples[player] = nil
+		hiddenFor[player] = nil
+		hiddenBest[player] = nil
 	end)
 	task.spawn(function()
 		while true do

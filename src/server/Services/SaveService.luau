@@ -95,6 +95,15 @@ function SaveService.AllowHit(player: Player, humanoid: Humanoid, damage: number
 	if SaveService.TryAegis(player, humanoid, damage) then
 		return false
 	end
+	-- an air-drop shield soaks one whole hit
+	local shields = player:GetAttribute(Config.Attributes.ShieldCharges)
+	if typeof(shields) == "number" and shields > 0 then
+		player:SetAttribute(Config.Attributes.ShieldCharges, shields - 1)
+		mercyUntil[player] = now + Config.Feel.MercySeconds
+		Remotes.get("ClientEffect"):FireClient(player, "Mercy", Config.Feel.MercySeconds)
+		Remotes.get("Popup"):FireClient(player, "🛡️ SHIELD BLOCKED A HIT", Color3.fromRGB(120, 200, 255))
+		return false
+	end
 	mercyUntil[player] = now + Config.Feel.MercySeconds
 	Remotes.get("ClientEffect"):FireClient(player, "Mercy", Config.Feel.MercySeconds)
 	return true

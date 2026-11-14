@@ -75,6 +75,9 @@ local function dash()
 	if player:GetAttribute(Attributes.LastStander) == true then
 		cooldown *= Config.Showdown.DashCooldownScale -- Last Stand: dash recharges twice as fast
 	end
+	if ReplicatedStorage:GetAttribute(Attributes.Mutator) == "Hyperdrive" then
+		cooldown /= Config.Mutators.HyperdriveScale -- Chaos Twist: dash recharges 25% faster
+	end
 	dashReadyAt = now + cooldown
 	local dir = humanoid.MoveDirection
 	if dir.Magnitude < 0.1 then
@@ -101,7 +104,9 @@ local function dash()
 	trail.Attachment0 = trailA
 	trail.Attachment1 = trailB
 	trail.Lifetime = 0.25
-	trail.Color = if player:GetAttribute(Attributes.PassPrefix .. "VIP") == true
+	trail.Color = if player:GetAttribute(Attributes.GoldenTrail) == true and player:GetAttribute(Attributes.PassPrefix .. "VIP") ~= true
+		then ColorSequence.new(Color3.fromRGB(255, 240, 150), Color3.fromRGB(255, 170, 30)) -- day-7 streak reward
+		elseif player:GetAttribute(Attributes.PassPrefix .. "VIP") == true
 		then ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
 			ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 220, 60)),
@@ -254,7 +259,7 @@ local function buildGui()
 		Components.stroke(b, Theme.Stroke.Heavy)
 		Components.gradient(b, def.Color:Lerp(Color3.new(1, 1, 1), 0.35), def.Color)
 		b.Parent = gearBar
-		Components.label({ Name = "Icon", Text = def.Icon, TextSize = 34, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = b })
+		Components.icon({ Name = "Icon", Icon = def.Id, TextSize = 34, Size = UDim2.fromScale(0.78, 0.78), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = b })
 		if not Components.isTouch() then
 			Components.label({ Name = "Key", Text = def.Key, TextSize = 16, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = b })
 		end

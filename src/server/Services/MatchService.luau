@@ -29,6 +29,7 @@ local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
 local ShopService = require(script.Parent.ShopService)
 local VoteService = require(script.Parent.VoteService)
+local MutatorService = require(script.Parent.MutatorService)
 
 type RoundPhase = Types.RoundPhase
 type SubPhase = Types.SubPhase
@@ -328,6 +329,8 @@ local function intermission(): (boolean, string)
 	else
 		mapName = MapService.NextMapName()
 	end
+	-- Chaos Twist: rolled right after the vote (the client shows it once the winner flashes)
+	MutatorService.Roll()
 	ReplicatedStorage:SetAttribute(Attributes.MapName, "Building…")
 
 	local info = MapService.Build(mapName)
@@ -373,6 +376,7 @@ local function active(god: Player?)
 	ShowdownService.Reset()
 	finalKill = false
 	DisasterService.BeginRound(god)
+	MutatorService.BeginRound()
 	ShopService.SetRoundActive(true)
 	PropService.SetRoundActive(true)
 	setPhase("Active", M.RoundDuration)
@@ -407,6 +411,7 @@ local function active(god: Player?)
 			break -- everyone is out: skip straight to the podium
 		end
 		DisasterService.SetHunterPulse(aliveCount == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
+		MutatorService.Update(state.TimeRemaining, M.RoundDuration, 1)
 		ShowdownService.Update(RoleService.GetAliveSurvivors(), state.TimeRemaining)
 	end
 end
@@ -438,6 +443,7 @@ local function roundEnd(mapName: string)
 	end
 
 	local summaries = ScoringService.FinishRound(mapName, god, list)
+	MutatorService.EndRound() -- after payouts (Gold Rush reads the twist)
 	for p, summary in summaries do
 		Remotes.get("RoundSummary"):FireClient(p, summary)
 	end
@@ -546,6 +552,7 @@ function MatchService.Start()
 			if not ok then
 				warn("[MatchService] round cycle error:", err)
 				DisasterService.EndRound()
+				MutatorService.EndRound()
 				RoleService.ResetAll()
 				task.wait(2)
 			end

@@ -16,15 +16,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Builder = require(script.Parent.Builder)
 local Types = require(ReplicatedStorage.Shared.Types)
 
-local GRASS = Color3.fromRGB(92, 160, 70)
-local MOSS = Color3.fromRGB(70, 128, 58)
-local LEAF = Color3.fromRGB(64, 150, 64)
-local LEAF_LIGHT = Color3.fromRGB(110, 190, 80)
+local GRASS = Color3.fromRGB(118, 180, 58)
+local MOSS = Color3.fromRGB(92, 150, 52)
+local LEAF = Color3.fromRGB(82, 165, 58)
+local LEAF_LIGHT = Color3.fromRGB(140, 205, 70)
 local BARK = Color3.fromRGB(104, 72, 48)
 local ROCK = Color3.fromRGB(122, 118, 110)
 local WHITE = Color3.fromRGB(232, 238, 236)
 local STEEL = Color3.fromRGB(176, 186, 190)
-local GLASS = Color3.fromRGB(196, 236, 236)
+local GLASS = Color3.fromRGB(228, 242, 236)
 local WATER = Color3.fromRGB(70, 170, 210)
 local PLANK = Color3.fromRGB(176, 136, 90)
 local ROPE = Color3.fromRGB(196, 170, 120)
@@ -134,7 +134,7 @@ local function dome(model: Model)
 				CFrame = CFrame.lookAt(c, c + normal, up),
 				Color = GLASS,
 				Material = Enum.Material.Glass,
-				Transparency = 0.6,
+				Transparency = 0.72,
 				CastShadow = false,
 			})
 			Builder.structural(panel, 2, false, 45)

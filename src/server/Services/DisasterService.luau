@@ -148,10 +148,45 @@ local function blast(center: Vector3, radius: number, damage: number, caster: Pl
 	ScoringService.CheckNearMiss(center, radius, cause)
 end
 
+-- God combos (Config.GodCombo): destructive hits from *different* disasters chained
+-- within a few seconds pay bonus Chaos Energy and coins, so mixing powers beats spamming.
+local GC = Config.GodCombo
+local lastCastId: { [Player]: string } = {}
+local chains: { [Player]: { At: number, Ids: { [string]: boolean }, Links: number } } = {}
+local bonusEnergy: (Player, number) -> () -- set below once pools exist
+
+local function comboLink(caster: Player)
+	local id = lastCastId[caster]
+	if not id then
+		return
+	end
+	local now = os.clock()
+	local chain = chains[caster]
+	if not chain or now - chain.At > GC.Window then
+		chain = { At = now, Ids = {}, Links = 0 }
+		chains[caster] = chain
+	end
+	chain.At = now
+	if chain.Ids[id] then
+		return
+	end
+	chain.Ids[id] = true
+	chain.Links += 1
+	if chain.Links >= 2 then
+		local links = math.min(chain.Links, GC.MaxLinks)
+		local energy = GC.EnergyPerLink * (links - 1)
+		bonusEnergy(caster, energy)
+		ScoringService.Award(caster, GC.CoinsPerLink * (links - 1), string.format("COMBO x%d (+%d ENERGY)", links, energy), Color3.fromRGB(255, 200, 60))
+	end
+end
+
 local function creditDestruction(caster: Player?, count: number)
 	ScoringService.RecordDestruction(caster, count)
 	if caster and count >= 6 then
 		ScoringService.Notify(caster, string.format("DESTRUCTION x%d", count), ORANGE)
+	end
+	if caster and count >= GC.MinParts then
+		comboLink(caster)
 	end
 end
 
@@ -1101,6 +1136,11 @@ local function poolFor(key: any): Pool
 	return pool
 end
 
+bonusEnergy = function(player: Player, amount: number)
+	local pool = poolFor(player)
+	pool.Energy = math.min(Chaos.Max, pool.Energy + amount)
+end
+
 local function publish(player: Player?)
 	if not player then
 		return
@@ -1127,6 +1167,9 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	end
 	pool.Energy -= def.Cost
 	pool.Ready[id] = now + def.Cooldown
+	if caster then
+		lastCastId[caster] = id
+	end
 	publish(caster)
 
 	local dir = Vector3.new(1, 0, 0)
@@ -1347,6 +1390,8 @@ function DisasterService.EndRound()
 	CosmeticService.SetGod(nil)
 	ReplicatedStorage:SetAttribute(Attributes.CastingOpen, false)
 	table.clear(pools)
+	table.clear(chains)
+	table.clear(lastCastId)
 end
 
 function DisasterService.Init()
@@ -1371,6 +1416,12 @@ function DisasterService.Init()
 
 	-- big collapses rattle every camera nearby
 	DestructionService.Collapsed:Connect(function(_building: Model, center: Vector3, size: Vector3)
+		-- a whole floor / building coming down rewards the human God
+		local god = state.God
+		if god and state.Active and state.CastingOpen and size.Magnitude >= GC.CollapseMinSize then
+			bonusEnergy(god, GC.CollapseEnergy)
+			ScoringService.Award(god, GC.CollapseCoins, string.format("COLLAPSE COMBO (+%d ENERGY)", GC.CollapseEnergy), Color3.fromRGB(255, 160, 60))
+		end
 		local J = Config.Juice
 		shakeAll(math.min(J.CollapseShakeMax, J.CollapseShakeBase + size.Magnitude * J.CollapseShakePerStud), 0.6, center)
 		sound("Debris", center, 1.6, 0.9 + math.random() * 0.2)
@@ -1396,6 +1447,9 @@ function DisasterService.Init()
 			return
 		end
 		local mult = if state.SuddenDeath then Chaos.SuddenDeathRegenMultiplier else 1
+		if ReplicatedStorage:GetAttribute(Attributes.Mutator) == "Hyperdrive" then
+			mult *= Config.Mutators.HyperdriveScale -- Chaos Twist: everything recharges faster
+		end
 		for _, pool in pools do
 			pool.Energy = math.min(Chaos.Max, pool.Energy + Chaos.RegenPerSecond * mult * dt)
 		end

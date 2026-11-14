@@ -25,6 +25,9 @@ local NAMES = {
 	"CosmeticAction", -- C->S ("Buy" | "Equip", cosmeticId) coin cosmetics + equipping
 	"GodAim", -- C->S (Vector3) the God's reticle, throttled, drives the sky skin
 	"MapVote", -- C->S (candidateIndex) intermission map vote
+	"Cheer", -- C->S (kind, targetUserId) spectator cheers / aid, paid in coins
+	"ClaimStreak", -- C->S () open today's lodge streak chest
+	"SaveSetting", -- C->S (key, value) quick settings (LowFx, Shake, Music, Sfx)
 }
 
 local Remotes = {}

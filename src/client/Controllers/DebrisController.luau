@@ -82,6 +82,9 @@ local function onRubble(batch: any)
 	if typeof(batch) ~= "table" then
 		return
 	end
+	if game:GetService("Players").LocalPlayer:GetAttribute(Config.Attributes.SettingPrefix .. "LowFx") == true then
+		return -- Low-FX mode: no client rubble at all
+	end
 	local cap = if touch then DB.TouchClientCap else DB.ClientCap
 	local lifetime = if touch then DB.TouchClientLifetime else DB.ClientLifetime
 	for _, entry in batch do

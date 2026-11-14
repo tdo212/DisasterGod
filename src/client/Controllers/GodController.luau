@@ -23,7 +23,7 @@ local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Component
 local OrbitCamera = require(ClientRoot:WaitForChild("Util"):WaitForChild("OrbitCamera") :: ModuleScript)
 
 type Ability = Types.AbilityDefinition
-type Slot = { Frame: TextButton, Cooldown: Frame, CooldownText: TextLabel, Icon: TextLabel, Stroke: UIStroke, Scale: UIScale }
+type Slot = { Frame: TextButton, Cooldown: Frame, CooldownText: TextLabel, Icon: GuiObject, Stroke: UIStroke, Scale: UIScale }
 
 local Attributes = Config.Attributes
 local C = Theme.Colors
@@ -132,7 +132,7 @@ local function buildSlots()
 		local scale = Instance.new("UIScale")
 		scale.Parent = slot
 
-		local icon = Components.label({ Name = "Icon", Text = def.Icon, TextSize = 38, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = slot })
+		local icon = Components.icon({ Name = "Icon", Icon = def.Id, TextSize = 38, Size = UDim2.fromScale(0.8, 0.8), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = slot })
 		if not touch then
 			Components.label({ Name = "Key", Text = tostring(i), TextSize = 18, Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(4, 2), XAlign = Enum.TextXAlignment.Left, Parent = slot })
 		end
@@ -358,7 +358,7 @@ local function refreshHotbar()
 			slot.Cooldown.Size = UDim2.fromScale(1, 0)
 			slot.CooldownText.Text = ""
 		end
-		slot.Icon.TextTransparency = if e >= def.Cost then 0 else 0.6
+		Components.setIconTransparency(slot.Icon, if e >= def.Cost then 0 else 0.6)
 	end
 	if ReplicatedStorage:GetAttribute(Attributes.CastingOpen) ~= true then
 		local t = ReplicatedStorage:GetAttribute(Attributes.TimeRemaining) :: number? or 0

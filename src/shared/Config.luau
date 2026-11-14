@@ -570,6 +570,7 @@ local Config = {
 
 	-- Kill feed and clutch callouts.
 	Feed = {
+		TopOffset = 112, -- feed starts this far down the right edge (under the coin counter)
 		MaxLines = 5,
 		LineSeconds = 6,
 		CauseWindow = 6, -- a hit this recent names the cause of death
@@ -628,6 +629,127 @@ local Config = {
 		CollapseShakeMax = 1.3,
 		ImpactFovKick = 7,
 		ImpactThreshold = 0.75, -- shake intensity that also triggers the FOV punch
+	},
+
+	-- Chaos Twist: a free, server-rolled round mutator on some rounds (MutatorService).
+	Mutators = {
+		Chance = 0.2, -- of rounds, rolled right after the map vote
+		Pool = {
+			{ Id = "BouncyRubble", Name = "Bouncy Rubble", Icon = "🎲", Description = "Rubble bounces like rubber", Color = Color3.fromRGB(255, 120, 200) },
+			{ Id = "GoldRush", Name = "Gold Rush", Icon = "🪙", Description = "Coins rain down and payouts are x1.5", Color = Color3.fromRGB(255, 210, 60) },
+			{ Id = "BrittleTimber", Name = "Brittle Timber", Icon = "💥", Description = "Wood and glass break twice as fast", Color = Color3.fromRGB(230, 150, 80) },
+			{ Id = "TwilightStorm", Name = "Twilight Storm", Icon = "⛈️", Description = "Darker skies, same bright warnings", Color = Color3.fromRGB(130, 140, 255) },
+			{ Id = "Hyperdrive", Name = "Hyperdrive", Icon = "💨", Description = "Dash and Chaos Energy recharge 25% faster", Color = Color3.fromRGB(90, 230, 255) },
+			{ Id = "AirDrops", Name = "Air Drops", Icon = "📦", Description = "Supply crates land mid-round", Color = Color3.fromRGB(120, 240, 120) },
+		} :: { { Id: string, Name: string, Icon: string, Description: string, Color: Color3 } },
+		BouncyRestitution = 0.85,
+		BrittleScale = 2, -- wood and glass structure damage
+		BrittleMaterials = { "Wood", "WoodPlanks", "Glass" } :: { string },
+		HyperdriveScale = 1.25, -- dash recharge and Chaos Energy regen speed
+		GoldRushPayout = 1.5,
+		GoldRushInterval = 4, -- seconds between falling coins
+		GoldRushCoins = 6, -- per coin picked up
+		GoldRushPerWave = 3,
+		AirDropCount = { 2, 3 },
+		AirDropSpeedSeconds = 6,
+		AirDropSpeed = 30,
+		AirDropCoins = 40,
+		PickupLifetime = 20,
+		BannerSeconds = 4,
+	},
+
+	-- God combos: chaining different disasters that each break things, or dropping a
+	-- whole floor at once, pays bonus Chaos Energy and coins (DisasterService).
+	GodCombo = {
+		Window = 5, -- seconds between destructive casts to keep the chain alive
+		MinParts = 3, -- a cast must break this many parts to count as a link
+		EnergyPerLink = 6,
+		CoinsPerLink = 8,
+		MaxLinks = 5,
+		CollapseEnergy = 10, -- a whole building / floor coming down
+		CollapseCoins = 12,
+		CollapseMinSize = 24, -- bounding-box diagonal: crates and lamps don't count
+	},
+
+	-- Late-round Emergency Flare on an exposed rooftop (MutatorService).
+	Beacon = {
+		StartAt = 30, -- seconds left in the round
+		HoldSeconds = 4,
+		Radius = 9,
+		Coins = 150,
+		Samples = 24, -- rooftop candidates tried
+	},
+
+	-- Stress cues before a weakened building gives way (DestructionService).
+	Stress = {
+		Margin = 0.15, -- within this much of the collapse fraction counts as "about to go"
+		ShakeRadius = 45,
+		Shake = 0.25,
+		Cooldown = 1.2,
+	},
+
+	-- Spectator cheers / aid: eliminated or waiting players spend coins (ProgressionService).
+	Cheers = {
+		Cheer = { Cost = 10, Icon = "🎆", Name = "Cheer" },
+		Berry = { Cost = 25, Icon = "🫐", Name = "Speed Berry", Speed = 26, Seconds = 5 },
+		Bandage = { Cost = 25, Icon = "🩹", Name = "Bandage", Heal = 30 },
+		Cooldown = 6,
+	},
+
+	-- Mastery tracks: counters on the profile unlock tiered titles shown over your head.
+	Mastery = {
+		Tracks = {
+			{ Id = "Runner", Stat = "Survive", Name = "Runner", Tiers = { 1, 5, 15, 40, 100 }, Color = Color3.fromRGB(120, 240, 120) },
+			{ Id = "Ghost", Stat = "Ghost", Name = "Ghost Walker", Tiers = { 1, 5, 20 }, Color = Color3.fromRGB(190, 220, 255) },
+			{ Id = "Daredevil", Stat = "Taunts", Name = "Daredevil", Tiers = { 10, 50, 200 }, Color = Color3.fromRGB(255, 90, 160) },
+			{ Id = "Demolisher", Stat = "Destroy", Name = "Demolisher", Tiers = { 500, 2500, 10000 }, Color = Color3.fromRGB(255, 150, 60) },
+			{ Id = "Architect", Stat = "GodWin:Architect", Name = "Architect", Tiers = { 1, 3, 10, 25, 50 }, Color = Color3.fromRGB(170, 120, 255) },
+			{ Id = "Storm", Stat = "GodWin:Storm", Name = "Storm Herald", Tiers = { 1, 3, 10, 25, 50 }, Color = Color3.fromRGB(90, 170, 255) },
+			{ Id = "Magma", Stat = "GodWin:Magma", Name = "Magma Lord", Tiers = { 1, 3, 10, 25, 50 }, Color = Color3.fromRGB(255, 120, 50) },
+			{ Id = "Glitch", Stat = "GodWin:Glitch", Name = "Glitch King", Tiers = { 1, 3, 10, 25, 50 }, Color = Color3.fromRGB(255, 80, 210) },
+			{ Id = "Cataclysm", Stat = "GodWin:Cataclysm", Name = "World Ender", Tiers = { 1, 3, 10, 25, 50 }, Color = Color3.fromRGB(150, 90, 255) },
+		} :: { { Id: string, Stat: string, Name: string, Tiers: { number }, Color: Color3 } },
+		Numerals = { "I", "II", "III", "IV", "V" } :: { string },
+	},
+
+	-- 7-day play streak chest in the lodge, and the first-win-of-the-day bonus.
+	Daily = {
+		Rewards = {
+			{ Coins = 100 },
+			{ Coins = 150 },
+			{ Coins = 100, Spins = 1 }, -- day 3: a free spin token
+			{ Coins = 250 },
+			{ Coins = 300 },
+			{ Coins = 400 },
+			{ Coins = 750, GoldenTrail = true }, -- day 7: the exclusive Golden Trail dash
+		} :: { { Coins: number, Spins: number?, GoldenTrail: boolean? } },
+		FirstWinMultiplier = 2, -- first survived round and first God win each day
+		ChestOffset = Vector3.new(-20, 0, -30), -- in the lodge, from LobbyOrigin
+	},
+
+	-- Round-end superlatives on the summary screen.
+	Awards = {
+		{ Id = "Demolitionist", Name = "Demolitionist", Icon = "💥", Stat = "Destroyed", Text = "most parts broken" },
+		{ Id = "ClosestCall", Name = "Closest Call", Icon = "💨", Stat = "NearMisses", Text = "most near misses" },
+		{ Id = "Phantom", Name = "Phantom", Icon = "👁️", Stat = "HiddenBest", Text = "longest stealth streak" },
+		{ Id = "Menace", Name = "Menace", Icon = "😜", Stat = "Taunts", Text = "most Daredevil taunts" },
+	} :: { { Id: string, Name: string, Icon: string, Stat: string, Text: string } },
+
+	-- Small hideout sheds scattered into open ground on every arena (MapService).
+	Hideouts = {
+		PerMap = 5,
+		Size = Vector3.new(14, 12, 12),
+		Tries = 40,
+	},
+
+	-- Client presentation: round intro fly-by, end-of-round pan, danger edge pulse.
+	Presentation = {
+		IntroSeconds = 2.5,
+		OutroSeconds = 2.2,
+		DangerDot = 0.35, -- telegraphs outside this view cone pulse the screen edge
+		DangerRange = 90,
+		ArenaCamInterval = 1, -- seconds between lobby Arena Cam refreshes
+		ArenaCamMinSize = 6, -- parts smaller than this (largest axis) are skipped
 	},
 
 	Disasters = {
@@ -912,6 +1034,19 @@ local Config = {
 			VerdantDome = "🌿",
 			IroncladArmada = "⚓",
 		} :: { [string]: string },
+		-- cinematic shots of each arena for the map vote cards (captured in Studio, 384x512)
+		MapThumbnails = {
+			ChronoSpire = "rbxassetid://140325150916621",
+			VerdantDome = "rbxassetid://113155266025422",
+			IroncladArmada = "rbxassetid://84718600640535",
+			FractureBay = "rbxassetid://106157294494912",
+			NeoShibuya = "rbxassetid://127124903661791",
+			MagmaCore = "rbxassetid://85217236615159",
+			SunscorchedMirage = "rbxassetid://109383400239121",
+			OutpostZero = "rbxassetid://89934695715065",
+			StarlightBoardwalk = "rbxassetid://110223167570976",
+		} :: { [string]: string },
+		NewMaps = { ChronoSpire = true, VerdantDome = true, IroncladArmada = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
 	},
 
@@ -992,6 +1127,16 @@ local Config = {
 		EquipPrefix = "Equip_", -- Player: equipped cosmetic id per category
 		SavePrefix = "Save_", -- Player: panic save charges
 		GodAim = "GodAim", -- ReplicatedStorage: the human God's reticle (Vector3), nil when none
+		Mutator = "Mutator", -- ReplicatedStorage: active Chaos Twist id ("" = none)
+		BeaconAt = "BeaconAt", -- ReplicatedStorage: Emergency Flare position (Vector3), nil when none
+		Title = "Title", -- Player: best mastery title ("" = none)
+		TitleColor = "TitleColor", -- Player: Color3 of that title
+		LoginStreak = "LoginStreak", -- Player: current daily play streak (days)
+		StreakReady = "StreakReady", -- Player: today's streak chest can be claimed
+		GoldenTrail = "GoldenTrail", -- Player: owns the day-7 Golden Trail dash
+		SpeedUntil = "SpeedUntil", -- Player: server time a speed pickup ends
+		ShieldCharges = "ShieldCharges", -- Player: one-hit shields from air drops
+		SettingPrefix = "Set_", -- Player: saved quick settings (LowFx, Shake, Music, Sfx)
 		GodSkin = "GodSkin", -- ReplicatedStorage: the human God's equipped skin id ("" = none)
 	},
 }

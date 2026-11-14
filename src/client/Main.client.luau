@@ -19,6 +19,7 @@ local order = {
 	"VoteController",
 	"FeelController",
 	"CosmeticController",
+	"SettingsController",
 	"HUDController",
 	"SurvivorController",
 	"GodController",
@@ -28,6 +29,7 @@ local order = {
 	"MenuController",
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
 	"SaveController",
+	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)
 }
 
 for _, name in order do

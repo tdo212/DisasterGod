@@ -132,15 +132,15 @@ local PRESETS: { [string]: Preset } = {
 	Conservatory = {
 		ClockTime = 12.5,
 		Brightness = 3,
-		Ambient = Color3.fromRGB(90, 110, 90),
-		OutdoorAmbient = Color3.fromRGB(150, 175, 150),
-		Tint = Color3.fromRGB(240, 255, 238),
-		Saturation = 0.22,
-		Contrast = 0.05,
-		AtmosphereColor = Color3.fromRGB(215, 240, 220),
-		AtmosphereDecay = Color3.fromRGB(150, 200, 170),
-		Density = 0.3,
-		Haze = 1.1,
+		Ambient = Color3.fromRGB(105, 110, 80),
+		OutdoorAmbient = Color3.fromRGB(170, 175, 135),
+		Tint = Color3.fromRGB(255, 252, 230),
+		Saturation = 0.25,
+		Contrast = 0.06,
+		AtmosphereColor = Color3.fromRGB(235, 240, 210),
+		AtmosphereDecay = Color3.fromRGB(190, 210, 150),
+		Density = 0.26,
+		Haze = 0.9,
 		Bloom = 0.2,
 	},
 	-- Ironclad Armada: dark overcast storm, driving rain (client weather adds the flashes)
@@ -190,6 +190,15 @@ local function moodValues(mood: string): Mood?
 			Contrast = p.Contrast + 0.07,
 			AtmosphereColor = p.AtmosphereColor:Lerp(Color3.fromRGB(120, 125, 150), 0.6),
 			Haze = p.Haze + 1.2,
+		}
+	elseif mood == "Twilight" then
+		-- Chaos Twist: a darker, moodier sky; telegraphs and outlines are neon so they stay readable
+		return {
+			Brightness = p.Brightness * 0.62,
+			Tint = p.Tint:Lerp(Color3.fromRGB(190, 195, 255), 0.45),
+			Contrast = p.Contrast + 0.1,
+			AtmosphereColor = p.AtmosphereColor:Lerp(Color3.fromRGB(90, 95, 140), 0.55),
+			Haze = p.Haze + 0.8,
 		}
 	elseif mood == "SuddenDeath" then
 		return {

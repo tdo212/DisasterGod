@@ -24,6 +24,17 @@ local AudioService = require(script.Parent.AudioService)
 
 local DC = Config.Destruction
 local DB = Config.Debris
+local MU = Config.Mutators
+local ST = Config.Stress
+local BRITTLE: { [Enum.Material]: boolean } = {}
+for _, name in MU.BrittleMaterials do
+	BRITTLE[(Enum.Material :: any)[name]] = true
+end
+local BOUNCY = PhysicalProperties.new(0.7, 0.3, MU.BouncyRestitution, 1, 100)
+
+local function mutator(): any
+	return ReplicatedStorage:GetAttribute(Config.Attributes.Mutator)
+end
 local DEBRIS_TAG = "Debris"
 
 local DestructionService = {}
@@ -84,6 +95,9 @@ local function fade(part: BasePart)
 end
 
 local function trackDebris(part: BasePart)
+	if mutator() == "BouncyRubble" then
+		part.CustomPhysicalProperties = BOUNCY -- Chaos Twist: rubble bounces like rubber
+	end
 	table.insert(debrisList, part)
 	CollectionService:AddTag(part, DEBRIS_TAG)
 	task.delay(DC.DebrisLifetime + math.random() * DC.DebrisLifetimeJitter, fade, part)
@@ -276,11 +290,22 @@ local function checkStability(building: Model, from: Vector3?): number
 	end
 	if failing == nil then
 		-- damaged but still standing: groan as a warning to anyone inside
+		local weakest = 1
 		for l, t in total do
 			if (intact[l] or 0) < t then
-				AudioService.playAt("Creak", building:GetPivot().Position, 1.8, 0.9 + math.random() * 0.3, DC.CreakCooldown)
-				break
+				weakest = math.min(weakest, (intact[l] or 0) / t)
 			end
+		end
+		if weakest < 1 then
+			AudioService.playAt("Creak", building:GetPivot().Position, 1.8, 0.9 + math.random() * 0.3, DC.CreakCooldown)
+		end
+		-- about to give way: dust sifts down and nearby cameras tremble (a split-second to dash out)
+		local last = building:GetAttribute("StressAt")
+		if weakest < DC.CollapseSupportFraction + ST.Margin and (typeof(last) ~= "number" or os.clock() - last > ST.Cooldown) then
+			building:SetAttribute("StressAt", os.clock())
+			local cf, size = building:GetBoundingBox()
+			AudioService.playAt("Creak", cf.Position, 2.6, 0.7, 0)
+			Remotes.get("ClientEffect"):FireAllClients("Stress", cf.Position, size, ST.ShakeRadius, ST.Shake)
 		end
 		return 0
 	end
@@ -351,6 +376,9 @@ local function applyDamage(parts: { BasePart }, damage: number, from: Vector3?, 
 	for _, part in parts do
 		if isIntact(part) then
 			local hit = damage * (if scale then scale[part.Material] or 1 else 1)
+			if BRITTLE[part.Material] and mutator() == "BrittleTimber" then
+				hit *= MU.BrittleScale
+			end
 			local health = (part:GetAttribute("Health") :: number? or DC.DefaultHealth) - hit
 			part:SetAttribute("Health", health)
 			local building = buildingOf(part)

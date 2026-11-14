@@ -1,5 +1,6 @@
 --!strict
--- FeedController: the kill feed / clutch callout stack under the round bar, the Last
+-- FeedController: the event feed in the top-right corner (eliminations of every kind,
+-- near misses, escapes, kill credits and combos, each with a sticker icon), the Last
 -- Stand zone the God sees, and the final-kill camera moment for everyone.
 
 local Debris = game:GetService("Debris")
@@ -15,6 +16,7 @@ local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 
 local UI = script.Parent.Parent:WaitForChild("UI")
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
+local Icons = require(UI:WaitForChild("Icons") :: ModuleScript)
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 
 local F = Config.Feed
@@ -31,18 +33,49 @@ local lines: { Frame } = {}
 local order = 0
 local finalPlaying = false
 
+local WIDTH = 330
+
+-- A leading emoji becomes a sticker icon on the left of the line.
+local function iconFor(text: string): (string?, string)
+	local first, rest = string.match(text, "^(%S+)%s+(.+)$")
+	if first and Icons.has(first) then
+		return first, rest :: string
+	end
+	local upper = string.upper(text)
+	if string.find(upper, "NEAR MISS", 1, true) or string.find(upper, "ESCAPE", 1, true) then
+		return "Dash", text
+	elseif string.find(upper, "ELIMINATED", 1, true) then
+		return "Skull", text
+	elseif string.find(upper, "COMBO", 1, true) then
+		return "Star", text
+	elseif string.find(text, "+", 1, true) then
+		return "Coin", text
+	end
+	return nil, text
+end
+
 local function push(text: string, color: Color3?)
 	order += 1
+	local icon, body = iconFor(text)
 	local row = Components.panel({
 		Name = "Line",
-		Size = UDim2.fromOffset(460, 26),
-		Color = C.Panel,
-		Transparency = 0.25,
+		Size = UDim2.fromOffset(WIDTH, 30),
+		Color = C.Window,
+		Transparency = 0.2,
 		Studs = false,
 		Parent = list,
 	})
 	row.LayoutOrder = -order -- newest on top
-	Components.label({ Name = "Text", Text = text, TextSize = 17, Color = color or C.Text, Size = UDim2.new(1, -12, 1, 0), Position = UDim2.fromOffset(6, 0), Parent = row })
+	if icon then
+		Components.icon({ Name = "Icon", Icon = icon, Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(4, 2), Parent = row })
+	end
+	local label = Components.label({ Name = "Text", Text = body, TextSize = 15, Color = color or C.Text, Size = UDim2.new(1, if icon then -40 else -12, 1, 0), Position = UDim2.fromOffset(if icon then 34 else 6, 0), XAlign = Enum.TextXAlignment.Left, Parent = row })
+	label.TextTruncate = Enum.TextTruncate.AtEnd
+	-- slide in from the right edge
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.6
+	scale.Parent = row
+	Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
 	table.insert(lines, row)
 	while #lines > F.MaxLines do
 		local old = table.remove(lines, 1)
@@ -53,9 +86,15 @@ local function push(text: string, color: Color3?)
 	task.delay(F.LineSeconds, function()
 		if row.Parent then
 			Components.tween(row, Theme.Tweens.Fade, { BackgroundTransparency = 1 })
-			local label = row:FindFirstChild("Text") :: TextLabel?
-			if label then
-				Components.tween(label, Theme.Tweens.Fade, { TextTransparency = 1 })
+			Components.tween(label, Theme.Tweens.Fade, { TextTransparency = 1 })
+			for _, stroke in { row:FindFirstChildOfClass("UIStroke"), label:FindFirstChildOfClass("UIStroke") } do
+				if stroke then
+					Components.tween(stroke, Theme.Tweens.Fade, { Transparency = 1 })
+				end
+			end
+			local img = row:FindFirstChild("Icon")
+			if img and img:IsA("ImageLabel") then
+				Components.tween(img, Theme.Tweens.Fade, { ImageTransparency = 1 })
 			end
 			task.delay(0.4, function()
 				local i = table.find(lines, row)
@@ -139,6 +178,13 @@ local function finalKill(position: Vector3, hold: number)
 	end)
 end
 
+-- Anything else can post to the feed (round events from HUD popups).
+function FeedController.Push(text: string, color: Color3?)
+	if list then
+		push(text, color)
+	end
+end
+
 function FeedController.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "FeedHUD"
@@ -146,33 +192,18 @@ function FeedController.Start()
 	gui.DisplayOrder = 2
 	gui.Parent = player:WaitForChild("PlayerGui")
 	local layer = Components.scaledRoot(gui)
+	-- top-right corner, under the coin counter
 	list = Instance.new("Frame")
 	list.Name = "Feed"
 	list.BackgroundTransparency = 1
-	list.AnchorPoint = Vector2.new(0.5, 0)
-	local baseY = 134 -- 10 below the round bar's status pills (which end at 124)
-	list.Position = UDim2.new(0.5, 0, 0, baseY)
-	-- step below the map vote strip while it is up (VoteController), so nothing overlaps
-	local voteToken = 0
-	ReplicatedStorage:GetAttributeChangedSignal(Config.Attributes.VoteOpen):Connect(function()
-		voteToken += 1
-		local token = voteToken
-		if ReplicatedStorage:GetAttribute(Config.Attributes.VoteOpen) == true then
-			list.Position = UDim2.new(0.5, 0, 0, baseY + 92)
-		else
-			task.delay(2.6, function()
-				if voteToken == token then
-					list.Position = UDim2.new(0.5, 0, 0, baseY)
-				end
-			end)
-		end
-	end)
-	list.Size = UDim2.fromOffset(460, F.MaxLines * 30)
+	list.AnchorPoint = Vector2.new(1, 0)
+	list.Position = UDim2.new(1, -14, 0, F.TopOffset)
+	list.Size = UDim2.fromOffset(WIDTH, F.MaxLines * 34)
 	list.Parent = layer
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Padding = UDim.new(0, 4)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 	layout.Parent = list
 
 	Remotes.get("Feed").OnClientEvent:Connect(function(text: any, color: any)

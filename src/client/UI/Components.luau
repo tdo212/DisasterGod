@@ -8,6 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(script.Parent:WaitForChild("Theme") :: ModuleScript)
 local Sound = require(script.Parent:WaitForChild("Sound") :: ModuleScript)
+local Icons = require(script.Parent:WaitForChild("Icons") :: ModuleScript)
 
 local C = Theme.Colors
 
@@ -124,7 +125,7 @@ function Components.label(props: LabelProps): TextLabel
 	local label = Instance.new("TextLabel")
 	label.Name = props.Name or "Label"
 	label.BackgroundTransparency = 1
-	label.Font = Theme.Font
+	label.FontFace = Theme.FontFace
 	label.Text = props.Text
 	label.TextColor3 = props.Color or C.Text
 	label.TextSize = props.TextSize or Theme.TextSize.Body
@@ -183,9 +184,69 @@ function Components.pressable(button: GuiButton, hover: number?): UIScale
 		Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.94 })
 	end)
 	button.MouseButton1Up:Connect(function()
-		Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+		Components.tween(scale, Theme.Tweens.Spring, { Scale = 1 }) -- springy bounce back
 	end)
 	return scale
+end
+
+export type IconProps = {
+	Name: string?,
+	Icon: string, -- icon name ("Shop") or an emoji the config uses ("⚡")
+	Size: UDim2,
+	Position: UDim2?,
+	AnchorPoint: Vector2?,
+	TextSize: number?, -- fallback emoji size
+	Parent: Instance?,
+	ZIndex: number?,
+}
+
+-- A sticker icon (UI/Icons). Unknown keys fall back to the emoji as text, so every
+-- caller works whether or not its icon is in the sheet.
+function Components.icon(props: IconProps): GuiObject
+	local obj: GuiObject
+	if Icons.has(props.Icon) then
+		local image = Instance.new("ImageLabel")
+		image.BackgroundTransparency = 1
+		image.ScaleType = Enum.ScaleType.Fit
+		Icons.apply(image, props.Icon)
+		obj = image
+	else
+		local text = Instance.new("TextLabel")
+		text.BackgroundTransparency = 1
+		text.FontFace = Theme.FontFace
+		text.Text = props.Icon
+		text.TextColor3 = C.Text
+		text.TextScaled = props.TextSize == nil
+		text.TextSize = props.TextSize or 32
+		obj = text
+	end
+	obj.Name = props.Name or "Icon"
+	obj.Size = props.Size
+	obj.Position = props.Position or UDim2.new()
+	obj.AnchorPoint = props.AnchorPoint or Vector2.zero
+	obj.ZIndex = props.ZIndex or 1
+	obj.Parent = props.Parent
+	return obj
+end
+
+-- Change what an icon made by Components.icon shows (image when known, else text).
+function Components.setIcon(obj: Instance, key: string)
+	if obj:IsA("ImageLabel") then
+		if not Icons.apply(obj, key) then
+			obj.Image = ""
+		end
+	elseif obj:IsA("TextLabel") then
+		obj.Text = key
+	end
+end
+
+-- Dim / undim an icon of either kind.
+function Components.setIconTransparency(obj: Instance, alpha: number)
+	if obj:IsA("ImageLabel") then
+		obj.ImageTransparency = alpha
+	elseif obj:IsA("TextLabel") then
+		obj.TextTransparency = alpha
+	end
 end
 
 export type ButtonProps = {
@@ -273,7 +334,9 @@ export type WindowHandle = {
 	IsOpen: () -> boolean,
 }
 
--- Modal window: blue studded header, bold title, red X, dark teal studded body.
+-- Modal window (UIReference "SHOP"): a dark, slightly see-through body with a heavy
+-- black outline, a cyan studded header block with a huge white title, and a separate
+-- square red X block to its right.
 function Components.window(parent: Instance, title: string, size: UDim2): WindowHandle
 	local root = Components.panel({
 		Name = title .. "Window",
@@ -281,36 +344,41 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = C.Window,
-		Transparency = 0.06,
-		Radius = Theme.Radius.Large,
-		Studs = true,
+		Transparency = 0.05,
+		Radius = Theme.Radius.Small,
+		Studs = false,
 		Parent = parent,
 	})
+	local rootStroke = root:FindFirstChildOfClass("UIStroke")
+	if rootStroke then
+		rootStroke.Thickness = Theme.Stroke.Window
+	end
 	root.Visible = false
 	root.ZIndex = 10
 	local scale = Instance.new("UIScale")
 	scale.Parent = root
 
+	local HEADER = 62
 	local header = Instance.new("Frame")
 	header.Name = "Header"
-	header.Size = UDim2.new(1, 0, 0, 60)
+	header.Size = UDim2.new(1, -HEADER, 0, HEADER)
 	header.BackgroundColor3 = Color3.new(1, 1, 1)
 	header.BorderSizePixel = 0
 	header.ZIndex = 2
-	Components.corner(header, Theme.Radius.Large)
+	Components.corner(header, Theme.Radius.Small)
 	Components.stroke(header, Theme.Stroke.Heavy)
-	Components.gradient(header, C.BlueLight, C.Blue, 90, true)
-	Components.studs(header, nil, Theme.Radius.Large)
+	Components.gradient(header, C.HeaderLight, C.Header, 90, true)
+	Components.studs(header, nil, Theme.Radius.Small)
 	header.Parent = root
 
 	Components.label({
 		Name = "Title",
-		Text = title,
-		TextSize = 36,
-		Size = UDim2.new(1, -90, 1, -6),
-		Position = UDim2.fromOffset(20, 0),
+		Text = string.upper(title),
+		TextSize = 40,
+		Size = UDim2.new(1, -24, 1, -8),
+		Position = UDim2.fromOffset(18, 0),
 		XAlign = Enum.TextXAlignment.Left,
-		StrokeThickness = Theme.Stroke.Heavy,
+		StrokeThickness = Theme.Stroke.Window,
 		Parent = header,
 	})
 
@@ -338,18 +406,19 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		end)
 	end
 
-	Components.button({
+	local closeButton = Components.button({
 		Name = "Close",
 		Text = "X",
-		TextSize = 30,
-		Size = UDim2.fromOffset(48, 48),
-		Position = UDim2.new(1, -6, 0, 6),
+		TextSize = 40,
+		Size = UDim2.fromOffset(HEADER, HEADER),
+		Position = UDim2.new(1, 0, 0, 0),
 		AnchorPoint = Vector2.new(1, 0),
 		Color = C.Red,
 		ColorLight = C.RedLight,
-		Parent = header,
+		Parent = root,
 		OnClick = close,
 	})
+	closeButton.ZIndex = 3
 
 	handle = {
 		Root = root,
@@ -384,12 +453,14 @@ function Components.tile(parent: Instance, icon: string, caption: string, color:
 	Components.studs(tile)
 	tile.Parent = parent
 
-	Components.label({
+	Components.icon({
 		Name = "Icon",
-		Text = icon,
+		Icon = icon,
 		TextSize = 36,
-		Size = UDim2.new(1, 0, 0.7, 0),
-		StrokeThickness = 0,
+		Size = UDim2.new(0.78, 0, 0.66, 0),
+		Position = UDim2.new(0.5, 0, 0.04, 0),
+		AnchorPoint = Vector2.new(0.5, 0),
+		ZIndex = 2,
 		Parent = tile,
 	})
 	local cap = Components.label({

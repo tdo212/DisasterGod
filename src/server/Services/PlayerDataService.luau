@@ -48,6 +48,17 @@ local function defaultProfile(): Profile
 		Cosmetics = {},
 		Equipped = table.clone(Config.Cosmetics.Defaults),
 		Saves = { Glider = 0, Aegis = 0 },
+		Mastery = {},
+		LoginDay = 0,
+		LoginStreak = 0,
+		StreakClaimedDay = 0,
+		FirstSurviveDay = 0,
+		FirstGodWinDay = 0,
+		GoldenTrail = false,
+		Set_LowFx = false,
+		Set_Shake = 1,
+		Set_Music = true,
+		Set_Sfx = true,
 	}
 end
 
@@ -81,6 +92,11 @@ local function publish(player: Player, profile: Profile)
 	end
 	for kind, count in profile.Saves do
 		player:SetAttribute(Attributes.SavePrefix .. kind, count)
+	end
+	player:SetAttribute(Attributes.GoldenTrail, profile.GoldenTrail)
+	player:SetAttribute(Attributes.LoginStreak, profile.LoginStreak)
+	for _, key in { "LowFx", "Shake", "Music", "Sfx" } do
+		player:SetAttribute(Attributes.SettingPrefix .. key, (profile :: any)["Set_" .. key])
 	end
 	local stats = player:FindFirstChild("leaderstats")
 	if stats then
@@ -121,6 +137,8 @@ local function merge(profile: Profile, data: { [string]: any })
 			copyMap(profile.Equipped, value, "string")
 		elseif key == "Saves" then
 			copyMap(profile.Saves, value, "number")
+		elseif key == "Mastery" then
+			copyMap(profile.Mastery, value, "number")
 		elseif key == "Receipts" and typeof(value) == "table" then
 			for _, id in value do
 				if typeof(id) == "string" then

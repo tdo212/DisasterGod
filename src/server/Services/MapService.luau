@@ -23,6 +23,19 @@ local Builders: { [string]: any } = {
 }
 
 local DestructionService = require(script.Parent.DestructionService)
+local Builder = require(World.Builder)
+
+-- Hideout palette per lighting preset (wall, roof, material).
+local HIDEOUT_LOOK: { [string]: { Color3 | Enum.Material } } = {
+	Desert = { Color3.fromRGB(205, 170, 120), Color3.fromRGB(150, 110, 70), Enum.Material.Sandstone },
+	Arctic = { Color3.fromRGB(225, 235, 245), Color3.fromRGB(120, 140, 170), Enum.Material.SmoothPlastic },
+	Night = { Color3.fromRGB(70, 60, 95), Color3.fromRGB(45, 40, 60), Enum.Material.Metal },
+	Volcanic = { Color3.fromRGB(110, 90, 85), Color3.fromRGB(70, 55, 50), Enum.Material.Slate },
+	Tempest = { Color3.fromRGB(110, 116, 124), Color3.fromRGB(70, 74, 80), Enum.Material.Metal },
+	Foundry = { Color3.fromRGB(150, 72, 52), Color3.fromRGB(58, 58, 68), Enum.Material.Brick },
+	Conservatory = { Color3.fromRGB(232, 238, 236), Color3.fromRGB(176, 186, 190), Enum.Material.SmoothPlastic },
+}
+local DEFAULT_LOOK = { Color3.fromRGB(170, 120, 75), Color3.fromRGB(120, 80, 50), Enum.Material.WoodPlanks }
 
 local MapService = {}
 
@@ -85,11 +98,50 @@ function MapService.Clear()
 	DestructionService.SetArena(nil)
 end
 
+-- Small enterable sheds dropped onto genuinely empty ground (more places to hide on every
+-- arena). A spot counts if the ground there is not a building and a box the size of the
+-- shed is clear.
+local function addHideouts(info: Types.MapInfo)
+	local H = Config.Hideouts
+	local look = HIDEOUT_LOOK[info.Lighting] or DEFAULT_LOOK
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { info.Model }
+	local rng = Random.new()
+	local placed = 0
+	for _ = 1, H.Tries do
+		if placed >= H.PerMap then
+			break
+		end
+		local a = rng:NextNumber(0, math.pi * 2)
+		local d = rng:NextNumber(20, info.Radius * 0.85)
+		local ground = MapService.TerrainAt(info.Center + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d))
+		if ground.Y < info.FluidStartY + 2 then
+			continue -- in the water
+		end
+		local box = CFrame.new(ground + Vector3.new(0, H.Size.Y / 2 + 0.6, 0))
+		if #workspace:GetPartBoundsInBox(box, H.Size + Vector3.new(4, 0, 4), params) > 0 then
+			continue
+		end
+		placed += 1
+		Builder.highrise(info.Model, "Hideout", ground, H.Size.X, H.Size.Z, 1, H.Size.Y - 2, {
+			SlabColor = look[2] :: Color3,
+			SlabMaterial = look[3] :: Enum.Material,
+			ColumnColor = look[2] :: Color3,
+			ColumnMaterial = Enum.Material.Metal,
+			WallColor = look[1] :: Color3,
+			WallMaterial = look[3] :: Enum.Material,
+			WallTransparency = 0,
+		})
+	end
+end
+
 function MapService.Build(name: string): Types.MapInfo
 	MapService.Clear()
 	local builder = Builders[name]
 	assert(builder, "Unknown map " .. name)
 	local info: Types.MapInfo = builder.build(arena)
+	addHideouts(info)
 
 	-- infinite sea (water or lava) under the island
 	local s = Instance.new("Part")

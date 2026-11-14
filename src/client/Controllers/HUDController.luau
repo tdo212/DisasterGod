@@ -15,6 +15,7 @@ local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
 local Store = require(UI:WaitForChild("Store") :: ModuleScript)
 local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
+local FeedController = require(script.Parent:WaitForChild("FeedController") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local M = Config.Match
@@ -131,6 +132,53 @@ local function buildRoundBar()
 	local godPill = pill("God")
 	local rolePill = pill("Role")
 
+	-- Chaos Twist badge under the pills (late joiners can see what's active)
+	local twist = Components.panel({
+		Name = "ChaosTwist",
+		Size = UDim2.fromOffset(250, 24),
+		Position = UDim2.new(0.5, 0, 0, 24 + BAR_TEXT_ONLY + 6 + 28),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = C.Window,
+		Transparency = 0.2,
+		Radius = Theme.Radius.Pill,
+		Parent = holder,
+	})
+	local twistText = Components.label({ Name = "Text", Text = "", TextSize = 15, Size = UDim2.fromScale(1, 1), Parent = twist })
+	twist.Visible = false
+	local function refreshTwist()
+		local id = ReplicatedStorage:GetAttribute(Attributes.Mutator)
+		local found = nil
+		for _, m in Config.Mutators.Pool do
+			if m.Id == id then
+				found = m
+			end
+		end
+		twist.Visible = found ~= nil
+		if found then
+			twistText.Text = "🎲 CHAOS TWIST: " .. string.upper(found.Name)
+			twistText.TextColor3 = found.Color
+			local stroke = twist:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Color = found.Color
+			end
+		end
+	end
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.Mutator):Connect(function()
+		refreshTwist()
+		local id = ReplicatedStorage:GetAttribute(Attributes.Mutator)
+		for _, m in Config.Mutators.Pool do
+			if m.Id == id then
+				-- right after the vote winner flashes (VoteController holds it ~2.5 s)
+				task.delay(2.7, function()
+					if ReplicatedStorage:GetAttribute(Attributes.Mutator) == m.Id then
+						HUDController.Banner("CHAOS TWIST: " .. string.upper(m.Name), m.Description, m.Color)
+					end
+				end)
+			end
+		end
+	end)
+	refreshTwist()
+
 	local showingTrack: boolean? = nil
 	local function setTrack(show: boolean)
 		if showingTrack == show then
@@ -141,6 +189,7 @@ local function buildRoundBar()
 		local height = if show then BAR_WITH_TRACK else BAR_TEXT_ONLY
 		Components.tween(bar, Theme.Tweens.Fade, { Size = UDim2.new(1, 0, 0, height) })
 		Components.tween(pills, Theme.Tweens.Fade, { Position = UDim2.new(0.5, 0, 0, 24 + height + 6) })
+		Components.tween(twist, Theme.Tweens.Fade, { Position = UDim2.new(0.5, 0, 0, 24 + height + 6 + 28) })
 	end
 
 	local function refresh()
@@ -221,7 +270,7 @@ local function buildCoins()
 		frame.AnchorPoint = Vector2.new(0, 1)
 	end
 	frame.Parent = layer
-	Components.label({ Name = "Icon", Text = "💰", TextSize = 38, Size = UDim2.fromOffset(46, 52), StrokeThickness = 0, Parent = frame })
+	Components.icon({ Name = "Icon", Icon = "Coin", TextSize = 38, Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(0, 3), Parent = frame })
 	local amount = Components.label({
 		Name = "Amount",
 		Text = "$0",
@@ -246,12 +295,20 @@ local function buildCoins()
 	local scale = Instance.new("UIScale")
 	scale.Parent = amount
 	local last = 0
+	-- the counter rolls up to the new total instead of jumping
+	local shown = Instance.new("NumberValue")
+	shown:GetPropertyChangedSignal("Value"):Connect(function()
+		amount.Text = "$" .. HUDController.FormatNumber(math.floor(shown.Value + 0.5))
+	end)
 	local function refresh()
 		local coins = player:GetAttribute(Attributes.Coins) :: number? or 0
-		amount.Text = "$" .. HUDController.FormatNumber(coins)
 		if coins > last then
 			scale.Scale = 1.25
-			Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+			Components.tween(scale, Theme.Tweens.Spring, { Scale = 1 })
+			Components.tween(shown, TweenInfo.new(math.clamp((coins - last) / 400, 0.35, 1.2), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = coins })
+		else
+			shown.Value = coins
+			amount.Text = "$" .. HUDController.FormatNumber(coins)
 		end
 		last = coins
 		local s = player:GetAttribute(Attributes.Streak) :: number? or 0
@@ -461,8 +518,20 @@ end
 
 local popupLane = 0
 
+-- Round events go to the top-right feed instead of the middle of the screen.
+local FEED_WORDS = { "NEAR MISS", "ESCAPE", "ELIMINATED", "DESTRUCTION", "COMBO", "PING", "CLOSE CALL", "TAUNT", "BEACON", "STREAK" }
+
 function HUDController.Popup(text: string, color: Color3?)
 	local upper = string.upper(text)
+	for _, word in FEED_WORDS do
+		if string.find(upper, word, 1, true) then
+			if string.find(text, "+", 1, true) then
+				Sound.play("Coin", 0.7, 0.95 + math.random() * 0.15)
+			end
+			FeedController.Push(text, color)
+			return
+		end
+	end
 	if string.find(upper, "BOUGHT", 1, true) or string.find(upper, "UNLOCKED", 1, true) or string.find(upper, "THANK", 1, true) or string.find(upper, "CLAIMED", 1, true) or string.find(upper, "WHEEL WIN", 1, true) then
 		Sound.play("Purchase", 0.9)
 	elseif string.find(text, "+", 1, true) then
@@ -685,7 +754,8 @@ end
 -- round summary
 
 local function showSummary(summary: any)
-	local window = Components.window(layer, "Round Over", UDim2.fromOffset(520, 420))
+	local awards = if typeof(summary.Awards) == "table" then summary.Awards else {}
+	local window = Components.window(layer, "Round Over", UDim2.fromOffset(560, 440 + (if #awards > 0 then 74 else 0)))
 	local content = window.Content
 	local headline = if summary.Role == "DisasterGod" then "GOD ROUND COMPLETE" elseif summary.Survived then "YOU SURVIVED!" else "ELIMINATED"
 	local headColor = if summary.Role == "DisasterGod" then C.PurpleLight elseif summary.Survived then C.GreenLight else C.RedLight
@@ -709,6 +779,36 @@ local function showSummary(summary: any)
 	local podiumText = {}
 	for i, entry in summary.Podium do
 		table.insert(podiumText, string.format("%s %s", ({ "🥇", "🥈", "🥉" })[i], entry.Name))
+	end
+	-- Play of the Match superlatives: a row of badges
+	if #awards > 0 then
+		local row = Instance.new("Frame")
+		row.Name = "Awards"
+		row.BackgroundTransparency = 1
+		row.Size = UDim2.new(1, 0, 0, 66)
+		row.Position = UDim2.new(0, 0, 1, -104)
+		row.Parent = content
+		local list = Instance.new("UIListLayout")
+		list.FillDirection = Enum.FillDirection.Horizontal
+		list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		list.Padding = UDim.new(0, 8)
+		list.Parent = row
+		for i, award in awards do
+			local badge = Components.panel({ Name = "Award", Size = UDim2.fromOffset(122, 64), Color = C.WindowLight, Transparency = 0.1, Parent = row })
+			badge.LayoutOrder = i
+			Components.icon({ Name = "Icon", Icon = award.Icon, Size = UDim2.fromOffset(30, 30), Position = UDim2.fromOffset(4, 4), Parent = badge })
+			Components.label({ Name = "Title", Text = string.upper(award.Name), TextSize = 13, Color = C.GoldLight, Size = UDim2.new(1, -38, 0, 16), Position = UDim2.fromOffset(36, 6), XAlign = Enum.TextXAlignment.Left, Parent = badge })
+			local who = Components.label({ Name = "Player", Text = award.Player, TextSize = 14, Size = UDim2.new(1, -38, 0, 18), Position = UDim2.fromOffset(36, 22), XAlign = Enum.TextXAlignment.Left, Parent = badge })
+			who.TextTruncate = Enum.TextTruncate.AtEnd
+			Components.label({ Name = "What", Text = award.Text, TextSize = 11, Color = C.TextDim, Size = UDim2.new(1, -8, 0, 14), Position = UDim2.fromOffset(4, 44), StrokeThickness = 1, Parent = badge })
+			local pop = Instance.new("UIScale")
+			pop.Scale = 0.2
+			pop.Parent = badge
+			task.delay(0.3 + i * 0.15, function()
+				Components.tween(pop, Theme.Tweens.Spring, { Scale = 1 })
+			end)
+		end
 	end
 	Components.label({
 		Name = "Podium",
@@ -773,6 +873,15 @@ function HUDController.Start()
 	Remotes.get("RoundSummary").OnClientEvent:Connect(function(summary)
 		if typeof(summary) == "table" then
 			showSummary(summary)
+		end
+	end)
+	-- Emergency Flare hold meter
+	local hold = Components.label({ Name = "BeaconHold", Text = "", TextSize = 26, Color = Color3.fromRGB(255, 150, 60), Size = UDim2.fromOffset(420, 34), Position = UDim2.fromScale(0.5, 0.62), AnchorPoint = Vector2.new(0.5, 0.5), Parent = layer })
+	hold.Visible = false
+	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any)
+		if kind == "BeaconHold" and typeof(a) == "number" then
+			hold.Visible = a >= 0
+			hold.Text = string.format("🔦 HOLDING THE FLARE %d%%", math.floor(a * 100))
 		end
 	end)
 end

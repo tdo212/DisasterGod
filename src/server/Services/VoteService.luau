@@ -47,14 +47,24 @@ function VoteService.Begin(): boolean
 	if RunService:IsStudio() and typeof(workspace:GetAttribute("ForceMap")) == "string" then
 		return false
 	end
-	local pool = {}
+	-- Fresh choices every vote: never the map just played, and none of the maps that
+	-- were on the previous ballot while enough others exist (9 maps -> always 3 new).
+	local previous: { [string]: boolean } = {}
+	for _, key in candidates do
+		previous[key] = true
+	end
+	local fresh, fallback = {}, {}
 	for _, key in Config.World.MapRotation do
 		if key ~= lastMap then
-			table.insert(pool, key)
+			table.insert(if previous[key] then fallback else fresh, key)
 		end
 	end
 	table.clear(candidates)
-	for _ = 1, math.min(V.Candidates, #pool) do
+	for _ = 1, V.Candidates do
+		local pool = if #fresh > 0 then fresh else fallback
+		if #pool == 0 then
+			break
+		end
 		table.insert(candidates, table.remove(pool, rng:NextInteger(1, #pool)) :: string)
 	end
 	if #candidates == 0 then

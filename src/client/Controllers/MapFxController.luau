@@ -119,6 +119,9 @@ local function weatherFor(camera: Camera): any
 	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
 		return nil
 	end
+	if player:GetAttribute(Attributes.SettingPrefix .. "LowFx") == true then
+		return nil -- Low-FX mode: no weather particles
+	end
 	if camera.CFrame.Position.Y > W.MaxCameraHeight then
 		return nil
 	end

@@ -13,6 +13,8 @@ local PlayerDataService = require(script.Parent.PlayerDataService)
 local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 local DestructionService = require(script.Parent.DestructionService)
+local ProgressionService = require(script.Parent.ProgressionService)
+local StealthService = require(script.Parent.StealthService)
 
 local S = Config.Scoring
 local F = Config.Feed
@@ -44,6 +46,8 @@ local function record(player: Player): Types.RoundRecord
 			Escapes = 0,
 			Kills = 0,
 			Destroyed = 0,
+			Taunts = 0,
+			HiddenBest = 0,
 		}
 		records[player] = r
 	end
@@ -184,6 +188,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 	local lines: { [Player]: { Types.SummaryLine } } = {}
 	local survivorCount = #RoleService.GetAliveSurvivors()
 	local mapKey = ReplicatedStorage:GetAttribute(Config.Attributes.MapKey)
+	local mutator = ReplicatedStorage:GetAttribute(Config.Attributes.Mutator)
 
 	for _, p in participants do
 		if not p.Parent then
@@ -204,6 +209,16 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 				table.insert(lines[p], { Text = string.format("Eliminations x%d", r.Kills), Amount = r.Kills * S.GodKillCoins })
 			end
 			QuestService.Progress(p, "Destroy", r.Destroyed)
+			ProgressionService.AddMastery(p, "Destroy", r.Destroyed)
+			if survivorCount == 0 then
+				-- the God wiped everyone out: kit mastery and the first God win of the day
+				ProgressionService.AddMastery(p, "GodWin:" .. tostring(p:GetAttribute(Config.Attributes.Kit)), 1)
+				if ProgressionService.FirstWin(p, "GodWin") then
+					local first = PlayerDataService.EarnCoins(p, r.Earned * (Config.Daily.FirstWinMultiplier - 1))
+					r.Earned += first
+					table.insert(lines[p], { Text = "First God win today x" .. Config.Daily.FirstWinMultiplier, Amount = first })
+				end
+			end
 			local destruction = math.floor(r.Destroyed * S.GodDestructionCoinsPerPart)
 			if destruction > 0 then
 				destruction = PlayerDataService.EarnCoins(p, destruction)
@@ -221,6 +236,15 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			end
 			r.Earned += bonus
 			table.insert(lines[p], { Text = if streak > 1 then string.format("Survived (streak %d)", streak) else "Survived", Amount = bonus })
+			ProgressionService.AddMastery(p, "Survive", 1)
+			if StealthService.Ripples(p) == 0 then
+				ProgressionService.AddMastery(p, "Ghost", 1) -- not a single noise ripple all round
+			end
+			if ProgressionService.FirstWin(p, "Survive") then
+				local first = PlayerDataService.EarnCoins(p, r.Earned * (Config.Daily.FirstWinMultiplier - 1))
+				r.Earned += first
+				table.insert(lines[p], { Text = "First win today x" .. Config.Daily.FirstWinMultiplier, Amount = first })
+			end
 		else
 			PlayerDataService.RecordRound(p, false)
 		end
@@ -231,6 +255,30 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			local vip = PlayerDataService.EarnCoins(p, Config.Monetization.VipBonusCoinsPerRound)
 			r.Earned += vip
 			table.insert(lines[p], { Text = "VIP bonus", Amount = vip })
+		end
+		if mutator == "GoldRush" then
+			local rush = PlayerDataService.EarnCoins(p, math.floor(r.Earned * (Config.Mutators.GoldRushPayout - 1)))
+			r.Earned += rush
+			table.insert(lines[p], { Text = "Gold Rush x" .. Config.Mutators.GoldRushPayout, Amount = rush })
+		end
+		r.HiddenBest = StealthService.HiddenBest(p)
+	end
+
+	-- superlatives: the round's standout in each stat (anyone, any role)
+	local awards = {}
+	for _, def in Config.Awards do
+		local best: Player? = nil
+		local bestValue = 0
+		for _, p in participants do
+			if p.Parent then
+				local value = (record(p) :: any)[def.Stat] or 0
+				if value > bestValue then
+					best, bestValue = p, value
+				end
+			end
+		end
+		if best then
+			table.insert(awards, { Name = def.Name, Icon = def.Icon, Player = best.DisplayName, Text = def.Text })
 		end
 	end
 
@@ -263,6 +311,8 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			Survived = r.Survived,
 			Lines = lines[p],
 			Total = r.Earned,
+			Awards = awards,
+			Mutator = if typeof(mutator) == "string" then mutator else "",
 		}
 	end
 	return summaries
