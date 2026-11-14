@@ -85,6 +85,17 @@ local BUILDERS: { [string]: (Model, number) -> () } = {
 		add(model, s, { Name = "Halo", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 26, 26), CFrame = CFrame.new(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 240, 160), Material = Enum.Material.Neon, Transparency = 0.3 })
 		add(model, s, { Name = "HaloHole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 22, 22), CFrame = CFrame.new(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 205, 60), Material = Enum.Material.Foil, Transparency = 0.85 })
 	end,
+	-- a thundercloud fist crackling with lightning arcs
+	StormSovereign = function(model, s)
+		hand(model, s, Color3.fromRGB(70, 80, 105), Color3.fromRGB(150, 210, 255), Enum.Material.Slate, 80, false, Color3.fromRGB(120, 190, 255))
+		for i = 0, 6 do
+			local a = math.rad(i * 51)
+			add(model, s, { Name = "Thundercloud", Shape = Enum.PartType.Ball, Size = Vector3.one * (8 + (i % 3) * 2), CFrame = CFrame.new(math.cos(a) * 9, 9 + (i % 2) * 3, math.sin(a) * 6), Color = Color3.fromRGB(80, 88, 110), Transparency = 0.15 })
+		end
+		for i, x in { -6, 1, 7 } do
+			add(model, s, { Name = "Arc", Size = Vector3.new(0.6, 9, 0.6), CFrame = CFrame.new(x, -14 - i, 2) * CFrame.Angles(0, 0, math.rad(i * 17 - 30)), Color = Color3.fromRGB(190, 230, 255), Material = Enum.Material.Neon })
+		end
+	end,
 }
 
 -- Build skin `id` at the origin (unparented). Unknown ids fall back to the Storm Eye.

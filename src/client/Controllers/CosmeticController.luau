@@ -148,6 +148,49 @@ local function finisher(id: string, position: Vector3)
 		burst(position + Vector3.new(0, 2, 0), math.floor(40 * scale), CONFETTI, 0.6, 16, 1.6, Enum.Material.SmoothPlastic)
 	elseif id == "CartoonBoing" then
 		burst(position + Vector3.new(0, 3, 0), math.floor(10 * scale), { Color3.fromRGB(255, 230, 80) }, 1, 8, 1.2)
+	-- God Pack finishers (the God's pack decides when the survivor has the starter Poof)
+	elseif id == "LavaBurst" then
+		burst(position + Vector3.new(0, 1, 0), math.floor(18 * scale), { Color3.fromRGB(255, 120, 30), Color3.fromRGB(255, 200, 60), Color3.fromRGB(60, 40, 35) }, 1.2, 12, 1.2)
+	elseif id == "VoxelDissolve" then
+		-- the body breaks into floating cyan voxels that drift up and fade
+		burst(position + Vector3.new(0, 2.5, 0), math.floor(28 * scale), { Color3.fromRGB(60, 230, 255), Color3.fromRGB(120, 255, 200), Color3.fromRGB(40, 90, 160) }, 0.8, 7, 2.2)
+	elseif id == "SkyBeam" then
+		local beam = Instance.new("Part")
+		beam.Anchored = true
+		beam.CanCollide = false
+		beam.CanQuery = false
+		beam.CanTouch = false
+		beam.CastShadow = false
+		beam.Shape = Enum.PartType.Cylinder
+		beam.Material = Enum.Material.Neon
+		beam.Color = Color3.fromRGB(255, 230, 150)
+		beam.Transparency = 0.35
+		beam.Size = Vector3.new(220, 5, 5)
+		beam.CFrame = CFrame.new(position + Vector3.new(0, 108, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		beam.Parent = fxFolder
+		TweenService:Create(beam, TweenInfo.new(1.6, Enum.EasingStyle.Quad), { Size = Vector3.new(220, 0.5, 0.5), Transparency = 1 }):Play()
+		Debris:AddItem(beam, 1.7)
+		burst(position + Vector3.new(0, 2, 0), math.floor(14 * scale), { Color3.fromRGB(255, 240, 180) }, 0.7, 10, 1.4)
+	elseif id == "StormBolt" then
+		local top = position + Vector3.new(0, 90, 0)
+		local prev = top
+		for i = 1, 6 do
+			local nextPoint = if i == 6 then position else top:Lerp(position, i / 6) + Vector3.new(math.random(-4, 4), 0, math.random(-4, 4))
+			local seg = Instance.new("Part")
+			seg.Anchored = true
+			seg.CanCollide = false
+			seg.CanQuery = false
+			seg.CanTouch = false
+			seg.CastShadow = false
+			seg.Material = Enum.Material.Neon
+			seg.Color = Color3.fromRGB(190, 225, 255)
+			seg.Size = Vector3.new(0.9, 0.9, (nextPoint - prev).Magnitude)
+			seg.CFrame = CFrame.lookAt((prev + nextPoint) / 2, nextPoint)
+			seg.Parent = fxFolder
+			Debris:AddItem(seg, 0.35)
+			prev = nextPoint
+		end
+		burst(position + Vector3.new(0, 1, 0), math.floor(12 * scale), { Color3.fromRGB(150, 210, 255), Color3.fromRGB(80, 90, 120) }, 1, 9, 1)
 	else
 		-- Poof (starter)
 		burst(position + Vector3.new(0, 1.5, 0), math.floor(12 * scale), { Color3.fromRGB(200, 200, 210), Color3.fromRGB(160, 160, 170) }, 2.4, 6, 0.9, Enum.Material.SmoothPlastic)

@@ -312,7 +312,7 @@ end
 local function intermission(): (boolean, string)
 	setPhase("Intermission", M.IntermissionDuration)
 	setSubPhase("None")
-	EnvironmentService.SetMood("Calm")
+	EnvironmentService.ApplyPreset("Lodge", 2) -- warm, soft light for the lobby (avatars no longer blow out)
 	ReplicatedStorage:SetAttribute(Attributes.GodName, "")
 	updateAlive()
 

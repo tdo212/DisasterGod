@@ -229,9 +229,17 @@ function OrbitCamera.ScreenToWorld(screen: Vector2, insetRelative: boolean?): Ve
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = { arena }
-		local result = workspace:Raycast(ray.Origin, ray.Direction * 1500, params)
-		if result then
-			return result.Position
+		local origin, direction = ray.Origin, ray.Direction * 1500
+		for _ = 1, 6 do
+			local result = workspace:Raycast(origin, direction, params)
+			if not result then
+				break
+			end
+			-- aim through glass canopies (the Bio-Dome roof) at what is under them
+			if result.Instance:GetAttribute("Canopy") ~= true then
+				return result.Position
+			end
+			origin = result.Position + ray.Direction * 0.1
 		end
 	end
 	if math.abs(ray.Direction.Y) > 1e-3 then

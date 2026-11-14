@@ -1,5 +1,5 @@
 --!strict
--- UI sound effects (client-local, 2D). Keys come from Config.Audio.Ui / Config.Audio.Stings.
+-- UI sound effects (client-local, 2D). Keys come from Config.Audio.Ui / Stings / Disaster.
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,7 +38,7 @@ local function template(key: string): Sound?
 	if existing then
 		return existing
 	end
-	local id = A.Ui[key] or (A.Stings :: any)[key]
+	local id = A.Ui[key] or (A.Stings :: any)[key] or A.Disaster[key]
 	if not id then
 		return nil
 	end

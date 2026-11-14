@@ -17,6 +17,9 @@ local Builders: { [string]: any } = {
 	SunscorchedMirage = require(World.SunscorchedMirage),
 	OutpostZero = require(World.OutpostZero),
 	StarlightBoardwalk = require(World.StarlightBoardwalk),
+	ChronoSpire = require(World.ChronoSpire),
+	VerdantDome = require(World.VerdantDome),
+	IroncladArmada = require(World.IroncladArmada),
 }
 
 local DestructionService = require(script.Parent.DestructionService)
@@ -133,12 +136,31 @@ function MapService.GroundAt(position: Vector3): Vector3
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { arena }
-	local origin = Vector3.new(position.X, 250, position.Z)
-	local result = workspace:Raycast(origin, Vector3.new(0, -400, 0), params)
-	if result and result.Instance.Name ~= "Sea" then
-		return result.Position
+	local y = 250
+	for _ = 1, 8 do
+		local result = workspace:Raycast(Vector3.new(position.X, y, position.Z), Vector3.new(0, -400, 0), params)
+		if not result or result.Instance.Name == "Sea" then
+			break
+		end
+		-- glass canopies (the Bio-Dome roof) are seen through: aim at what is under them
+		if result.Instance:GetAttribute("Canopy") ~= true then
+			return result.Position
+		end
+		y = result.Position.Y - 0.05
 	end
 	return Vector3.new(position.X, 0, position.Z)
+end
+
+-- The intact canopy part straight above a point, if any (impacts crack the dome over them).
+function MapService.CanopyAbove(position: Vector3): BasePart?
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { arena }
+	local result = workspace:Raycast(position + Vector3.new(0, 1, 0), Vector3.new(0, 250, 0), params)
+	if result and result.Instance:GetAttribute("Canopy") == true and result.Instance:IsA("BasePart") then
+		return result.Instance
+	end
+	return nil
 end
 
 -- Like GroundAt, but sees through destructible structures to the island surface below.
@@ -168,7 +190,7 @@ function MapService.InBounds(position: Vector3): boolean
 		return false
 	end
 	local flat = Vector3.new(position.X - info.Center.X, 0, position.Z - info.Center.Z)
-	return flat.Magnitude <= Config.World.ArenaRadius
+	return flat.Magnitude <= math.max(Config.World.ArenaRadius, info.Radius + Config.World.BoundsMargin)
 end
 
 return MapService

@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
+local Loadout = require(ReplicatedStorage.Shared.Loadout)
 
 local ComboService = require(script.Parent.ComboService)
 local CosmeticService = require(script.Parent.CosmeticService)
@@ -464,7 +465,9 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 	end
 end
 
-local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
+-- `steered` (Maelstrom Vortex): follows the God's reticle instead of chasing survivors,
+-- puts out fires and hurls the rubble it gathers outward.
+local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Player?, steered: boolean?)
 	ringTelegraph(ground, def.Radius, def.WarningTime, Color3.fromRGB(200, 200, 210))
 	EnvironmentService.Darken(def.WarningTime + (def.Duration or 8))
 	task.wait(def.WarningTime)
@@ -512,7 +515,16 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		-- chase the nearest survivor (keeps hiding spots under pressure)
 		local nearest: Vector3? = nil
 		local best = 140
+		local aim = if steered then ReplicatedStorage:GetAttribute(Attributes.GodAim) else nil
+		if typeof(aim) == "Vector3" then
+			local flat = Vector3.new(aim.X - pos.X, 0, aim.Z - pos.Z)
+			nearest = flat
+			best = -1 -- the reticle wins
+		end
 		for _, player in RoleService.GetAliveSurvivors() do
+			if best < 0 then
+				break
+			end
 			local hrp = hrpAndHumanoid(player)
 			if hrp then
 				local flat = Vector3.new(hrp.Position.X - pos.X, 0, hrp.Position.Z - pos.Z)
@@ -523,7 +535,7 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 			end
 		end
 		if nearest and nearest.Magnitude > 1 then
-			heading = heading:Lerp(nearest.Unit, math.min(1, dt * 0.8)).Unit
+			heading = heading:Lerp(nearest.Unit, math.min(1, dt * (if steered then 2.5 else 0.8))).Unit
 		end
 		local nextPos = pos + heading * speed * dt
 		if not MapService.InBounds(nextPos) then
@@ -540,7 +552,11 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		if tickTimer >= 0.25 then
 			tickTimer = 0
 			creditDestruction(caster, DestructionService.DamageArea(pos + Vector3.new(0, 8, 0), radius, def.StructureDamage * 0.25))
-			if not burning and ComboService.FireNear(pos, radius) then
+			if steered then
+				if ComboService.Extinguish(pos, radius) > 0 then
+					sound("Gust", pos, 1.4, 0.7)
+				end
+			elseif not burning and ComboService.FireNear(pos, radius) then
 				burning = true
 				for i, ring in rings do
 					ring.Part.Color = Color3.fromRGB(255, 120 - i * 8, 30)
@@ -551,10 +567,14 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 					ScoringService.Notify(caster, "🔥 COMBO: FIRENADO!", ORANGE)
 				end
 			end
+			local fling = steered and math.random() < 0.25
 			for _, part in DestructionService.GetDebrisNear(pos, radius * 1.8) do
 				local offset = part.Position - pos
 				local tangent = Vector3.new(-offset.Z, 0, offset.X)
-				if tangent.Magnitude > 0.1 then
+				if fling and tangent.Magnitude > 0.1 then
+					-- the Maelstrom hurls its rubble out like projectiles
+					part.AssemblyLinearVelocity = Vector3.new(offset.X, 0, offset.Z).Unit * 85 + Vector3.new(0, 30, 0)
+				elseif tangent.Magnitude > 0.1 then
 					part.AssemblyLinearVelocity = tangent.Unit * 40 - Vector3.new(offset.X, 0, offset.Z) * 0.6 + Vector3.new(0, 35, 0)
 				end
 			end
@@ -667,6 +687,364 @@ local function seismicPing(def: Ability, ground: Vector3, caster: Player?)
 	end
 end
 
+---------------------------------------------------------------------------
+-- big-map disasters (Cataclysm kit) and God Pack signatures
+
+local VOID = Color3.fromRGB(120, 60, 255)
+local CYBER = Color3.fromRGB(60, 230, 255)
+local WOOD_SCALE: { [Enum.Material]: number } = { [Enum.Material.Wood] = 2, [Enum.Material.WoodPlanks] = 2 }
+local METAL_SCALE: { [Enum.Material]: number } = { [Enum.Material.Metal] = 1.5, [Enum.Material.DiamondPlate] = 1.5, [Enum.Material.CorrodedMetal] = 1.5 }
+
+-- One meteor falling onto `point` (Meteor Barrage): short fall, impact, blast.
+local function dropMeteor(def: Ability, point: Vector3, caster: Player?, fall: number)
+	local pal = CosmeticService.VfxOf(caster)
+	local impact = def.ImpactRadius or 9
+	local rock = fxPart({
+		Name = "Meteor",
+		Shape = pal.MeteorShape or Enum.PartType.Ball,
+		Size = Vector3.one * 6,
+		CFrame = CFrame.new(point + Vector3.new(25, 110, 15)),
+		Color = pal.Meteor or Color3.fromRGB(255, 90, 30),
+	})
+	local fire = Instance.new("Fire")
+	fire.Size = 10
+	fire.Heat = 18
+	fire.Parent = rock
+	local tween = TweenService:Create(rock, TweenInfo.new(fall, Enum.EasingStyle.Linear), { CFrame = CFrame.new(point) })
+	tween:Play()
+	tween.Completed:Wait()
+	rock:Destroy()
+	local boom = Instance.new("Explosion")
+	boom.Position = point
+	boom.BlastRadius = impact
+	boom.BlastPressure = 0
+	boom.DestroyJointRadiusPercent = 0
+	boom.Parent = workspace
+	sound("MeteorImpact", point, 2, 0.9 + math.random() * 0.3)
+	shakeAll(0.6, 0.3, point)
+	creditDestruction(caster, DestructionService.DamageArea(point, impact, def.StructureDamage))
+	blast(point, impact, def.PlayerDamage, caster, 40, def.DisplayName)
+end
+
+-- Meteor Barrage: a rolling line of impacts along the God's facing (carpet sweep).
+local function meteorBarrage(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
+	local length = def.Length or 80
+	local cf = CFrame.lookAt(ground, ground + dir)
+	lineTelegraph(cf, length, def.Width or 12, def.WarningTime)
+	task.wait(def.WarningTime * 0.55)
+	local count = def.Count or 7
+	for i = 1, count do
+		local along = length / 2 - length * (i - 0.5) / count
+		local point = MapService.GroundAt((cf * CFrame.new(math.random(-2, 2), 0, along)).Position)
+		task.spawn(dropMeteor, def, point, caster, 0.6)
+		task.wait(def.Duration or 0.18)
+	end
+end
+
+-- Gravity Singularity / Astral Collapse: survivors and loose debris are dragged toward a
+-- point for a moment, then it detonates. Astral Collapse throws everything skyward and
+-- leaves the rubble floating.
+local function singularity(def: Ability, ground: Vector3, caster: Player?, astral: boolean)
+	local center = ground + Vector3.new(0, 4, 0)
+	local tint = if astral then Color3.fromRGB(255, 215, 120) else (CosmeticService.VfxOf(caster).Telegraph or VOID)
+	ringTelegraph(ground, def.Radius, def.WarningTime, tint)
+	task.wait(def.WarningTime)
+	local core = fxPart({ Name = "Singularity", Shape = Enum.PartType.Ball, Size = Vector3.one * 2, CFrame = CFrame.new(center), Color = Color3.fromRGB(10, 6, 20), Material = Enum.Material.SmoothPlastic })
+	local halo = fxPart({ Name = "EventHorizon", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 10, 10), CFrame = CFrame.new(center) * CFrame.Angles(0, 0, math.rad(90)), Color = tint, Transparency = 0.3 })
+	TweenService:Create(core, TweenInfo.new(def.Duration or 2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = Vector3.one * 9 }):Play()
+	TweenService:Create(halo, TweenInfo.new(def.Duration or 2.5), { Size = Vector3.new(0.4, def.Radius * 1.6, def.Radius * 1.6), Transparency = 0.7 }):Play()
+	AudioService.attach("Tornado", core, 2.2, true, 0.6)
+	shakeAll(0.3, def.Duration or 2.5, center)
+	local pull = def.Pull or 36
+	local elapsed = 0
+	local duration = def.Duration or 2.5
+	while elapsed < duration do
+		local dt = task.wait(0.12)
+		elapsed += dt
+		halo.CFrame = CFrame.new(center) * CFrame.Angles(elapsed * 3, 0, math.rad(90))
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp then
+				local offset = center - hrp.Position
+				if offset.Magnitude <= def.Radius and offset.Magnitude > 3 then
+					-- a steady drag (below ragdoll strength): sprint or dash out of it
+					clientEffect:FireClient(player, "Knockback", offset.Unit * pull + Vector3.new(0, 6, 0))
+				end
+			end
+		end
+		for _, part in DestructionService.GetDebrisNear(center, def.Radius) do
+			local offset = center - part.Position
+			if offset.Magnitude > 2 then
+				part.AssemblyLinearVelocity = offset.Unit * pull * 1.2
+			end
+		end
+	end
+	core:Destroy()
+	halo:Destroy()
+	local impact = def.ImpactRadius or 16
+	local burst = fxPart({ Name = "Detonation", Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = CFrame.new(center), Color = tint, Transparency = 0.2 })
+	TweenService:Create(burst, TweenInfo.new(0.45, Enum.EasingStyle.Quad), { Size = Vector3.one * impact * 2.4, Transparency = 1 }):Play()
+	Debris:AddItem(burst, 0.5)
+	sound("Explosion", center, 2.6, if astral then 0.6 else 0.8)
+	shakeAll(1.1, 0.5, center)
+	creditDestruction(caster, DestructionService.DamageArea(center, impact, def.StructureDamage))
+	local k = def.Knockback or 70
+	for _, player in RoleService.GetAliveSurvivors() do
+		local hrp = hrpAndHumanoid(player)
+		if hrp then
+			local offset = hrp.Position - center
+			if offset.Magnitude <= impact + 1.5 then
+				hurt(player, def.PlayerDamage, caster, def.DisplayName)
+				local flat = Vector3.new(offset.X, 0, offset.Z)
+				local out = if flat.Magnitude > 0.1 then flat.Unit else Vector3.xAxis
+				knock(player, if astral then out * k * 0.25 + Vector3.new(0, k, 0) else out * k + Vector3.new(0, k * 0.45, 0))
+			end
+		end
+	end
+	ScoringService.CheckNearMiss(center, impact, def.DisplayName)
+	for _, part in DestructionService.GetDebrisNear(center, impact * 1.6) do
+		local offset = part.Position - center
+		local out = if offset.Magnitude > 0.1 then offset.Unit else Vector3.yAxis
+		part.AssemblyLinearVelocity = if astral then Vector3.new(out.X * 12, 70, out.Z * 12) else out * 70 + Vector3.new(0, 25, 0)
+		if astral then
+			-- low-gravity float: the rubble hangs in the air before drifting down
+			local attachment = Instance.new("Attachment")
+			attachment.Parent = part
+			local float = Instance.new("VectorForce")
+			float.Attachment0 = attachment
+			float.RelativeTo = Enum.ActuatorRelativeTo.World
+			float.Force = Vector3.new(0, part:GetMass() * workspace.Gravity * 0.8, 0)
+			float.Parent = part
+			Debris:AddItem(float, 3)
+			Debris:AddItem(attachment, 3)
+		end
+	end
+end
+
+-- Tectonic Spire: rock pillars burst up from the bedrock, through every floor above.
+local function tectonicSpire(def: Ability, ground: Vector3, caster: Player?)
+	ground = MapService.TerrainAt(ground)
+	ringTelegraph(ground, def.Radius, def.WarningTime, Color3.fromRGB(200, 120, 60))
+	shakeAll(0.25, def.WarningTime, ground)
+	task.wait(def.WarningTime)
+	sound("Collapse", ground, 2.6, 0.7)
+	sound("Rumble", ground, 2, 1.2)
+	shakeAll(1.2, 0.6, ground)
+	local count = def.Count or 5
+	local height = def.Length or 46
+	local hitPlayers: { [Player]: boolean } = {}
+	for i = 1, count do
+		local offset = if i == 1 then Vector3.zero else (function()
+			local a = (i - 1) / (count - 1) * math.pi * 2 + math.random() * 0.6
+			local d = def.Radius * (0.45 + math.random() * 0.45)
+			return Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+		end)()
+		local base = MapService.TerrainAt(ground + offset)
+		local w = math.random(5, 8)
+		local h = height * (0.65 + math.random() * 0.35)
+		local spire = fxPart({
+			Name = "Spire",
+			Size = Vector3.new(w, h, w),
+			CFrame = CFrame.new(base - Vector3.new(0, h / 2 + 1, 0)) * CFrame.Angles(0, math.random() * 3, math.rad(math.random(-8, 8))),
+			Color = Color3.fromRGB(110, 92, 80),
+			Material = Enum.Material.Slate,
+		})
+		local up = spire.CFrame + Vector3.new(0, h, 0)
+		TweenService:Create(spire, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { CFrame = up }):Play()
+		task.delay(0.3, function()
+			if spire.Parent then
+				spire.CanCollide = true
+			end
+		end)
+		task.delay(4.5, function()
+			if spire.Parent then
+				spire.CanCollide = false
+				TweenService:Create(spire, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = up - Vector3.new(0, h, 0), Transparency = 1 }):Play()
+			end
+		end)
+		Debris:AddItem(spire, 6)
+		-- smash straight up through every floor
+		creditDestruction(caster, DestructionService.DamageBox(CFrame.new(base + Vector3.new(0, h / 2, 0)), Vector3.new(w + 3, h, w + 3), def.StructureDamage))
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp and not hitPlayers[player] then
+				local flat = Vector3.new(hrp.Position.X - base.X, 0, hrp.Position.Z - base.Z)
+				if flat.Magnitude <= w / 2 + 3 and hrp.Position.Y >= base.Y - 2 and hrp.Position.Y <= base.Y + h + 4 then
+					hitPlayers[player] = true
+					hurt(player, def.PlayerDamage, caster, def.DisplayName)
+					knock(player, Vector3.new(0, def.Knockback or 95, 0) + (if flat.Magnitude > 0.1 then flat.Unit * 15 else Vector3.zero))
+				end
+			end
+		end
+		task.wait(0.08)
+	end
+	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
+end
+
+-- Chain Arc: an energy bolt that jumps between survivors (through walls) or along metal.
+local function arcFx(from: Vector3, to: Vector3, color: Color3, life: number)
+	local prev = from
+	for i = 1, 4 do
+		local nextPoint = if i == 4 then to else from:Lerp(to, i / 4) + Vector3.new(math.random(-2, 2), math.random(-2, 2), math.random(-2, 2))
+		local seg = fxPart({ Name = "Arc", Size = Vector3.new(0.5, 0.5, math.max(0.5, (nextPoint - prev).Magnitude)), CFrame = CFrame.lookAt((prev + nextPoint) / 2, nextPoint), Color = color, Transparency = 0.1 })
+		TweenService:Create(seg, TweenInfo.new(life), { Transparency = 1 }):Play()
+		Debris:AddItem(seg, life + 0.05)
+		prev = nextPoint
+	end
+end
+
+local function chainArc(def: Ability, ground: Vector3, caster: Player?)
+	local color = CosmeticService.VfxOf(caster).Bolt or CYBER
+	ringTelegraph(ground, def.Radius, def.WarningTime, CosmeticService.VfxOf(caster).Telegraph or CYBER)
+	task.wait(def.WarningTime)
+	local hit: { [Player]: boolean } = {}
+	local pos = ground + Vector3.new(0, 3, 0)
+	local range = def.Length or 32
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { MapService.GetArenaFolder() }
+	local function zap(at: Vector3, victim: Player?)
+		sound("Lightning", at, 1.4, 1.4)
+		creditDestruction(caster, DestructionService.DamageArea(at, def.Radius * 0.6, def.StructureDamage, METAL_SCALE))
+		if victim then
+			hurt(victim, def.PlayerDamage, caster, def.DisplayName)
+			local hrp = hrpAndHumanoid(victim)
+			if hrp then
+				local flat = Vector3.new(hrp.Position.X - pos.X, 0, hrp.Position.Z - pos.Z)
+				knock(victim, (if flat.Magnitude > 0.1 then flat.Unit else Vector3.xAxis) * 25 + Vector3.new(0, 30, 0))
+			end
+		end
+	end
+	-- first strike: whoever is closest to the reticle
+	local first: Player? = nil
+	local best = def.Radius * 1.5
+	for _, player in RoleService.GetAliveSurvivors() do
+		local hrp = hrpAndHumanoid(player)
+		if hrp and (hrp.Position - pos).Magnitude <= best then
+			best = (hrp.Position - pos).Magnitude
+			first = player
+		end
+	end
+	arcFx(pos + Vector3.new(0, 60, 0), pos, color, 0.3)
+	if first then
+		hit[first] = true
+		local hrp = hrpAndHumanoid(first)
+		if hrp then
+			pos = hrp.Position
+		end
+	end
+	zap(pos, first)
+	for _ = 1, def.Count or 4 do
+		task.wait(def.Duration or 0.25)
+		local target: Vector3? = nil
+		local victim: Player? = nil
+		local nearest = range
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp and not hit[player] and (hrp.Position - pos).Magnitude <= nearest then
+				nearest = (hrp.Position - pos).Magnitude
+				target = hrp.Position
+				victim = player
+			end
+		end
+		if not target then
+			-- no one near: crawl along the nearest metal
+			local bestMetal = range
+			for _, part in workspace:GetPartBoundsInRadius(pos, range, params) do
+				if part:GetAttribute("Structural") == true and METAL_SCALE[part.Material] and part:GetAttribute("Broken") ~= true then
+					local d = (part.Position - pos).Magnitude
+					if d > 6 and d < bestMetal then
+						bestMetal = d
+						target = part.Position
+					end
+				end
+			end
+		end
+		if not target then
+			break
+		end
+		if victim then
+			hit[victim] = true
+		end
+		arcFx(pos, target :: Vector3, color, 0.35)
+		pos = target :: Vector3
+		zap(pos, victim)
+	end
+end
+
+-- Pyroclast Surge (Magma Claw): a slow lava wave rolls along a line, igniting wood.
+local function pyroclastSurge(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
+	local length = def.Length or 100
+	local width = def.Width or 12
+	ground = MapService.TerrainAt(ground)
+	local cf = CFrame.lookAt(ground, ground + dir)
+	lineTelegraph(cf, length, width, def.WarningTime)
+	EnvironmentService.Darken(def.WarningTime + 2)
+	task.wait(def.WarningTime)
+	local wave = fxPart({ Name = "LavaWave", Size = Vector3.new(width, 7, 6), CFrame = cf * CFrame.new(0, 3, length / 2), Color = Color3.fromRGB(255, 110, 30), Material = Enum.Material.CrackedLava })
+	local glow = Instance.new("Fire")
+	glow.Size = width
+	glow.Heat = 12
+	glow.Parent = wave
+	AudioService.attach("Rumble", wave, 2.2, true, 0.7)
+	local speed = def.Speed or 22
+	local travelled = 0
+	local tick = 0
+	local fireTimer = 0
+	local hit: { [Player]: boolean } = {}
+	while travelled < length do
+		local dt = task.wait()
+		travelled = math.min(length, travelled + speed * dt)
+		local at = cf * CFrame.new(0, 0, length / 2 - travelled)
+		local ground2 = MapService.TerrainAt(at.Position)
+		wave.CFrame = CFrame.lookAt(ground2, ground2 + dir) + Vector3.new(0, 3, 0)
+		tick += dt
+		fireTimer += dt
+		if tick >= 0.2 then
+			tick = 0
+			creditDestruction(caster, DestructionService.DamageBox(CFrame.lookAt(ground2, ground2 + dir) + Vector3.new(0, 15, 0), Vector3.new(width, 30, 7), def.StructureDamage * 0.3, WOOD_SCALE))
+			for _, player in RoleService.GetAliveSurvivors() do
+				local hrp = hrpAndHumanoid(player)
+				if hrp and not hit[player] then
+					local rel = wave.CFrame:PointToObjectSpace(hrp.Position)
+					if math.abs(rel.X) <= width / 2 + 1 and math.abs(rel.Z) <= 5 and rel.Y < 12 then
+						hit[player] = true
+						hurt(player, def.PlayerDamage, caster, def.DisplayName)
+						knock(player, dir * 40 + Vector3.new(0, 55, 0))
+					end
+				end
+			end
+		end
+		if fireTimer >= 0.9 then
+			fireTimer = 0
+			ComboService.DropFire(ground2, caster)
+		end
+	end
+	TweenService:Create(wave, TweenInfo.new(0.6), { Transparency = 1 }):Play()
+	Debris:AddItem(wave, 0.65)
+end
+
+-- System Override (Cyber Gauntlet): an EMP burst. Survivors caught lose their dash and
+-- get a scrambled screen for a few seconds.
+local function systemOverride(def: Ability, ground: Vector3, caster: Player?)
+	ringTelegraph(ground, def.Radius, def.WarningTime, CYBER)
+	task.wait(def.WarningTime)
+	local pulse = fxPart({ Name = "Emp", Shape = Enum.PartType.Ball, Size = Vector3.one * 3, CFrame = CFrame.new(ground + Vector3.new(0, 2, 0)), Color = CYBER, Transparency = 0.2 })
+	TweenService:Create(pulse, TweenInfo.new(0.4, Enum.EasingStyle.Quad), { Size = Vector3.one * def.Radius * 2.2, Transparency = 1 }):Play()
+	Debris:AddItem(pulse, 0.45)
+	sound("Glass", ground, 2, 0.5)
+	sound("Lightning", ground, 1.6, 1.8)
+	shakeAll(0.5, 0.3, ground)
+	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage, METAL_SCALE))
+	for _, player in RoleService.GetAliveSurvivors() do
+		local hrp = hrpAndHumanoid(player)
+		if hrp and (hrp.Position - ground).Magnitude <= def.Radius + 1.5 then
+			clientEffect:FireClient(player, "Emp", def.Duration or 3)
+		end
+	end
+	blast(ground, def.Radius, def.PlayerDamage, caster, 25, def.DisplayName)
+end
+
 local function execute(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
 	if def.Id == "SeismicPing" then
 		seismicPing(def, ground, caster)
@@ -686,21 +1064,29 @@ local function execute(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		eruption(def, ground, caster)
 	elseif def.Id == "Glitch" then
 		glitch(def, ground, caster)
+	elseif def.Id == "GravitySingularity" then
+		singularity(def, ground, caster, false)
+	elseif def.Id == "AstralCollapse" then
+		singularity(def, ground, caster, true)
+	elseif def.Id == "TectonicSpire" then
+		tectonicSpire(def, ground, caster)
+	elseif def.Id == "ChainArc" then
+		chainArc(def, ground, caster)
+	elseif def.Id == "MeteorBarrage" then
+		meteorBarrage(def, ground, dir, caster)
+	elseif def.Id == "PyroclastSurge" then
+		pyroclastSurge(def, ground, dir, caster)
+	elseif def.Id == "SystemOverride" then
+		systemOverride(def, ground, caster)
+	elseif def.Id == "MaelstromVortex" then
+		tornado(def, ground, dir, caster, true)
 	end
 end
 
--- A human God may only cast what their equipped kit contains (plus the universal slot).
+-- A human God may only cast what their loadout holds: the equipped kit, the God Pack
+-- signature swapped in (shared/Loadout) and the universal slot.
 local function kitAllows(player: Player, id: string): boolean
-	if table.find(Config.Disasters.UniversalAbilities, id) then
-		return true
-	end
-	local kitId = player:GetAttribute(Attributes.Kit)
-	for _, kit in Config.Kits do
-		if kit.Id == kitId then
-			return table.find(kit.Abilities, id) ~= nil
-		end
-	end
-	return false
+	return Loadout.allows(player:GetAttribute(Attributes.Kit), ReplicatedStorage:GetAttribute(Attributes.GodSkin), id)
 end
 
 ---------------------------------------------------------------------------
@@ -751,6 +1137,15 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 		end
 	end
 	local ground = MapService.GroundAt(target)
+	-- under a glass canopy (the Bio-Dome) the impact cracks the panels overhead too
+	if def.Tier ~= "Utility" then
+		local canopy = MapService.CanopyAbove(ground)
+		if canopy then
+			task.delay(def.WarningTime, function()
+				DestructionService.DamageArea(canopy.Position, Config.Destruction.CanopyCrackRadius, def.StructureDamage * Config.Destruction.CanopyCrackScale)
+			end)
+		end
+	end
 	-- every disaster announces itself with its own sound
 	local cue = Config.Audio.AbilityCue[id]
 	if cue then
@@ -782,7 +1177,7 @@ local function directorLoop()
 		local affordable: { Ability } = {}
 		local majors: { Ability } = {}
 		for _, def in Config.Disasters.Abilities do
-			if def.Tier ~= "Utility" and pool.Energy >= def.Cost and (pool.Ready[def.Id] or 0) <= now then
+			if def.Tier ~= "Utility" and def.Signature ~= true and pool.Energy >= def.Cost and (pool.Ready[def.Id] or 0) <= now then
 				table.insert(affordable, def)
 				if def.Tier == "Major" then
 					table.insert(majors, def)

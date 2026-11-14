@@ -309,6 +309,12 @@ local function standDancer(board: Model)
 	if avatar then
 		hideTemplateRig(avatar)
 	end
+	-- the template's spotlight (Brightness 10) blew the dancer out to white
+	for _, d in board:GetDescendants() do
+		if d:IsA("SpotLight") then
+			d.Brightness = L.DancerLight
+		end
+	end
 	local dancer = source:Clone()
 	dancer.Name = "Dancer"
 	local root = dancer:FindFirstChild("HumanoidRootPart") :: BasePart?

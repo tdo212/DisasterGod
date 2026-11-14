@@ -28,6 +28,21 @@ type Preset = {
 }
 
 local PRESETS: { [string]: Preset } = {
+	-- the Sky Lodge between rounds: indoor warmth, gentle exposure so avatars keep their colour
+	Lodge = {
+		ClockTime = 15.5,
+		Brightness = 1.8,
+		Ambient = Color3.fromRGB(80, 72, 70),
+		OutdoorAmbient = Color3.fromRGB(120, 112, 108),
+		Tint = Color3.fromRGB(255, 244, 232),
+		Saturation = 0.1,
+		Contrast = 0.06,
+		AtmosphereColor = Color3.fromRGB(220, 210, 200),
+		AtmosphereDecay = Color3.fromRGB(150, 140, 130),
+		Density = 0.25,
+		Haze = 0.8,
+		Bloom = 0.15,
+	},
 	Day = {
 		ClockTime = 14.5,
 		Brightness = 3,
@@ -45,8 +60,8 @@ local PRESETS: { [string]: Preset } = {
 	Night = {
 		ClockTime = 20.6,
 		Brightness = 2.2,
-		Ambient = Color3.fromRGB(125, 105, 165),
-		OutdoorAmbient = Color3.fromRGB(165, 140, 210),
+		Ambient = Color3.fromRGB(118, 100, 155),
+		OutdoorAmbient = Color3.fromRGB(155, 132, 198),
 		Tint = Color3.fromRGB(235, 225, 255),
 		Saturation = 0.3,
 		Contrast = 0.12,
@@ -54,7 +69,7 @@ local PRESETS: { [string]: Preset } = {
 		AtmosphereDecay = Color3.fromRGB(70, 40, 120),
 		Density = 0.3,
 		Haze = 1.3,
-		Bloom = 0.7,
+		Bloom = 0.22,
 	},
 	Desert = {
 		ClockTime = 13,
@@ -96,7 +111,52 @@ local PRESETS: { [string]: Preset } = {
 		AtmosphereDecay = Color3.fromRGB(240, 140, 120),
 		Density = 0.3,
 		Haze = 1.4,
-		Bloom = 0.5,
+		Bloom = 0.3,
+	},
+	-- Chrono-Spire: warm golden sunset haze over the foundries
+	Foundry = {
+		ClockTime = 17.4,
+		Brightness = 2.4,
+		Ambient = Color3.fromRGB(115, 90, 70),
+		OutdoorAmbient = Color3.fromRGB(190, 150, 110),
+		Tint = Color3.fromRGB(255, 232, 200),
+		Saturation = 0.22,
+		Contrast = 0.1,
+		AtmosphereColor = Color3.fromRGB(255, 200, 130),
+		AtmosphereDecay = Color3.fromRGB(220, 140, 80),
+		Density = 0.36,
+		Haze = 2,
+		Bloom = 0.25,
+	},
+	-- Verdant Bio-Dome: bright midday through glass, green bounce light
+	Conservatory = {
+		ClockTime = 12.5,
+		Brightness = 3,
+		Ambient = Color3.fromRGB(90, 110, 90),
+		OutdoorAmbient = Color3.fromRGB(150, 175, 150),
+		Tint = Color3.fromRGB(240, 255, 238),
+		Saturation = 0.22,
+		Contrast = 0.05,
+		AtmosphereColor = Color3.fromRGB(215, 240, 220),
+		AtmosphereDecay = Color3.fromRGB(150, 200, 170),
+		Density = 0.3,
+		Haze = 1.1,
+		Bloom = 0.2,
+	},
+	-- Ironclad Armada: dark overcast storm, driving rain (client weather adds the flashes)
+	Tempest = {
+		ClockTime = 15,
+		Brightness = 2,
+		Ambient = Color3.fromRGB(100, 108, 120),
+		OutdoorAmbient = Color3.fromRGB(140, 150, 165),
+		Tint = Color3.fromRGB(215, 225, 240),
+		Saturation = -0.15,
+		Contrast = 0.14,
+		AtmosphereColor = Color3.fromRGB(120, 130, 145),
+		AtmosphereDecay = Color3.fromRGB(70, 80, 95),
+		Density = 0.42,
+		Haze = 2.4,
+		Bloom = 0.15,
 	},
 	Volcanic = {
 		ClockTime = 15,
@@ -159,20 +219,32 @@ function EnvironmentService.Init()
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
 	Lighting.GlobalShadows = true
+	Lighting.ExposureCompensation = -0.15
+	-- the place file ships its own Bloom / SunRays / Atmosphere / DepthOfField; stacked on
+	-- ours they doubled the glow (neon and white avatars blew out). Ours are the only ones.
+	for _, effect in Lighting:GetChildren() do
+		if string.sub(effect.Name, 1, 2) ~= "DG" then
+			if effect:IsA("PostEffect") then
+				effect.Enabled = false
+			elseif effect:IsA("Atmosphere") then
+				effect:Destroy()
+			end
+		end
+	end
 
 	atmosphere = ensure("Atmosphere", "DGAtmosphere")
 	atmosphere.Offset = 0.2
 	atmosphere.Glare = 0.2
 	correction = ensure("ColorCorrectionEffect", "DGColor")
 	bloom = ensure("BloomEffect", "DGBloom")
-	bloom.Size = 24
-	bloom.Threshold = 2
+	bloom.Size = 18
+	bloom.Threshold = 2.4
 	local rays: SunRaysEffect = ensure("SunRaysEffect", "DGSunRays")
 	rays.Intensity = 0.06
 	rays.Spread = 0.6
 	ensure("Sky", "DGSky")
 
-	EnvironmentService.ApplyPreset("Day", 0)
+	EnvironmentService.ApplyPreset("Lodge", 0)
 end
 
 -- Switch the whole look for a map (tweened unless seconds == 0).

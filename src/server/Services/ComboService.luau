@@ -194,14 +194,33 @@ function ComboService.DropFire(position: Vector3, caster: Player?)
 	if inZone(puddles, ground) then
 		return
 	end
+	-- Magma Claw God Pack: the God's fires burn longer
+	local skin = ReplicatedStorage:GetAttribute(Config.Attributes.GodSkin)
+	local pack = if caster and typeof(skin) == "string" then Config.GodPacks[skin] else nil
+	local duration = CB.FireDuration * (if pack and pack.FireDurationScale then pack.FireDurationScale else 1)
 	local part = disc(ground, CB.FireRadius, FIRE, 0.35)
 	local flame = Instance.new("Fire")
 	flame.Size = CB.FireRadius * 1.4
 	flame.Heat = 8
 	flame.Parent = part
-	TweenService:Create(part, TweenInfo.new(CB.FireDuration, Enum.EasingStyle.Linear), { Transparency = 0.9 }):Play()
-	Debris:AddItem(part, CB.FireDuration)
-	table.insert(fires, { Position = ground, Radius = CB.FireRadius, Until = os.clock() + CB.FireDuration, Damaging = true, Caster = caster, Part = part })
+	TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Linear), { Transparency = 0.9 }):Play()
+	Debris:AddItem(part, duration)
+	table.insert(fires, { Position = ground, Radius = CB.FireRadius, Until = os.clock() + duration, Damaging = true, Caster = caster, Part = part })
+end
+
+-- Put out every fire within `radius` (the Maelstrom Vortex). Returns how many.
+function ComboService.Extinguish(position: Vector3, radius: number): number
+	local count = 0
+	for _, fire in fires do
+		if fire.Until > os.clock() and (Vector3.new(fire.Position.X - position.X, 0, fire.Position.Z - position.Z)).Magnitude <= radius + fire.Radius then
+			fire.Until = 0
+			count += 1
+			if fire.Part and fire.Part.Parent then
+				fire.Part:Destroy()
+			end
+		end
+	end
+	return count
 end
 
 -- A flooded patch at `position`. Puts out fires inside it.

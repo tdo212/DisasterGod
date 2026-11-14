@@ -13,6 +13,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
+local Loadout = require(Shared:WaitForChild("Loadout") :: ModuleScript)
 local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 local Types = require(Shared:WaitForChild("Types") :: ModuleScript)
 
@@ -71,24 +72,11 @@ local function readyAt(id: string): number
 	return player:GetAttribute(Attributes.CooldownPrefix .. id) :: number? or 0
 end
 
--- The five abilities of the equipped kit, then the universal ones (Seismic Ping).
+-- The five abilities of the equipped kit (with the God Pack signature swapped in), then
+-- the universal ones (Seismic Ping). See shared/Loadout.
 local function currentLoadout(): { Ability }
-	local kitId = player:GetAttribute(Attributes.Kit)
-	local kit = Config.Kits[1]
-	for _, candidate in Config.Kits do
-		if candidate.Id == kitId then
-			kit = candidate
-			break
-		end
-	end
 	local list = {}
-	for _, id in kit.Abilities do
-		local def = abilityById[id]
-		if def then
-			table.insert(list, def)
-		end
-	end
-	for _, id in Config.Disasters.UniversalAbilities do
+	for _, id in Loadout.ids(player:GetAttribute(Attributes.Kit), ReplicatedStorage:GetAttribute(Attributes.GodSkin)) do
 		local def = abilityById[id]
 		if def then
 			table.insert(list, def)
@@ -336,7 +324,7 @@ local function updateReticle()
 	line.Color = color
 	beam.Color = color
 	local pulse = 1 + math.sin(os.clock() * 6) * 0.04
-	if def.Id == "FaultCleave" then
+	if def.Width then -- line abilities: Fault Cleave, Meteor Barrage, Pyroclast Surge
 		ring.Transparency = 1
 		line.Transparency = 0.45
 		line.Size = Vector3.new(def.Width or 8, 0.3, def.Length or 100)
@@ -474,6 +462,7 @@ function GodController.Start()
 	buildGui()
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(evaluate)
 	player:GetAttributeChangedSignal(Attributes.Kit):Connect(buildSlots)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.GodSkin):Connect(buildSlots) -- God Pack signature
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(evaluate)
 	player.CharacterAdded:Connect(function()
 		task.defer(evaluate)

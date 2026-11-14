@@ -228,6 +228,8 @@ export type HighriseStyle = {
 	PillarHeight: number?, -- open ground floor of exposed pillars
 	OpenSide: string?, -- "East" | "West": side left open for the ladder
 	Health: number?, -- per-part health override (reinforced vaults)
+	Stairwell: boolean?, -- a ladder shaft in the north-west corner reaches every floor and the roof
+	Windows: boolean?, -- upper-floor walls get window gaps (see in, peek out)
 }
 
 -- Multi-storey structure whose floors stack on support columns.
@@ -248,6 +250,7 @@ function Builder.highrise(
 	local level = 1
 	local y = base.Y
 	local hx, hz = width / 2, depth / 2
+	local floorBelow = base.Y -- top of the floor under the slab being laid (stairwell ladders)
 
 	local function columnGrid(fromY: number, height: number, lvl: number, size: number)
 		local xs = { -hx + size / 2, hx - size / 2 }
@@ -276,6 +279,21 @@ function Builder.highrise(
 		local tw, td = width / nx, depth / nz
 		for ix = 1, nx do
 			for iz = 1, nz do
+				if style.Stairwell and ix == 1 and iz == nz and nx > 1 and nz > 1 then
+					-- stairwell hole: a climbable truss rises through it from the floor below
+					local hx0 = base.X - hx + tw * 0.5
+					local hz0 = base.Z - hz + td * (nz - 0.5)
+					local shaft = Builder.part(model, {
+						Name = "StairLadder",
+						Class = "TrussPart",
+						Size = Vector3.new(2, atY + 1.5 - floorBelow + 2, 2),
+						CFrame = CFrame.new(hx0 - tw / 2 + 1.6, (floorBelow + atY + 1.5 + 2) / 2, hz0),
+						Color = Color3.fromRGB(90, 90, 100),
+						Material = Enum.Material.Metal,
+					})
+					Builder.structural(shaft, lvl - 1, false, 60)
+					continue
+				end
 				local tile = Builder.block(
 					model,
 					"Slab",
@@ -303,9 +321,15 @@ function Builder.highrise(
 				end
 				local offset = -length / 2 + segLen * (i - 0.5)
 				local pos = center + (if alongX then Vector3.new(offset, 0, 0) else Vector3.new(0, 0, offset))
+				local h = height
+				if style.Windows and not groundFloor and i % 2 == 0 then
+					-- a window: the lower half of the wall only (crouch behind it, peek over it)
+					h = height * 0.45
+					pos -= Vector3.new(0, (height - h) / 2, 0)
+				end
 				local panel = Builder.part(model, {
 					Name = "Wall",
-					Size = if alongX then Vector3.new(segLen, height, 0.6) else Vector3.new(0.6, height, segLen),
+					Size = if alongX then Vector3.new(segLen, h, 0.6) else Vector3.new(0.6, h, segLen),
 					CFrame = CFrame.new(pos),
 					Color = style.WallColor,
 					Material = style.WallMaterial,
@@ -333,6 +357,7 @@ function Builder.highrise(
 			slab(y, level)
 			floorTop = y + 1.5
 		end
+		floorBelow = floorTop
 		local wallHeight = floorHeight - 1.5
 		columnGrid(floorTop, wallHeight, level, 2)
 		walls(floorTop, wallHeight, level, floor == 1)
@@ -416,7 +441,7 @@ function Builder.bridge(
 				Size = Vector3.new(0.35, 0.35, segLen),
 				CFrame = CFrame.lookAt(rp, rp + dir),
 				Color = railColor,
-				Material = Enum.Material.Neon,
+				Material = Enum.Material.Metal, -- not Neon: rails everywhere added up to too much glow
 			})
 			Builder.structural(rail, 2, false, 20)
 		end
@@ -504,6 +529,35 @@ function Builder.waterTower(parent: Instance, base: Vector3, legHeight: number, 
 		Builder.fallDirection(model, fallDir)
 	end
 	return model
+end
+
+-- Standing on this part launches you upward (steam vents, geysers). Read by the client.
+function Builder.launchPad(part: BasePart, power: number): BasePart
+	part:SetAttribute("LaunchPower", power)
+	return part
+end
+
+-- The client spins this part around its own axes (radians / second) while it is anchored
+-- (clock gears, radar dishes, propellers). Purely visual: keep it non-colliding.
+function Builder.spin(part: BasePart, radiansPerSecond: Vector3): BasePart
+	part:SetAttribute("Spin", radiansPerSecond)
+	part.CanCollide = false
+	return part
+end
+
+-- When this building's supports fail it lists (rotates `degrees` around a world axis
+-- through `pivot`) instead of collapsing; a second failure afterwards collapses it.
+function Builder.tilt(model: Model, pivot: Vector3, axis: Vector3, degrees: number)
+	model:SetAttribute("TiltPivot", pivot)
+	model:SetAttribute("TiltAxis", axis.Unit)
+	model:SetAttribute("TiltDegrees", degrees)
+end
+
+-- Overhead cover the God's targeting sees through (glass dome panels): the reticle and
+-- the disasters land on whatever is under it. Impacts still crack the panels above.
+function Builder.canopy(part: BasePart): BasePart
+	part:SetAttribute("Canopy", true)
+	return part
 end
 
 -- Decorative neon strip (not destructible).

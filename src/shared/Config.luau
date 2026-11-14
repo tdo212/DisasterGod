@@ -117,6 +117,136 @@ local Abilities: { Types.AbilityDefinition } = {
 		StructureDamage = 115,
 		Knockback = 70,
 	},
+	-- big-map disasters (the Cataclysm kit; the AI Director uses them too)
+	{
+		Id = "GravitySingularity",
+		DisplayName = "Singularity",
+		Icon = "🕳️",
+		Tier = "Major",
+		Cost = 50,
+		Cooldown = 15,
+		WarningTime = 1,
+		Radius = 28, -- pull radius
+		PlayerDamage = 35,
+		StructureDamage = 230,
+		Knockback = 75, -- outward blast at the end
+		Duration = 2.5, -- seconds of pull before it detonates
+		ImpactRadius = 16, -- detonation radius
+		Pull = 38, -- inward speed (studs / s) at the rim
+	},
+	{
+		Id = "TectonicSpire",
+		DisplayName = "Tectonic Spire",
+		Icon = "🗻",
+		Tier = "Major",
+		Cost = 45,
+		Cooldown = 13,
+		WarningTime = 1.4,
+		Radius = 14,
+		PlayerDamage = 30,
+		StructureDamage = 420, -- smashes up through floors
+		Knockback = 95, -- straight up
+		Count = 5, -- pillars
+		Length = 46, -- pillar height
+	},
+	{
+		Id = "ChainArc",
+		DisplayName = "Chain Arc",
+		Icon = "🔗",
+		Tier = "Major",
+		Cost = 35,
+		Cooldown = 9,
+		WarningTime = 0.8,
+		Radius = 10,
+		PlayerDamage = 30,
+		StructureDamage = 110,
+		Count = 4, -- jumps after the first hit
+		Length = 32, -- max jump distance (through walls: punishes groups hiding together)
+		Duration = 0.25, -- seconds per jump
+	},
+	{
+		Id = "MeteorBarrage",
+		DisplayName = "Meteor Barrage",
+		Icon = "🎯",
+		Tier = "Major",
+		Cost = 40,
+		Cooldown = 11,
+		WarningTime = 1.6,
+		Radius = 9,
+		PlayerDamage = 35,
+		StructureDamage = 230,
+		Count = 7, -- impacts rolling along the line
+		ImpactRadius = 9,
+		Length = 80, -- the line runs along your camera's facing
+		Width = 12,
+		Duration = 0.18, -- seconds between impacts
+	},
+	-- God Pack signatures (Config.GodPacks): each one costs and cools down exactly like the
+	-- ability it replaces, so a pack changes the playstyle, never the power.
+	{
+		Id = "PyroclastSurge",
+		DisplayName = "Pyroclast Surge",
+		Icon = "🌊",
+		Tier = "Major",
+		Signature = true,
+		Cost = 65,
+		Cooldown = 18,
+		WarningTime = 2.5,
+		Radius = 8,
+		PlayerDamage = 40,
+		StructureDamage = 300, -- wood takes double
+		Length = 100,
+		Width = 12,
+		Speed = 22, -- the lava wave rolls forward at this speed
+	},
+	{
+		Id = "SystemOverride",
+		DisplayName = "System Override",
+		Icon = "📵",
+		Tier = "Minor",
+		Signature = true,
+		Cost = 12,
+		Cooldown = 2.5,
+		WarningTime = 1.5,
+		Radius = 14,
+		PlayerDamage = 25,
+		StructureDamage = 140,
+		Duration = 3, -- dash jammed + screen scrambled
+	},
+	{
+		Id = "AstralCollapse",
+		DisplayName = "Astral Collapse",
+		Icon = "🌌",
+		Tier = "Major",
+		Signature = true,
+		Cost = 40,
+		Cooldown = 10,
+		WarningTime = 2,
+		Radius = 26,
+		PlayerDamage = 40,
+		StructureDamage = 240,
+		Knockback = 110, -- mostly upward
+		Duration = 2,
+		ImpactRadius = 15,
+		Pull = 34,
+	},
+	{
+		Id = "MaelstromVortex",
+		DisplayName = "Maelstrom Vortex",
+		Icon = "🌀",
+		Tier = "Major",
+		Signature = true,
+		Cost = 55,
+		Cooldown = 16,
+		WarningTime = 2,
+		Radius = 17,
+		PlayerDamage = 0,
+		StructureDamage = 90,
+		Duration = 8,
+		Speed = 20, -- follows your reticle instead of chasing survivors
+		TickDamage = 8,
+		Knockback = 60,
+	},
 	-- every kit also gets this one (Disasters.UniversalAbilities)
 	{
 		Id = "SeismicPing",
@@ -139,6 +269,16 @@ local Kits: { Types.KitDefinition } = {
 	{ Id = "Storm", Name = "Storm Deity", Icon = "⛈️", Description = "Chain bolts and hurricanes", Price = 1500, Color = Color3.fromRGB(40, 140, 255), Abilities = { "Lightning", "ChainLightning", "Gust", "Tornado", "Meteor" } },
 	{ Id = "Magma", Name = "Magma Titan", Icon = "🔥", Description = "Eruptions, meteors, fissures", Price = 2500, Color = Color3.fromRGB(255, 110, 30), Abilities = { "Eruption", "Meteor", "FaultCleave", "Lightning", "Gust" } },
 	{ Id = "Glitch", Name = "Cyber Glitch", Icon = "👾", Description = "Glitch pulses and chain bolts", Price = 4000, Color = Color3.fromRGB(255, 60, 200), Abilities = { "Glitch", "ChainLightning", "Lightning", "Tornado", "FaultCleave" } },
+	{ Id = "Cataclysm", Name = "Cataclysm", Icon = "🕳️", Description = "Singularities, spires, barrages", Price = 3500, Color = Color3.fromRGB(120, 80, 255), Abilities = { "MeteorBarrage", "TectonicSpire", "ChainArc", "GravitySingularity", "Gust" } },
+}
+
+-- God Packs: a GodSkin cosmetic that also swaps one ability for its signature version
+-- (shared/Loadout) and brings a matching elimination finisher. Same cost, same cooldown.
+local GodPacks: { [string]: Types.GodPack } = {
+	MagmaClaw = { Replaces = "FaultCleave", Signature = "PyroclastSurge", Finisher = "LavaBurst", Synergy = "Fires burn twice as long", FireDurationScale = 2 },
+	CyberGauntlet = { Replaces = "Lightning", Signature = "SystemOverride", Finisher = "VoxelDissolve", Synergy = "Jams survivors' dash" },
+	CelestialMask = { Replaces = "Meteor", Signature = "AstralCollapse", Finisher = "SkyBeam", Synergy = "Huge vertical launches" },
+	StormSovereign = { Replaces = "Tornado", Signature = "MaelstromVortex", Finisher = "StormBolt", Synergy = "Puts out fires, flings rubble" },
 }
 
 -- Spin wheel segments. Odds shown to players are Weight / total weight.
@@ -227,9 +367,10 @@ local Cosmetics: { Types.CosmeticDefinition } = {
 	-- God Skins: a giant sky avatar that hovers over the God's reticle for everyone to see
 	{ Id = "StormEye", Category = "GodSkin", Name = "Storm Eye", Icon = "👁️", Description = "The all-seeing storm", Color = Color3.fromRGB(90, 170, 255) },
 	{ Id = "StoneFist", Category = "GodSkin", Name = "Stone Fist", Icon = "✊", Description = "A mountain comes down", Color = Color3.fromRGB(150, 140, 130), Coins = 3000 },
-	{ Id = "MagmaClaw", Category = "GodSkin", Name = "Magma Claw", Icon = "🔥", Description = "Molten talons", Color = Color3.fromRGB(255, 110, 30), Product = "SkinMagmaClaw" },
-	{ Id = "CyberGauntlet", Category = "GodSkin", Name = "Cyber Gauntlet", Icon = "🤖", Description = "Neon steel fist", Color = Color3.fromRGB(60, 230, 255), Product = "SkinCyberGauntlet" },
-	{ Id = "CelestialMask", Category = "GodSkin", Name = "Celestial Mask", Icon = "🌟", Description = "A golden deity watches", Color = Color3.fromRGB(255, 205, 60), Product = "SkinCelestialMask" },
+	{ Id = "MagmaClaw", Category = "GodSkin", Name = "Magma Claw", Icon = "🔥", Description = "Signature: Pyroclast Surge", Color = Color3.fromRGB(255, 110, 30), Product = "SkinMagmaClaw" },
+	{ Id = "CyberGauntlet", Category = "GodSkin", Name = "Cyber Gauntlet", Icon = "🤖", Description = "Signature: System Override", Color = Color3.fromRGB(60, 230, 255), Product = "SkinCyberGauntlet" },
+	{ Id = "CelestialMask", Category = "GodSkin", Name = "Celestial Mask", Icon = "🌟", Description = "Signature: Astral Collapse", Color = Color3.fromRGB(255, 205, 60), Product = "SkinCelestialMask" },
+	{ Id = "StormSovereign", Category = "GodSkin", Name = "Storm Sovereign", Icon = "🌩️", Description = "Signature: Maelstrom Vortex", Color = Color3.fromRGB(90, 150, 255), Coins = 7500 },
 	-- Disaster FX: recolours / reshapes your disasters as God
 	{ Id = "ClassicFx", Category = "Vfx", Name = "Classic", Icon = "⚡", Description = "Storm blue and fire", Color = Color3.fromRGB(120, 200, 255) },
 	{ Id = "GoldenWrath", Category = "Vfx", Name = "Golden Wrath", Icon = "✨", Description = "Everything in gold", Color = Color3.fromRGB(255, 200, 40), Coins = 2500 },
@@ -496,6 +637,7 @@ local Config = {
 	},
 
 	Kits = Kits,
+	GodPacks = GodPacks,
 	DefaultKit = "Architect",
 
 	Spin = {
@@ -521,6 +663,7 @@ local Config = {
 		Template = "TimePlayedLeaderboard", -- workspace model the extra boards are cloned from
 		Dancer = "dancinggirl", -- workspace model that dances on each board's pedestal (moved to ServerStorage at runtime)
 		DancerFallbackOffset = Vector3.new(-9, 1, 0), -- board-local spot if a board has no pedestal
+		DancerLight = 1.6, -- board spotlight brightness on the dancer (template ships 10)
 		-- Hall of Legends podium in the lodge: the all-time top three of this stat stand on it
 		Hall = { Stat = "RoundsSurvived", Unit = "rounds", Subtitle = "Most rounds survived · all time" },
 		Boards = {
@@ -564,6 +707,10 @@ local Config = {
 		BuckleNoCollideTime = 1, -- seconds those supports pass through the falling floors
 		DirectedFallSpeed = 16, -- push for buildings with a FallDirection (obelisks, billboards, wheel)
 		DirectedTipSpin = 1.6, -- rad/s tip-over spin for directed falls
+		CrashDelay = 0.9, -- seconds after a heavy hull starts falling that its impact lands (CrashDamage)
+		TiltSeconds = 2.2, -- a ship section listing over when its bulkheads fail (Builder.tilt)
+		CanopyCrackRadius = 12, -- impacts under a glass canopy crack the panels overhead
+		CanopyCrackScale = 0.6, -- x the ability's structure damage
 		DebrisLifetime = 9, -- seconds debris stays solid
 		DebrisLifetimeJitter = 3,
 		DebrisFadeTime = 2.5, -- then it ghosts through players, shrinks and fades
@@ -647,10 +794,17 @@ local Config = {
 			SunscorchedMirage = 9125742262, -- airy desert wind (PSE)
 			OutpostZero = 81404060588532, -- Howling Wind
 			StarlightBoardwalk = 9118695887, -- Roller Coaster crowd (PSE)
+			ChronoSpire = 9112839913, -- Oil Refinery: burners, pump clatter, machine hiss (PSE)
+			VerdantDome = 9112803829, -- Jungle Birds, exotic calls (PSE)
+			IroncladArmada = 82247046952844, -- Thunder & Rain (TooLost)
 		} :: { [string]: number },
 		AmbienceLayer = {
 			StarlightBoardwalk = 9117143228, -- Ocean Surf (PSE)
 			OutpostZero = 9120621792, -- Waves Rolling (PSE)
+			FractureBay = 9118858002, -- Seagulls flock overhead (PSE)
+			VerdantDome = 9120552550, -- Waterfall steady stream (PSE)
+			IroncladArmada = 9126201551, -- heavy rolling surf (PSE)
+			ChronoSpire = 9112838943, -- refinery fan whir and metal groans (PSE)
 		} :: { [string]: number },
 		Ui = {
 			Click = "rbxasset://sounds/clickfast.wav",
@@ -694,6 +848,14 @@ local Config = {
 			FaultCleave = { Key = "Rumble", Volume = 1.2, Speed = 1.3 },
 			Eruption = { Key = "Rumble", Volume = 1.6, Speed = 0.8 },
 			Glitch = { Key = "Glass", Volume = 1.2, Speed = 0.6 },
+			GravitySingularity = { Key = "Rumble", Volume = 1.4, Speed = 0.5 },
+			TectonicSpire = { Key = "Rumble", Volume = 1.5, Speed = 1.1 },
+			ChainArc = { Key = "Thunder", Volume = 0.8, Speed = 2.4 },
+			MeteorBarrage = { Key = "MeteorFall", Volume = 1.6, Speed = 0.7 },
+			PyroclastSurge = { Key = "Rumble", Volume = 1.6, Speed = 0.7 },
+			SystemOverride = { Key = "Glass", Volume = 1.2, Speed = 1.4 },
+			AstralCollapse = { Key = "Rumble", Volume = 1.6, Speed = 0.4 },
+			MaelstromVortex = { Key = "Gust", Volume = 1.6, Speed = 0.5 },
 		} :: { [string]: { Key: string, Volume: number, Speed: number } },
 		SirenVolume = 0.35,
 		Volume = {
@@ -724,9 +886,10 @@ local Config = {
 	World = {
 		ArenaCenter = Vector3.new(0, 0, 0),
 		ArenaRadius = 175,
+		BoundsMargin = 55, -- casts are allowed this far past a map's own Radius
 		LobbyOrigin = Vector3.new(0, 150, -232), -- close + low enough that the balcony overlooks the arena
 		GodPerch = Vector3.new(0, 150, 0),
-		MapRotation = { "FractureBay", "NeoShibuya", "MagmaCore", "SunscorchedMirage", "OutpostZero", "StarlightBoardwalk" },
+		MapRotation = { "ChronoSpire", "FractureBay", "NeoShibuya", "VerdantDome", "MagmaCore", "SunscorchedMirage", "IroncladArmada", "OutpostZero", "StarlightBoardwalk" },
 		MapDisplayNames = {
 			FractureBay = "Fracture Bay",
 			NeoShibuya = "Neo-Shibuya Skyline",
@@ -734,6 +897,9 @@ local Config = {
 			SunscorchedMirage = "Sunscorched Mirage",
 			OutpostZero = "Outpost Zero",
 			StarlightBoardwalk = "Starlight Boardwalk",
+			ChronoSpire = "Chrono-Spire Citadel",
+			VerdantDome = "Verdant Bio-Dome",
+			IroncladArmada = "Ironclad Armada",
 		} :: { [string]: string },
 		MapIcons = {
 			FractureBay = "🏖️",
@@ -742,8 +908,32 @@ local Config = {
 			SunscorchedMirage = "🏜️",
 			OutpostZero = "🧊",
 			StarlightBoardwalk = "🎡",
+			ChronoSpire = "⚙️",
+			VerdantDome = "🌿",
+			IroncladArmada = "⚓",
 		} :: { [string]: string },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
+	},
+
+	-- Client weather per map (MapFxController). Kinds: Rain | Snow | Pollen | Embers | Dust.
+	Weather = {
+		Maps = {
+			IroncladArmada = { Kind = "Rain", Rate = 450, Lightning = true },
+			NeoShibuya = { Kind = "Rain", Rate = 140 },
+			OutpostZero = { Kind = "Snow", Rate = 160 },
+			VerdantDome = { Kind = "Pollen", Rate = 40 },
+			ChronoSpire = { Kind = "Embers", Rate = 30 },
+			MagmaCore = { Kind = "Embers", Rate = 60 },
+			SunscorchedMirage = { Kind = "Dust", Rate = 14 },
+		} :: { [string]: { Kind: string, Rate: number, Lightning: boolean? } },
+		Area = 140, -- emitter footprint over the camera
+		Height = 45, -- studs above the camera
+		MaxCameraHeight = 130, -- above this the camera is at the Sky Lodge: no weather
+		FlashMin = 7, -- seconds between lightning flashes
+		FlashMax = 15,
+		FlashBrightness = 0.45,
+		ThunderVolume = 0.5,
+		LaunchCooldown = 0.6, -- steam vents (Builder.launchPad)
 	},
 
 	Camera = {

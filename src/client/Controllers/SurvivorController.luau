@@ -281,12 +281,55 @@ local function refreshVisibility()
 	gearBar.Visible = role == "Survivor" and alive and phase == "Active"
 end
 
+-- System Override (Cyber Gauntlet God Pack): the dash is jammed and the screen
+-- scrambles for a few seconds.
+local function emp(seconds: number)
+	dashReadyAt = math.max(dashReadyAt, os.clock() + seconds)
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then
+		return
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "EmpScramble"
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 20
+	gui.Parent = playerGui
+	local layer = Components.scaledRoot(gui)
+	local bars: { Frame } = {}
+	for i = 1, 7 do
+		local bar = Instance.new("Frame")
+		bar.BorderSizePixel = 0
+		bar.BackgroundColor3 = if i % 2 == 0 then Color3.fromRGB(60, 230, 255) else Color3.fromRGB(255, 60, 200)
+		bar.BackgroundTransparency = 0.75
+		bar.Size = UDim2.new(1, 0, 0, 10)
+		bar.Parent = gui
+		table.insert(bars, bar)
+	end
+	Components.label({ Name = "Warning", Text = "📵 SYSTEM OVERRIDE · DASH JAMMED", TextSize = 26, Color = Color3.fromRGB(120, 255, 255), Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromScale(0, 0.28), Parent = layer })
+	task.spawn(function()
+		local t = 0
+		while t < seconds and gui.Parent do
+			for _, bar in bars do
+				bar.Position = UDim2.fromScale(0, math.random())
+				bar.Size = UDim2.new(1, 0, 0, math.random(4, 26))
+			end
+			t += task.wait(0.06)
+		end
+		gui:Destroy()
+	end)
+end
+
 function SurvivorController.Start()
 	if started then
 		return
 	end
 	started = true
 	buildGui()
+	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any)
+		if kind == "Emp" and typeof(a) == "number" then
+			emp(a)
+		end
+	end)
 
 	ContextActionService:BindAction("DisasterGodDash", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then

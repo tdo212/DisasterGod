@@ -29,6 +29,16 @@ export type AbilityDefinition = {
 	TickDamage: number?, -- tornado damage per tick
 	Length: number?, -- fault line length
 	Width: number?, -- fault line width
+	Pull: number?, -- singularity inward speed
+	Signature: boolean?, -- a God Pack signature (never picked by the AI Director)
+}
+
+export type GodPack = {
+	Replaces: string, -- ability id the signature takes the place of
+	Signature: string, -- ability id
+	Finisher: string, -- elimination effect for survivors without their own finisher
+	Synergy: string, -- one-line description for the shop
+	FireDurationScale: number?,
 }
 
 export type GearDefinition = {
@@ -132,7 +142,7 @@ export type MapInfo = {
 	FluidMaterial: Enum.Material,
 	HazardFloorY: number?, -- standing below this Y hurts (lava floors)
 	FluidName: string, -- shown in the sudden-death banner ("WATER", "LAVA", ...)
-	Lighting: string, -- EnvironmentService preset: Day | Night | Desert | Arctic | Sunset | Volcanic
+	Lighting: string, -- EnvironmentService preset: Day | Night | Desert | Arctic | Sunset | Volcanic | Foundry | Conservatory | Tempest
 	KnockbackMultiplier: number?, -- slippery maps make knockback stronger
 	Center: Vector3,
 	Radius: number,

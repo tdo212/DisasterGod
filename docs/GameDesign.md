@@ -76,7 +76,7 @@ A big timber great hall floating beside the arena at (0, 150, -232), built to fe
 - **East: Neon Climb obby.** 11 evenly spaced pads (8 studs apart, 1.5 studs higher each, alternating 2 studs left/right) on glowing stems up the east wall to a loft in the front corner (+15 coins, 20 s cooldown), with a neon ramp back down. A glass divider separates the course from the ramp and the hall so it can't be skipped; falling lands you on the lodge floor next to the start.
 - **Observation deck:** past the wide front opening, 112 x 34 studs with a glass-floor strip at the edge, a low glass rail with no neon on the front (so nothing glares across the view), invisible walls above the rails, and the telescopes and benches kept to the sides so the middle stays clear for looking down on the arena.
 
-Six arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vote** (VoteService / VoteController): a compact strip of three map cards appears under the round bar (never the map just played), players tap or click a card and can change their mind, live counts show on the cards, then the winner flashes and the strip tucks away. Ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event. The round bar carries the countdown, so the strip only says "Tap a map to vote". It replaced the lobby vote pads, which only worked if you walked over to them. Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
+Nine arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vote** (VoteService / VoteController): a compact strip of three map cards appears under the round bar (never the map just played), players tap or click a card and can change their mind, live counts show on the cards, then the winner flashes and the strip tucks away. Ties and empty votes pick at random; each vote is logged as a `MapVote` analytics event. The round bar carries the countdown, so the strip only says "Tap a map to vote". It replaced the lobby vote pads, which only worked if you walked over to them. Each sets its own lighting preset, sudden-death fluid and knockback multiplier. Every arena is one connected, traversable area (no void between platforms): survivors can always run somewhere, and height is the reward for climbing.
 
 | Arena | Look | Signature destruction | Sudden death |
 |---|---|---|---|
@@ -85,19 +85,28 @@ Six arenas (`Config.World.MapRotation`). Each intermission opens a 9 s **map vot
 | Magma Core Station | Volcanic | Four rock quadrants split by narrow lava channels, joined by land bridges and a central hub plaza; catwalks on truss supports drop into the lava; volatile silos and barrels chain-explode; smokestacks topple toward the hub; 3-storey refinery; 3-storey control block, 4-storey refinery, forge hall, pump station, 4-storey assay lab and ore depot; vents burn | Lava to Y 14 |
 | Sunscorched Mirage | Desert | Obelisks topple outward onto the wooden scaffold ring; stone aqueducts; stepped pyramid (sturdy high ground); sandstone bazaar buildings (2-3 storeys) in the courtyard corners; quicksand pits slow and hurt | Sand to Y 12 |
 | Outpost Zero | Arctic | Research containers drop when their stilts snap; one large ice shelf with pressure ridges and a ramped comms plateau; bunkhouse, hangar, 3-storey drill hall and cold store; breakable edge floes; **2x knockback** on slippery ice | Freezing water to Y 9 |
+| Chrono-Spire Citadel | Steampunk foundry at golden sunset (~1,300 parts, radius 165) | Two cliff plateaus over a molten channel, crossed by iron bridges. A 5-storey Clocktower with spinning gear faces and clock hands; six brick works with sawtooth roofs, smokestacks that topple, and ladder shafts with windowed floors to hide in; catwalks and a sky-bridge between the roofs; **steam vents** launch you up to the catwalks; pressurised **boilers** chain-explode. **Set-piece:** a dirigible moored over the Central Works by four tethers. Snap two and it dives into the factory roof, smashing what it lands on | Molten brass to Y 20 |
+| Verdant Bio-Dome | Solarpunk conservatory, bright sunbeams (~1,270 parts) | Four ancient trees, each with a low and a high white-steel glass lab on stilts (ladder shafts inside, a rope ramp between them); rope bridges between trees (cut them to strand the far side); a tiered greenhouse; a waterfall cliff with climbable ledges; hedges and pools. **Set-piece:** a 24-bay steel-and-glass dome. The God aims straight through the glass, impacts underneath crack the panels above, and breaking a bay's ribs drops its whole sheet of glass | Toxic spores to Y 18 |
+| Ironclad Armada | Stormy fleet: rain, lightning, black cliffs (~1,100 parts) | An aircraft carrier with four hangar halls under the flight deck (hatch ladders), a command island and radar lattice, parked jets and container stacks, flanked by two destroyers. Wooden gangplanks join the ships; the sea is deadly. **Set-piece:** break a destroyer section's bulkheads and it **lists** 16° toward the water (a second hit sinks it); yellow cranes topple across onto the carrier | Hurricane swell to Y 21 |
 | Starlight Boardwalk | Sunset carnival | Pier sections fall when pilings break; the Ferris wheel comes off its A-frame and rolls like a wrecking ball (the pier sections under its feet stand on unbreakable concrete footings so it always rolls instead of sinking); climbable coaster trestles; circus tent; four 2-3 storey pavilions on their own piles, so they stay up when the pier around them breaks | Tide to Y 12 |
+
+The three newest arenas are about 40% wider than the originals and lean on hiding: every highrise can have a ladder shaft (`Stairwell`) and half-height window walls (`Windows`), so upper floors are reachable and survivors can duck below the sills. `Builder.launchPad`, `Builder.spin`, `Builder.tilt` and `Builder.canopy` mark steam vents, spinning parts, listing ship sections and see-through glass roofs. Casts are allowed up to 55 studs past a map's own radius.
 
 **Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map (this also skips the vote). Set `ForceTouchUI = true` before Play to preview the touch layout with a mouse.
 
 ### Audio
 - **Music** (`Config.Audio.Music`): calm lobby track, tense round track, boss track in sudden death. `AudioController` crossfades between them.
-- **Ambience** (`Config.Audio.Ambience` / `AmbienceLayer`): birds in the lobby, plus a per-map bed in the arena (waves, city, lava, wind, desert, carnival), picked from the replicated `MapKey` attribute.
+- **Ambience** (`Config.Audio.Ambience` / `AmbienceLayer`): birds in the lobby, plus a per-map bed and layer in the arena, picked from the replicated `MapKey` attribute: waves and seagulls (Fracture Bay), city night, lava, desert wind, howling wind and surf, carnival crowd and surf, refinery hiss and metal groans (Chrono-Spire), jungle birds and a waterfall (Bio-Dome), thunder, rain and heavy surf (Armada).
+- **Weather** (`Config.Weather`, MapFxController): client particles that follow the camera while it is down in the arena. Rain on the Armada (with lightning flashes and thunder every 7-15 s) and a lighter rain in Neo-Shibuya, snow on Outpost Zero, pollen in the Bio-Dome, embers on Chrono-Spire and Magma Core, drifting dust on Sunscorched Mirage.
 - **Round cues:** countdown ticks with rising pitch in the last 5 s of intermission, tocks before casting opens, ticks in the last 5 s of the round, a round-start hit, a God stinger, a sudden-death alarm, and win/lose stingers.
 - **UI** (`UI/Sound.luau`): every Components button, tab and window plays a click, tab or open sound; popups play coin, purchase or error sounds.
 - **Disasters** (`AudioService`, server): positional, replicated sounds for telegraphs, lightning and thunder, meteors, tornado loops, gusts, quakes, collapses, glass breaks and explosions.
 
+### Lighting and glow
+`EnvironmentService` owns the only post effects. The place file's own Bloom, SunRays and DepthOfField are disabled at start and its Atmosphere removed; stacked on ours they doubled the glow. Bloom is softer (threshold 2.4, size 18, Neon-night intensity 0.22, down from 0.7), exposure is -0.15, and bridge rails are metal rather than neon. Between rounds the lodge uses its own warm `Lodge` preset, so avatars and statues keep their colour; the board spotlights on the dancers are turned down from 10 to 1.6 and the lodge's candle, podium and display lights are softer. Presets per map: Day, Night, Desert, Arctic, Sunset, Volcanic, Foundry (golden haze), Conservatory (bright and green) and Tempest (overcast storm).
+
 ### Destruction model
-Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel). Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris stays solid for ~9-12 s, then stops colliding with players, shrinks and fades (so rubble can't trap anyone and late-round frame rate holds), or is removed when it sinks. A damaged building that is still standing groans as a warning.
+Every destructible part has health (from its material), a level, and a support flag, and belongs to a building. Damage breaks parts. When a level loses more than 30% of its supports, every level above is welded into slabs and released, and the remaining supports buckle out from under it. A building with a `FallDirection` tips over in that direction instead of slumping (obelisks, billboards, smokestacks, water towers, the Ferris wheel, cranes, the dirigible); `FallSpeed` overrides the push and `CrashDamage` / `CrashRadius` make the falling hull smash what it lands on. A building marked with `Builder.tilt` lists around a pivot axis on its first support failure (ship sections) and collapses on the next. Parts marked `Canopy` (the dome glass) are transparent to the God's aim and to ground raycasts. Parts tagged as hazards (`HazardDPS` / `HazardWalkSpeed`) hurt or slow anyone standing on them. Debris stays solid for ~9-12 s, then stops colliding with players, shrinks and fades (so rubble can't trap anyone and late-round frame rate holds), or is removed when it sinks. A damaged building that is still standing groans as a warning.
 
 **Performance (`Config.Debris`).** Floors, supports and collapsing slabs stay server-simulated so collisions are fair. Small non-load-bearing pieces (up to 60 cubic studs, plus all glass, neon, fabric and leaves) are removed on the server when they break and sent, batched once per frame, to every client, which simulates them locally as rubble that never touches characters (`DebrisController`): up to 220 pieces for 7 s on desktop, 80 pieces for 4.5 s on phones. Server debris that has rested for 2 s is anchored with touch and query off so the solver stops working on rubble piles (the tornado wakes pieces it picks up). On touch devices, particle emitters run at half rate and 60% lifetime, trails at half length, fire at 70% size, and debris casts no shadows.
 
@@ -121,7 +130,7 @@ Every destructible part has health (from its material), a level, and a support f
 - **Final kill:** the round's last elimination is posted as FINAL KILL, and every camera glides in on it with a desaturated grade and narrowed FOV for 2.4 s before everyone returns to the lodge.
 
 ## God kits
-The God's five-slot hotbar comes from the equipped kit (`Config.Kits`). Kits are bought with coins in the Shop's God Kits tab and can be swapped any time.
+The God's five-slot hotbar comes from the equipped kit (`Config.Kits`), with a God Pack signature swapped in (see below; `shared/Loadout.luau` builds the list for both the client hotbar and the server check). Kits are bought with coins in the Shop's God Kits tab and can be swapped any time.
 
 | Kit | Price | Abilities |
 |---|---|---|
@@ -129,8 +138,28 @@ The God's five-slot hotbar comes from the equipped kit (`Config.Kits`). Kits are
 | Storm Deity | 1,500 | Lightning, Chain Bolt, Gust, Tornado, Meteors |
 | Magma Titan | 2,500 | Eruption, Meteors, Fault Cleave, Lightning, Gust |
 | Cyber Glitch | 4,000 | Glitch, Chain Bolt, Lightning, Tornado, Fault Cleave |
+| Cataclysm | 3,500 | Meteor Barrage, Tectonic Spire, Chain Arc, Singularity, Gust |
 
-Chain Bolt hops between the nearest survivors, Eruption leaves a burning lava pool, and Glitch flings survivors straight up. The server refuses any ability that is not in the caster's kit. The AI Director uses all eight.
+Chain Bolt hops between the nearest survivors, Eruption leaves a burning lava pool, and Glitch flings survivors straight up. The server refuses any ability that is not in the caster's loadout. The AI Director uses every ability except the pack signatures.
+
+**Big-map disasters (Cataclysm kit).** Built to flush survivors out of multi-storey interiors:
+
+| Ability | Cost | Cooldown | Effect |
+|---|---|---|---|
+| 🕳️ Singularity | 50 | 15 s | Drags survivors and loose debris toward a point for 2.5 s (below ragdoll strength, so you can sprint or dash out), then detonates outward |
+| 🗻 Tectonic Spire | 45 | 13 s | Five rock pillars burst up from the bedrock, smashing through every floor above and launching anyone on top |
+| 🔗 Chain Arc | 35 | 9 s | A bolt that jumps up to 4 times between survivors, through walls, or crawls along nearby metal when no one is close |
+| 🎯 Meteor Barrage | 40 | 11 s | Seven impacts rolling along an 80-stud line in the direction your camera faces (the reticle shows the line) |
+
+**God Packs (`Config.GodPacks`).** Each premium God skin also swaps one ability for a signature version and brings a matching finisher. A signature costs and cools down exactly like the ability it replaces, so packs change the playstyle and the counterplay read, never the power. If the kit lacks the replaced ability, the signature takes the kit's last slot. The pack's finisher plays for eliminated survivors who are still on the starter Poof.
+
+| Pack | Replaces | Signature | Synergy | Finisher |
+|---|---|---|---|---|
+| Storm Eye / Stone Fist | none | Classic Meteors and Fault Cleave | balanced | (the survivor's own) |
+| 🔥 Magma Claw (R$149) | Fault Cleave | **Pyroclast Surge:** a lava wave rolls 100 studs along the line, burning wood for double damage and leaving fire | the God's fires burn twice as long | Lava Burst |
+| 🤖 Cyber Gauntlet (R$149) | Lightning | **System Override:** an EMP that jams survivors' dash and scrambles their screen for 3 s; metal takes 1.5x | | Voxel Dissolve |
+| 🌟 Celestial Mask (R$199) | Meteors | **Astral Collapse:** a golden singularity that throws everyone skyward and leaves the rubble floating | huge vertical launches | Sky Beam (the body is launched up a pillar of light) |
+| 🌩️ Storm Sovereign (7,500 coins) | Tornado | **Maelstrom Vortex:** a vortex that follows your reticle instead of chasing survivors, puts out fires and hurls its rubble outward | | Storm Bolt |
 
 ## Daily quests
 Three quests a day, the same for everyone: two drawn from `Config.Quests.Pool` plus "survive a round on the map of the day" (which gives the map vote a purpose). Claiming pays coins; claiming all three grants a wheel spin and extends a daily streak. Open them from the Quests tile or the lobby quest board.
@@ -168,11 +197,11 @@ Each category has a free starter, a coin item and Robux items. Bought or equippe
 
 | Category | Free | Coins | Robux |
 |---|---|---|---|
-| God Skin: a giant avatar hovering 70 studs over the God's reticle for everyone (the God sees their own at 80% transparency) | 👁️ Storm Eye | ✊ Stone Fist (3,000) | 🔥 Magma Claw, 🤖 Cyber Gauntlet, 🌟 Celestial Mask |
+| God Skin / God Pack: a giant avatar hovering 70 studs over the God's reticle for everyone (the God sees their own at 80% transparency); premium ones are God Packs with a signature ability | 👁️ Storm Eye | ✊ Stone Fist (3,000), 🌩️ Storm Sovereign (7,500) | 🔥 Magma Claw, 🤖 Cyber Gauntlet, 🌟 Celestial Mask |
 | Disaster FX: recolours the God's bolts, telegraphs, meteors, tornado and lava | ⚡ Classic | ✨ Golden Wrath (2,500) | 🟣 Neon Void, 👾 Pixel Chaos (voxel meteors) |
 | Finisher: plays where you're eliminated | 💨 Poof | 👻 Ghost Rise (2,000) | 🎉 Confetti Pop, 🌀 Cartoon Boing (boing + the body floats off) |
 
-Small statues of all five God skins stand on pedestals either side of the lodge spawn; their prompt opens the Style tab. Skins are part-built models in `src/shared/GodSkins.luau`. The God's client sends its reticle about 6 times a second (`GodAim`).
+Small statues of all six God skins stand on pedestals either side of the lodge spawn; their prompt opens the Style tab. Skins are part-built models in `src/shared/GodSkins.luau`. The God's client sends its reticle about 6 times a second (`GodAim`).
 
 ## Monetization (Robux)
 Created through Open Cloud for universe 10776039268. The IDs are in `Config.Monetization`.

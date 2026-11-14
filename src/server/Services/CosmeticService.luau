@@ -51,14 +51,27 @@ function CosmeticService.SetGod(god: Player?)
 	ReplicatedStorage:SetAttribute(Attributes.GodAim, nil)
 end
 
--- Elimination effect at the body (everyone sees it). Cartoon Boing also flings the body.
+-- Elimination effect at the body (everyone sees it). Cartoon Boing and Sky Beam also
+-- fling the body.
 function CosmeticService.Finisher(player: Player, character: Model)
 	local id = PlayerDataService.GetEquipped(player, "Finisher")
+	-- a God Pack brings its own finisher for survivors still on the starter one
+	local skin = ReplicatedStorage:GetAttribute(Attributes.GodSkin)
+	local pack = if typeof(skin) == "string" then Config.GodPacks[skin] else nil
+	if pack and (id == "" or id == CO.Defaults.Finisher) then
+		id = pack.Finisher
+	end
 	local hrp = character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not hrp then
 		return
 	end
 	Remotes.get("ClientEffect"):FireAllClients("Finisher", id, hrp.Position, character)
+	if id == "SkyBeam" then
+		pcall(function()
+			hrp:SetNetworkOwner(nil)
+		end)
+		hrp.AssemblyLinearVelocity = Vector3.new(0, CO.BoingUpSpeed * 1.6, 0)
+	end
 	if id == "CartoonBoing" then
 		AudioService.playAt("Boing", hrp.Position, 2)
 		pcall(function()

@@ -156,6 +156,8 @@ local function collapseAbove(building: Model, level: number, from: Vector3?): nu
 	end
 	local count = 0
 	local fallDir = building:GetAttribute("FallDirection") :: Vector3?
+	local crash = building:GetAttribute("CrashDamage")
+	local crashRadius = building:GetAttribute("CrashRadius")
 	for _, parts in byLevel do
 		local root = parts[1]
 		for i, part in parts do
@@ -177,8 +179,26 @@ local function collapseAbove(building: Model, level: number, from: Vector3?): nu
 		end)
 		if fallDir then
 			-- directed fall: shove the whole assembly and tip it over toward fallDir
-			root.AssemblyLinearVelocity = fallDir * DC.DirectedFallSpeed
+			local speed = building:GetAttribute("FallSpeed")
+			root.AssemblyLinearVelocity = fallDir * (if typeof(speed) == "number" then speed else DC.DirectedFallSpeed)
 			root.AssemblyAngularVelocity = Vector3.yAxis:Cross(fallDir) * DC.DirectedTipSpin
+			if typeof(crash) == "number" and typeof(crashRadius) == "number" then
+				-- a heavy falling hull (the dirigible) smashes what it lands on
+				task.delay(DC.CrashDelay, function()
+					if root.Parent then
+						local at = root.Position
+						local boom = Instance.new("Explosion")
+						boom.Position = at
+						boom.BlastRadius = crashRadius
+						boom.BlastPressure = 0
+						boom.DestroyJointRadiusPercent = 0
+						boom.Parent = workspace
+						AudioService.playAt("Explosion", at, 3, 0.6, 0)
+						volatileBurst:Fire(at, crashRadius)
+						DestructionService.DamageArea(at, crashRadius, crash)
+					end
+				end)
+			end
 			continue
 		end
 		-- nudge the slab so it shears off instead of dropping straight down
@@ -192,6 +212,45 @@ local function collapseAbove(building: Model, level: number, from: Vector3?): nu
 		root.AssemblyAngularVelocity = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5) * 1.5
 	end
 	return count
+end
+
+-- A ship section whose bulkheads gave way lists over (Builder.tilt) instead of falling:
+-- every intact part turns around the hull's keel line over DC.TiltSeconds.
+local function tiltBuilding(building: Model)
+	local pivot = building:GetAttribute("TiltPivot") :: Vector3?
+	local axis = building:GetAttribute("TiltAxis") :: Vector3?
+	local degrees = building:GetAttribute("TiltDegrees") :: number?
+	if not (pivot and axis and degrees) then
+		return
+	end
+	local parts: { BasePart } = {}
+	local start: { CFrame } = {}
+	for _, d in building:GetDescendants() do
+		if d:IsA("BasePart") and d.Anchored then
+			table.insert(parts, d)
+			table.insert(start, d.CFrame)
+		end
+	end
+	AudioService.playAt("Creak", pivot, 3, 0.6, 0)
+	AudioService.playAt("Collapse", pivot, 2.4, 0.5, 0)
+	task.spawn(function()
+		local origin = CFrame.new(pivot)
+		local t = 0
+		while t < DC.TiltSeconds do
+			t = math.min(DC.TiltSeconds, t + task.wait())
+			local alpha = TweenService:GetValue(t / DC.TiltSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			local turn = origin * CFrame.fromAxisAngle(axis, math.rad(degrees * alpha)) * origin:Inverse()
+			local moving: { BasePart } = {}
+			local goals: { CFrame } = {}
+			for i, part in parts do
+				if part.Anchored and part.Parent then
+					table.insert(moving, part)
+					table.insert(goals, turn * start[i])
+				end
+			end
+			workspace:BulkMoveTo(moving, goals, Enum.BulkMoveMode.FireCFrameChanged)
+		end
+	end)
 end
 
 local function checkStability(building: Model, from: Vector3?): number
@@ -223,6 +282,14 @@ local function checkStability(building: Model, from: Vector3?): number
 				break
 			end
 		end
+		return 0
+	end
+	if building:GetAttribute("TiltDegrees") ~= nil and building:GetAttribute("Tilted") ~= true then
+		-- first failure: the section lists; the next one sinks it
+		building:SetAttribute("Tilted", true)
+		tiltBuilding(building)
+		local cf0, size0 = building:GetBoundingBox()
+		collapsed:Fire(building, cf0.Position, size0)
 		return 0
 	end
 	local cf, size = building:GetBoundingBox()
@@ -277,12 +344,14 @@ local function breakPart(part: BasePart, from: Vector3?): boolean
 	return true
 end
 
-local function applyDamage(parts: { BasePart }, damage: number, from: Vector3?): number
+-- `scale` multiplies the damage per material (a lava wave burns wood twice as hard).
+local function applyDamage(parts: { BasePart }, damage: number, from: Vector3?, scale: { [Enum.Material]: number }?): number
 	local destroyed = 0
 	local touched: { [Model]: boolean } = {}
 	for _, part in parts do
 		if isIntact(part) then
-			local health = (part:GetAttribute("Health") :: number? or DC.DefaultHealth) - damage
+			local hit = damage * (if scale then scale[part.Material] or 1 else 1)
+			local health = (part:GetAttribute("Health") :: number? or DC.DefaultHealth) - hit
 			part:SetAttribute("Health", health)
 			local building = buildingOf(part)
 			if building then
@@ -302,21 +371,21 @@ local function applyDamage(parts: { BasePart }, damage: number, from: Vector3?):
 end
 
 -- Damage all structural parts within a sphere. Returns parts destroyed (incl. collapses).
-function DestructionService.DamageArea(center: Vector3, radius: number, damage: number): number
+function DestructionService.DamageArea(center: Vector3, radius: number, damage: number, scale: { [Enum.Material]: number }?): number
 	if not arenaFolder then
 		return 0
 	end
 	local hits = workspace:GetPartBoundsInRadius(center, radius, overlapParams())
-	return applyDamage(hits, damage, center)
+	return applyDamage(hits, damage, center, scale)
 end
 
 -- Damage all structural parts within an oriented box (fault lines).
-function DestructionService.DamageBox(cframe: CFrame, size: Vector3, damage: number): number
+function DestructionService.DamageBox(cframe: CFrame, size: Vector3, damage: number, scale: { [Enum.Material]: number }?): number
 	if not arenaFolder then
 		return 0
 	end
 	local hits = workspace:GetPartBoundsInBox(cframe, size, overlapParams())
-	return applyDamage(hits, damage, cframe.Position)
+	return applyDamage(hits, damage, cframe.Position, scale)
 end
 
 local function wake(part: BasePart)

@@ -149,7 +149,7 @@ local function chandelier(parent: Instance, L: Vector3, offset: Vector3)
 			CastShadow = false,
 		})
 		if i == 0 then
-			pointLight(candle, 48, 1.3)
+			pointLight(candle, 40, 0.8)
 		end
 	end
 end
@@ -309,7 +309,7 @@ local function hallOfLegends(model: Model, L: Vector3): { CFrame }
 		block:SetAttribute("HallRank", i)
 		local plate = Builder.block(f, "Number" .. s.label, L + Vector3.new(s.x, 1 + s.h / 2, z + 3.6), Vector3.new(2.6, 2.6, 0.2), Color3.fromRGB(40, 40, 55), Enum.Material.SmoothPlastic)
 		Builder.sign(plate, Enum.NormalId.Back, s.label, Color3.new(1, 1, 1))
-		pointLight(block, 14, 1.5, s.color)
+		pointLight(block, 12, 0.5, s.color)
 		local top = L + Vector3.new(s.x, 1 + s.h, z)
 		spots[i] = CFrame.lookAt(top, top + Vector3.new(0, 0, 1))
 	end
@@ -523,7 +523,7 @@ local function passPedestals(model: Model, L: Vector3)
 		local base = L + spot.Offset
 		local pedestal = Builder.cylinder(f, "Pedestal", base + Vector3.new(0, 0.6, 0), 1.2, 7, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
 		local glow = Builder.cylinder(f, "Glow", base + Vector3.new(0, 1.25, 0), 0.15, 6, spot.Color, Enum.Material.Neon)
-		pointLight(glow, 16, 2, spot.Color)
+		pointLight(glow, 12, 0.8, spot.Color)
 		local feet = base + Vector3.new(0, 1.3, 0)
 		local neon = spot.Key == "GodPriority"
 		local torso = mannequin(f, feet, if neon then spot.Color else Color3.fromRGB(235, 236, 242), if neon then Enum.Material.Neon else Enum.Material.SmoothPlastic)
@@ -578,7 +578,7 @@ end
 
 -- God skin display: a small statue of every skin either side of the spawn, facing the
 -- hall. The prompt opens the shop's Style tab (MenuController).
-local SKIN_SPOTS = { Vector3.new(-40, 0, -42), Vector3.new(-30, 0, -42), Vector3.new(-20, 0, -42), Vector3.new(20, 0, -42), Vector3.new(30, 0, -42) }
+local SKIN_SPOTS = { Vector3.new(-40, 0, -42), Vector3.new(-30, 0, -42), Vector3.new(-20, 0, -42), Vector3.new(20, 0, -42), Vector3.new(30, 0, -42), Vector3.new(40, 0, -42) }
 
 local function skinDisplays(model: Model, L: Vector3)
 	local root = folder(model, "SkinDisplays")
@@ -595,7 +595,7 @@ local function skinDisplays(model: Model, L: Vector3)
 		local base = L + spot
 		local pedestal = Builder.cylinder(root, "SkinPedestal", base + Vector3.new(0, 0.75, 0), 1.5, 6, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
 		local glow = Builder.cylinder(root, "SkinGlow", base + Vector3.new(0, 1.55, 0), 0.15, 5, def.Color, Enum.Material.Neon)
-		pointLight(glow, 12, 1.5, def.Color)
+		pointLight(glow, 10, 0.6, def.Color)
 		local statue = GodSkins.build(def.Id, Config.Cosmetics.DisplayScale)
 		statue:PivotTo(CFrame.new(base + Vector3.new(0, 5.2, 0)) * CFrame.Angles(0, math.rad(180), 0))
 		statue.Parent = root
