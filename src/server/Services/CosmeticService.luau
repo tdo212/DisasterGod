@@ -2,8 +2,11 @@
 -- CosmeticService: God skins, disaster VFX packs and ragdoll finishers.
 --   * Coin items are bought here (CosmeticAction "Buy"); Robux items are granted by
 --     MonetizationService. Anything owned can be equipped (CosmeticAction "Equip").
---   * The human God's reticle (GodAim remote, throttled by the client) and equipped skin
---     are published on ReplicatedStorage; every client floats the skin over that point.
+--   * The God's sky rig: the human God's reticle arrives on the GodAim UnreliableRemoteEvent
+--     (10 Hz max) and is relayed to every client on GodAimRelay; the AI Director's hand
+--     drifts between random spots and swoops to each target it casts at. The GodAim
+--     attribute mirrors it at 2 Hz for late joiners and server logic. CastGesture tells
+--     clients to play the slam / snap / flare on every cast.
 --   * VfxOf(caster) gives DisasterService the caster's palette.
 --   * Finisher(player, character) plays the victim's equipped elimination effect.
 
@@ -32,6 +35,52 @@ end
 
 local popup = Remotes.get("Popup")
 local lastAim: { [Player]: number } = {}
+local aimRelay = Remotes.unreliable("GodAimRelay")
+local currentAim: Vector3? = nil
+local lastAttribute = 0
+local aiDriving = false
+
+local function setAim(aim: Vector3)
+	currentAim = aim
+	aimRelay:FireAllClients(aim)
+	local now = os.clock()
+	if now - lastAttribute >= CO.AimAttributeInterval or ReplicatedStorage:GetAttribute(Attributes.GodAim) == nil then
+		lastAttribute = now
+		ReplicatedStorage:SetAttribute(Attributes.GodAim, aim)
+	end
+end
+
+-- The latest aim point (server-side, every update; the attribute is throttled).
+function CosmeticService.GetAim(): Vector3?
+	return currentAim
+end
+
+-- The God (human or AI) just cast at `at`: the rig swoops there and gestures.
+function CosmeticService.CastGesture(at: Vector3, abilityId: string)
+	setAim(at)
+	Remotes.get("ClientEffect"):FireAllClients("GodCast", at, abilityId)
+end
+
+-- AI rounds: the Director's hand wanders over the arena between casts (never over a
+-- survivor, so it can't give hiding spots away).
+local function directorDrift()
+	if aiDriving then
+		return
+	end
+	aiDriving = true
+	task.spawn(function()
+		local rng = Random.new()
+		while ReplicatedStorage:GetAttribute(Attributes.GodSkin) == CO.DirectorSkin and RoleService.GetGod() == nil do
+			if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" then
+				local a = rng:NextNumber(0, math.pi * 2)
+				local d = rng:NextNumber(0, Config.World.ArenaRadius * 0.6)
+				setAim(Config.World.ArenaCenter + Vector3.new(math.cos(a) * d, 10, math.sin(a) * d))
+			end
+			task.wait(CO.DirectorDriftSeconds)
+		end
+		aiDriving = false
+	end)
+end
 
 local function isFree(def: Types.CosmeticDefinition): boolean
 	return def.Coins == nil and def.Product == nil
@@ -45,10 +94,21 @@ function CosmeticService.VfxOf(caster: Player?): Types.VfxPack
 	return CO.VfxPacks[PlayerDataService.GetEquipped(caster, "Vfx")] or CO.VfxPacks.ClassicFx
 end
 
--- Publish the God's skin for the sky avatar ("" when the AI Director plays God).
+-- Round start / God change: a human God shows their equipped skin, the AI Director its own.
 function CosmeticService.SetGod(god: Player?)
-	ReplicatedStorage:SetAttribute(Attributes.GodSkin, if god then PlayerDataService.GetEquipped(god, "GodSkin") else "")
+	ReplicatedStorage:SetAttribute(Attributes.GodSkin, if god then PlayerDataService.GetEquipped(god, "GodSkin") else CO.DirectorSkin)
 	ReplicatedStorage:SetAttribute(Attributes.GodAim, nil)
+	currentAim = nil
+	if not god then
+		directorDrift()
+	end
+end
+
+-- Round over: no sky rig until the next round.
+function CosmeticService.ClearSky()
+	ReplicatedStorage:SetAttribute(Attributes.GodSkin, "")
+	ReplicatedStorage:SetAttribute(Attributes.GodAim, nil)
+	currentAim = nil
 end
 
 -- Elimination effect at the body (everyone sees it). Cartoon Boing and Sky Beam also
@@ -148,7 +208,7 @@ end
 function CosmeticService.Init()
 	ReplicatedStorage:SetAttribute(Attributes.GodSkin, "")
 	Remotes.get("CosmeticAction").OnServerEvent:Connect(onAction)
-	Remotes.get("GodAim").OnServerEvent:Connect(function(player, aim)
+	Remotes.unreliable("GodAim").OnServerEvent:Connect(function(player, aim)
 		if typeof(aim) ~= "Vector3" or aim.X ~= aim.X or aim.Magnitude > 1e4 then
 			return
 		end
@@ -160,7 +220,7 @@ function CosmeticService.Init()
 			return -- ignore floods beyond twice the send rate
 		end
 		lastAim[player] = now
-		ReplicatedStorage:SetAttribute(Attributes.GodAim, aim)
+		setAim(aim)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastAim[player] = nil

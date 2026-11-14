@@ -299,15 +299,22 @@ local function aimPoint(): Vector3?
 	return OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 end
 
--- The reticle drives the God skin in the sky for everyone (CosmeticService), throttled.
-local aimRemote = Remotes.get("GodAim")
+-- The reticle drives the God rig in the sky for everyone (CosmeticService relays it):
+-- unreliable, at most 10 Hz, and only after it moved 1.5 studs.
+local aimRemote = Remotes.unreliable("GodAim")
 local lastAimSent = 0
+local lastAimPoint: Vector3? = nil
 local function sendAim(point: Vector3)
 	local now = os.clock()
-	if now - lastAimSent >= 1 / Config.Cosmetics.AimSendRate then
-		lastAimSent = now
-		aimRemote:FireServer(point)
+	if now - lastAimSent < 1 / Config.Cosmetics.AimSendRate then
+		return
 	end
+	if lastAimPoint and (point - lastAimPoint).Magnitude < Config.Cosmetics.AimMinMove then
+		return
+	end
+	lastAimSent = now
+	lastAimPoint = point
+	aimRemote:FireServer(point)
 end
 
 local function updateReticle()

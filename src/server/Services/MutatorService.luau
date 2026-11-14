@@ -26,6 +26,8 @@ local MU = Config.Mutators
 local B = Config.Beacon
 local Attributes = Config.Attributes
 
+local AnalyticsService = require(script.Parent.AnalyticsService)
+
 local MutatorService = {}
 
 local rng = Random.new()
@@ -246,6 +248,9 @@ function MutatorService.Roll(): string
 		active = MU.Pool[rng:NextInteger(1, #MU.Pool)].Id
 	end
 	ReplicatedStorage:SetAttribute(Attributes.Mutator, active)
+	if active ~= "" then
+		AnalyticsService.MutatorRolled(active)
+	end
 	return active
 end
 

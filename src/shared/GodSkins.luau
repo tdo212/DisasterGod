@@ -46,14 +46,27 @@ local function hand(model: Model, scale: number, palm: Color3, accent: Color3, m
 	for i = 0, 3 do
 		local x = -5.25 + i * 3.5
 		local length = if i == 1 or i == 2 then 11 else 9.5
-		local root = CFrame.new(x, -6, 0) * CFrame.Angles(math.rad(-curl), 0, 0)
-		add(model, scale, { Name = "Finger", Size = Vector3.new(3, length, 3.2), CFrame = root * CFrame.new(0, -length / 2, 0), Color = palm, Material = material })
+		-- two jointed segments per finger with a knuckle between: reads as a hand, not a rake
+		local root = CFrame.new(x, -6, 0) * CFrame.Angles(math.rad(-curl * 0.6), 0, 0)
+		local first = length * 0.55
+		add(model, scale, { Name = "Knuckle", Shape = Enum.PartType.Ball, Size = Vector3.one * 3.5, CFrame = root, Color = accent, Material = material })
+		add(model, scale, { Name = "Finger", Size = Vector3.new(3, first, 3.2), CFrame = root * CFrame.new(0, -first / 2, 0), Color = palm, Material = material })
+		local joint = root * CFrame.new(0, -first, 0) * CFrame.Angles(math.rad(-curl * 0.5), 0, 0)
+		local second = length - first
+		add(model, scale, { Name = "Joint", Shape = Enum.PartType.Ball, Size = Vector3.one * 3.1, CFrame = joint, Color = palm, Material = material })
+		add(model, scale, { Name = "Fingertip", Size = Vector3.new(2.7, second, 2.9), CFrame = joint * CFrame.new(0, -second / 2, 0), Color = palm, Material = material })
 		if claw then
-			add(model, scale, { Name = "Talon", Size = Vector3.new(1.6, 4, 1.6), CFrame = root * CFrame.new(0, -length - 1.6, 0.4), Color = accent, Material = Enum.Material.Neon })
+			add(model, scale, { Name = "Talon", Size = Vector3.new(1.6, 4, 1.6), CFrame = joint * CFrame.new(0, -second - 1.6, 0.4), Color = accent, Material = Enum.Material.Neon })
 		end
 		if trim then
-			add(model, scale, { Name = "Trim", Size = Vector3.new(3.1, 0.6, 3.3), CFrame = root * CFrame.new(0, -length * 0.45, 0), Color = trim, Material = Enum.Material.Neon })
+			add(model, scale, { Name = "Trim", Size = Vector3.new(3.1, 0.6, 3.3), CFrame = root * CFrame.new(0, -first * 0.5, 0), Color = trim, Material = Enum.Material.Neon })
 		end
+	end
+	-- an emissive palm core and a ring of orbiting sparks around the wrist
+	add(model, scale, { Name = "PalmGem", Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = CFrame.new(0, 0, -2.6), Color = trim or accent, Material = Enum.Material.Neon })
+	for i = 0, 3 do
+		local a = math.rad(i * 90)
+		add(model, scale, { Name = "Orbit", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.6, CFrame = CFrame.new(math.cos(a) * 11, 8, math.sin(a) * 11), Color = trim or accent, Material = Enum.Material.Neon })
 	end
 	add(model, scale, { Name = "Thumb", Size = Vector3.new(3.2, 8, 3.2), CFrame = CFrame.new(8.2, -2, 0) * CFrame.Angles(0, 0, math.rad(-35)), Color = palm, Material = material })
 end
@@ -65,7 +78,7 @@ local BUILDERS: { [string]: (Model, number) -> () } = {
 		add(model, s, { Name = "Pupil", Shape = Enum.PartType.Ball, Size = Vector3.one * 4.6, CFrame = CFrame.new(0, -6.3, 0), Color = Color3.fromRGB(10, 15, 30) })
 		for i = 0, 5 do
 			local a = math.rad(i * 60)
-			add(model, s, { Name = "Cloud", Shape = Enum.PartType.Ball, Size = Vector3.one * 9, CFrame = CFrame.new(math.cos(a) * 10, 2, math.sin(a) * 10), Color = Color3.fromRGB(120, 130, 160), Transparency = 0.25 })
+			add(model, s, { Name = "Orbit", Shape = Enum.PartType.Ball, Size = Vector3.one * 9, CFrame = CFrame.new(math.cos(a) * 10, 2, math.sin(a) * 10), Color = Color3.fromRGB(120, 130, 160), Transparency = 0.25 })
 		end
 	end,
 	StoneFist = function(model, s)
@@ -84,13 +97,18 @@ local BUILDERS: { [string]: (Model, number) -> () } = {
 		end
 		add(model, s, { Name = "Halo", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 26, 26), CFrame = CFrame.new(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 240, 160), Material = Enum.Material.Neon, Transparency = 0.3 })
 		add(model, s, { Name = "HaloHole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 22, 22), CFrame = CFrame.new(0, 11, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 205, 60), Material = Enum.Material.Foil, Transparency = 0.85 })
+		-- orbiting mask rings: gems circling the face on a tilted path
+		for i = 0, 5 do
+			local a = math.rad(i * 60)
+			add(model, s, { Name = "Orbit", Shape = Enum.PartType.Ball, Size = Vector3.one * 2.2, CFrame = CFrame.new(math.cos(a) * 14, math.sin(a) * 3, math.sin(a) * 14), Color = Color3.fromRGB(255, 240, 160), Material = Enum.Material.Neon })
+		end
 	end,
 	-- a thundercloud fist crackling with lightning arcs
 	StormSovereign = function(model, s)
 		hand(model, s, Color3.fromRGB(70, 80, 105), Color3.fromRGB(150, 210, 255), Enum.Material.Slate, 80, false, Color3.fromRGB(120, 190, 255))
 		for i = 0, 6 do
 			local a = math.rad(i * 51)
-			add(model, s, { Name = "Thundercloud", Shape = Enum.PartType.Ball, Size = Vector3.one * (8 + (i % 3) * 2), CFrame = CFrame.new(math.cos(a) * 9, 9 + (i % 2) * 3, math.sin(a) * 6), Color = Color3.fromRGB(80, 88, 110), Transparency = 0.15 })
+			add(model, s, { Name = "Orbit", Shape = Enum.PartType.Ball, Size = Vector3.one * (8 + (i % 3) * 2), CFrame = CFrame.new(math.cos(a) * 9, 9 + (i % 2) * 3, math.sin(a) * 6), Color = Color3.fromRGB(80, 88, 110), Transparency = 0.15 })
 		end
 		for i, x in { -6, 1, 7 } do
 			add(model, s, { Name = "Arc", Size = Vector3.new(0.6, 9, 0.6), CFrame = CFrame.new(x, -14 - i, 2) * CFrame.Angles(0, 0, math.rad(i * 17 - 30)), Color = Color3.fromRGB(190, 230, 255), Material = Enum.Material.Neon })

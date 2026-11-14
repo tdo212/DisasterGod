@@ -34,6 +34,8 @@ Instance names equal the file name without extension/suffix (e.g. `MatchService.
 ## World
 - Maps and the lobby are built **from code at runtime** (`src/server/World/*`), so geometry is version-controlled. Don't hand-build arena geometry in Studio; change the builders.
 - The exceptions to code-built geometry are `Workspace.TimePlayedLeaderboard` (a third-party board model) and `Workspace.dancinggirl` (the dancer on each board's pedestal): both must stay in Workspace in the place file. `LeaderboardService` clones the board for the other lobby boards and moves the dancer to ServerStorage as a clone source at runtime.
+- Two more place-file folders are kept on purpose: `Workspace.Skyboxes` (hand-picked Sky objects; EnvironmentService moves them to ServerStorage and applies one per lighting preset, `Config.Skyboxes`) and `Workspace.Models` (hand-made props such as the Car; MapService strips and scatters them, `Config.PropModels`).
+- Per-map reference dressing (rooftop clutter, signs, set dressing) lives in `World/Details.luau`, which runs after each builder; add new detail there rather than in Studio.
 - Destructible parts are marked with `Builder.structural(part, level, isSupport)`. A level collapses when its intact supports fall below `Config.Destruction.CollapseSupportFraction`.
 
 ## Configuration

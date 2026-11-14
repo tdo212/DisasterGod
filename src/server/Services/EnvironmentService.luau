@@ -4,6 +4,7 @@
 -- red sudden-death tint).
 
 local Lighting = game:GetService("Lighting")
+local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -15,6 +16,25 @@ local correction: ColorCorrectionEffect
 local atmosphere: Atmosphere
 local bloom: BloomEffect
 local sky: Sky? = nil
+local skyTemplates: Folder? = nil
+
+-- Workspace.Skyboxes (place file) -> ServerStorage, so the Sky objects never apply by
+-- themselves; ApplyPreset copies one onto DGSky.
+local function stashSkyboxes()
+	local folder = workspace:FindFirstChild(Config.Skyboxes.Folder) or ServerStorage:FindFirstChild(Config.Skyboxes.Folder)
+	if folder and folder:IsA("Folder") then
+		folder.Parent = ServerStorage
+		skyTemplates = folder
+	end
+	-- the place file's own Lighting.Sky would fight DGSky for which one renders
+	for _, child in Lighting:GetChildren() do
+		if child:IsA("Sky") and child.Name ~= "DGSky" then
+			child:Destroy()
+		end
+	end
+end
+
+local SKY_PROPS = { "SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp", "StarCount", "CelestialBodiesShown", "SunTextureId", "MoonTextureId", "SunAngularSize", "MoonAngularSize" }
 
 type Preset = {
 	ClockTime: number,
@@ -255,6 +275,7 @@ function EnvironmentService.Init()
 	local rays: SunRaysEffect = ensure("SunRaysEffect", "DGSunRays")
 	rays.Intensity = 0.06
 	rays.Spread = 0.6
+	stashSkyboxes()
 	local s: Sky = ensure("Sky", "DGSky")
 	s.SunAngularSize = 14
 	s.MoonAngularSize = 9
@@ -270,7 +291,15 @@ function EnvironmentService.ApplyPreset(name: string, seconds: number?)
 	currentMood = "Calm"
 	local faces = Config.Skies[name] or Config.Skies.Day
 	local sk = sky
-	if sk and faces then
+	local pick = Config.Skyboxes.ByPreset[name]
+	local template = if skyTemplates and pick then skyTemplates:FindFirstChild(pick) else nil
+	if sk and template and template:IsA("Sky") then
+		for _, prop in SKY_PROPS do
+			pcall(function()
+				(sk :: any)[prop] = (template :: any)[prop]
+			end)
+		end
+	elseif sk and faces then
 		local function id(n: number): string
 			return "rbxassetid://" .. tostring(n)
 		end

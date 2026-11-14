@@ -2,6 +2,7 @@
 -- MapService: builds / clears the active arena and runs the sudden-death rising fluid.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local TweenService = game:GetService("TweenService")
@@ -24,6 +25,7 @@ local Builders: { [string]: any } = {
 
 local DestructionService = require(script.Parent.DestructionService)
 local Builder = require(World.Builder)
+local Details = require(World.Details)
 
 -- Hideout palette per lighting preset (wall, roof, material).
 local HIDEOUT_LOOK: { [string]: { Color3 | Enum.Material } } = {
@@ -57,7 +59,105 @@ local function ensureFolder(name: string): Folder
 	return folder
 end
 
+-- Workspace.Models (hand-made props in the place file) -> a clean, static template in
+-- ServerStorage: scripts, seats, forces, sounds, emitters and welds go; every part is
+-- anchored destructible structure.
+local propTemplates: { [string]: Model } = {}
+local function prepareProps()
+	local P = Config.PropModels
+	local source = workspace:FindFirstChild(P.Folder)
+	if not source then
+		local stored = ServerStorage:FindFirstChild("PropModels")
+		source = stored
+	end
+	if not source then
+		return
+	end
+	local store = ServerStorage:FindFirstChild("PropModels") or Instance.new("Folder")
+	store.Name = "PropModels"
+	store.Parent = ServerStorage
+	if source ~= store then
+		source.Parent = ServerStorage
+		for _, m in source:GetChildren() do
+			m.Parent = store
+		end
+		source:Destroy()
+	end
+	for _, model in store:GetChildren() do
+		if not model:IsA("Model") then
+			continue
+		end
+		local clean = Instance.new("Model")
+		clean.Name = model.Name
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local part: BasePart
+				if d:IsA("Seat") or d:IsA("VehicleSeat") then
+					local p = Instance.new("Part")
+					p.Size, p.CFrame, p.Color, p.Material = d.Size, d.CFrame, d.Color, d.Material
+					part = p
+				else
+					part = d:Clone()
+					for _, c in part:GetChildren() do
+						if not (c:IsA("DataModelMesh") or c:IsA("Decal") or c:IsA("Texture") or c:IsA("SurfaceAppearance")) then
+							c:Destroy()
+						end
+					end
+				end
+				part.Anchored = true
+				part.CanTouch = false
+				part.Parent = clean
+			end
+		end
+		propTemplates[model.Name] = clean
+	end
+end
+
+-- Cars etc. on open ground (or decks) that is genuinely clear, each a destructible model.
+local function addProps(info: Types.MapInfo, key: string)
+	local P = Config.PropModels
+	local spec = P.Cars[key]
+	local template = propTemplates[P.CarModel]
+	if not spec or not template then
+		return
+	end
+	local cf0, size0 = template:GetBoundingBox()
+	local pivot = template:GetPivot()
+	local bottom = pivot:ToObjectSpace(cf0 * CFrame.new(0, -size0.Y / 2, 0)).Position
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { info.Model }
+	local rng = Random.new()
+	local placed = 0
+	for _ = 1, P.Tries do
+		if placed >= spec.Count then
+			break
+		end
+		local a = rng:NextNumber(0, math.pi * 2)
+		local d = rng:NextNumber(15, info.Radius * 0.85)
+		local flat = info.Center + Vector3.new(math.cos(a) * d, 0, math.sin(a) * d)
+		local ground = if spec.Surface == "Top" then MapService.GroundAt(flat) else MapService.TerrainAt(flat)
+		if ground.Y < info.FluidStartY + 2 then
+			continue
+		end
+		local yaw = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+		local box = CFrame.new(ground + Vector3.new(0, size0.Y / 2 + 0.4, 0)) * yaw
+		if #workspace:GetPartBoundsInBox(box, size0 + Vector3.new(2, 0, 2), params) > 0 then
+			continue
+		end
+		placed += 1
+		local car = Builder.building(info.Model, "Car")
+		for _, part in template:GetChildren() do
+			local p = (part :: BasePart):Clone()
+			Builder.structural(p, 1, false, P.CarHealth)
+			p.Parent = car
+		end
+		car:PivotTo(CFrame.new(ground) * yaw * CFrame.new(-bottom))
+	end
+end
+
 function MapService.Init()
+	prepareProps()
 	arena = ensureFolder("Arena")
 	hazards = ensureFolder("Hazards")
 	-- maps may have been built in edit mode for previewing; start clean
@@ -167,6 +267,8 @@ function MapService.Build(name: string): Types.MapInfo
 	assert(builder, "Unknown map " .. name)
 	local info: Types.MapInfo = builder.build(arena)
 	addHideouts(info)
+	addProps(info, name)
+	Details.apply(name, info) -- reference-art dressing: rooftop clutter, signs, set dressing
 
 	-- infinite sea (water or lava) under the island
 	local s = Instance.new("Part")

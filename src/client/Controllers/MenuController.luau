@@ -17,6 +17,7 @@ local ClientRoot = script.Parent.Parent
 local Theme = require(ClientRoot:WaitForChild("UI"):WaitForChild("Theme") :: ModuleScript)
 local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Components") :: ModuleScript)
 local Store = require(ClientRoot:WaitForChild("UI"):WaitForChild("Store") :: ModuleScript)
+local Analytics = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Analytics") :: ModuleScript)
 local SpectateController = require(script.Parent:WaitForChild("SpectateController") :: ModuleScript)
 local SettingsController = require(script.Parent:WaitForChild("SettingsController") :: ModuleScript)
 local HUDController = require(script.Parent:WaitForChild("HUDController") :: ModuleScript)
@@ -559,6 +560,7 @@ local function buildShop()
 			Parent = tabs,
 			OnClick = function()
 				selectTab(name)
+				Analytics.track("ItemPreviewed", name)
 			end,
 		})
 		b.LayoutOrder = i
@@ -591,6 +593,10 @@ local function buildShop()
 	selectTab("Gear")
 end
 
+function MenuController.IsShopOpen(): boolean
+	return shop ~= nil and shop.IsOpen()
+end
+
 -- Open the shop (optionally on a tab). Without a tab it toggles.
 function MenuController.OpenShop(tab: string?)
 	if tab then
@@ -599,6 +605,9 @@ function MenuController.OpenShop(tab: string?)
 	if shop.IsOpen() and not tab then
 		shop.Close()
 	else
+		if not shop.IsOpen() then
+			Analytics.track("ShopOpened", tab or "Shop")
+		end
 		shop.Open()
 	end
 end

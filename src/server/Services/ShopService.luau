@@ -14,6 +14,8 @@ local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 local StealthService = require(script.Parent.StealthService)
 
+local AnalyticsService = require(script.Parent.AnalyticsService)
+
 local ShopService = {}
 
 local kits: { [string]: Types.KitDefinition } = {}
@@ -97,6 +99,9 @@ function ShopService.Init()
 			return
 		end
 		local def = gear[id]
+		if def and roundActive and RoleService.IsAliveSurvivor(player) then
+			AnalyticsService.FirstAction(player, "Gear")
+		end
 		if not def or not roundActive or not RoleService.IsAliveSurvivor(player) then
 			return
 		end

@@ -26,6 +26,8 @@ local SpinService = require(script.Parent.SpinService)
 local M = Config.Monetization
 local Attributes = Config.Attributes
 
+local AnalyticsService = require(script.Parent.AnalyticsService)
+
 local MonetizationService = {}
 
 local productKeyById: { [number]: string } = {}
@@ -104,6 +106,7 @@ local function grantCoins(key: string): (Player) -> ()
 	return function(player: Player)
 		local coins = M.Products[key].Coins or 0
 		PlayerDataService.AddCoins(player, coins)
+		AnalyticsService.CoinsBought(player, coins, key)
 		popup:FireClient(player, string.format("+%d COINS — THANK YOU!", coins), GOLD)
 	end
 end
@@ -183,6 +186,8 @@ local function processReceipt(receipt: { [string]: any }, keyOverride: string?):
 	end
 	PlayerDataService.AddReceipt(player, purchaseId)
 	PlayerDataService.SaveNow(player)
+	local def = M.Products[key :: string]
+	AnalyticsService.PurchaseCompleted(player, key :: string, "Product", if def then def.Price else nil)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
@@ -197,6 +202,7 @@ function MonetizationService.Init()
 		local key = passKeyById[passId]
 		if purchased and key then
 			setPass(player, key, true)
+			AnalyticsService.PurchaseCompleted(player, key, "Pass", M.Passes[key].Price)
 			popup:FireClient(player, string.upper(M.Passes[key].Name) .. " UNLOCKED!", GOLD)
 		end
 	end)

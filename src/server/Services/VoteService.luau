@@ -6,7 +6,7 @@
 -- State is replicated on ReplicatedStorage: VoteOpen, VoteCandidates ("A,B,C"),
 -- VoteCounts ("2,0,1"), VoteEndsAt (server time) and VoteWinner (index, 0 = none).
 
-local AnalyticsService = game:GetService("AnalyticsService")
+local RobloxAnalytics = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -18,6 +18,8 @@ local QuestService = require(script.Parent.QuestService)
 
 local V = Config.Voting
 local Attributes = Config.Attributes
+
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 local VoteService = {}
 
@@ -44,6 +46,7 @@ end
 
 -- Opens a vote. False when there is nothing to vote on (Studio ForceMap).
 function VoteService.Begin(): boolean
+	AnalyticsService.BallotOpened()
 	if RunService:IsStudio() and typeof(workspace:GetAttribute("ForceMap")) == "string" then
 		return false
 	end
@@ -102,7 +105,7 @@ function VoteService.Finish(): string
 			QuestService.Progress(player, "Vote", 1)
 			-- telemetry: which maps players ask for
 			pcall(function()
-				AnalyticsService:LogCustomEvent(player, "MapVote", 1, {
+				RobloxAnalytics:LogCustomEvent(player, "MapVote", 1, {
 					[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = candidates[index],
 					[Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = if index == winner then "won" else "lost",
 				})
@@ -124,6 +127,7 @@ function VoteService.Init()
 		end
 		votes[player] = index
 		publishCounts()
+		AnalyticsService.MapVoted(player, tostring(candidates[index]))
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		votes[player] = nil

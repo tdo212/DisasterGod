@@ -17,6 +17,7 @@ local ClientRoot = script.Parent.Parent
 local Theme = require(ClientRoot:WaitForChild("UI"):WaitForChild("Theme") :: ModuleScript)
 local Components = require(ClientRoot:WaitForChild("UI"):WaitForChild("Components") :: ModuleScript)
 local OrbitCamera = require(ClientRoot:WaitForChild("Util"):WaitForChild("OrbitCamera") :: ModuleScript)
+local Analytics = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Analytics") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local Mobility = Config.Mobility
@@ -68,6 +69,7 @@ local function dash()
 	if player:GetAttribute(Attributes.Ragdolled) == true then
 		return -- tumbling from a hit
 	end
+	Analytics.track("Dash")
 	local cooldown = Mobility.DashCooldown
 	if player:GetAttribute(Attributes.PassPrefix .. "QuickDash") == true then
 		cooldown *= Config.Monetization.QuickDashCooldownMultiplier

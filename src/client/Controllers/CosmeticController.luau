@@ -1,8 +1,11 @@
 --!strict
 -- CosmeticController: renders cosmetics everyone sees.
---   * God skin: while a human God plays, their equipped skin (GodSkin attribute) floats
---     high over their reticle (GodAim attribute) and glides after it. The God sees their
---     own skin almost transparent so it never blocks the view.
+--   * God sky rig: the God's skin (GodSkin attribute; the AI Director has one too) floats
+--     high over the God's aim (GodAimRelay at ~10 Hz, the GodAim attribute as a
+--     fallback), glides and banks after it, idles with a bob and orbiting parts, and
+--     slams + flashes on every cast (ClientEffect "GodCast"). Always-on-top outline so it
+--     reads through glass roofs and storm haze. The God sees it faint, or not at all when
+--     their camera is close. No particles on phones or in Low-FX.
 --   * Finishers: the effect at an eliminated survivor's body (ClientEffect "Finisher").
 
 local Debris = game:GetService("Debris")
@@ -45,6 +48,27 @@ local function setTransparency(model: Model, alpha: number)
 	end
 end
 
+-- latest relayed aim (GodAimRelay, ~10 Hz); the throttled GodAim attribute covers joins
+local liveAim: Vector3? = nil
+local gestureLeft = 0
+local bank = CFrame.identity
+local outlineRef: Highlight? = nil
+local lightRef: PointLight? = nil
+local orbit: { { Part: BasePart, Offset: CFrame } } = {}
+local godAlpha = -1
+
+local function lowFx(): boolean
+	return player:GetAttribute(Attributes.SettingPrefix .. "LowFx") == true
+end
+
+local function targetAim(): Vector3?
+	if liveAim then
+		return liveAim
+	end
+	local a = ReplicatedStorage:GetAttribute(Attributes.GodAim)
+	return if typeof(a) == "Vector3" then a else nil
+end
+
 local function clearSky()
 	if sky then
 		sky:Destroy()
@@ -52,88 +76,162 @@ local function clearSky()
 	end
 	skyId = ""
 	skyPos = nil
+	outlineRef = nil
+	lightRef = nil
+	table.clear(orbit)
+	godAlpha = -1
+end
+
+local function isGod(): boolean
+	return player:GetAttribute(Attributes.Role) == "DisasterGod"
+end
+
+local function buildSky(id: string)
+	local model = GodSkins.build(id, CO.SkyScale)
+	local tint = Color3.fromRGB(255, 255, 255)
+	for _, def in CO.Items do
+		if def.Id == id and def.Color then
+			tint = def.Color
+		end
+	end
+	-- render / physics hygiene: moving it across the sky must never wake physics or
+	-- recompute shadows
+	local pivot = model:GetPivot()
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			d.CastShadow = false
+			d.Massless = true
+			if d.Material == Enum.Material.SmoothPlastic then
+				d.Reflectance = 0.08
+			end
+			if d.Name == "Orbit" then
+				table.insert(orbit, { Part = d, Offset = pivot:ToObjectSpace(d.CFrame) })
+			end
+		end
+	end
+	-- emissive rim + faint glow fill, drawn on top so it reads through the Bio-Dome glass
+	-- and the Armada's storm haze
+	local outline = Instance.new("Highlight")
+	outline.FillColor = tint
+	outline.FillTransparency = 0.85
+	outline.OutlineColor = tint
+	outline.OutlineTransparency = CO.SkyOutline
+	outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	outline.Parent = model
+	outlineRef = outline
+	local core = model.PrimaryPart
+	if core then
+		local light = Instance.new("PointLight")
+		light.Color = tint
+		light.Range = CO.SkyLightRange
+		light.Brightness = 1.4
+		light.Shadows = false
+		light.Parent = core
+		lightRef = light
+		if not touch and not lowFx() then
+			local aura = Instance.new("ParticleEmitter")
+			aura.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			aura.Color = ColorSequence.new(tint)
+			aura.LightEmission = 1
+			aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0) })
+			aura.Transparency = NumberSequence.new(0.3)
+			aura.Lifetime = NumberRange.new(1, 1.8)
+			aura.Rate = 14
+			aura.Speed = NumberRange.new(2, 5)
+			aura.SpreadAngle = Vector2.new(180, 180)
+			aura.Parent = core
+		end
+	end
+	model.Parent = fxFolder
+	sky = model
 end
 
 local function refreshSky()
 	local id = ReplicatedStorage:GetAttribute(Attributes.GodSkin)
-	local aim = ReplicatedStorage:GetAttribute(Attributes.GodAim)
-	if typeof(id) ~= "string" or id == "" or typeof(aim) ~= "Vector3" then
+	if typeof(id) ~= "string" or id == "" then
+		liveAim = nil
 		clearSky()
 		return
+	end
+	if not targetAim() then
+		return -- spawns on the first aim update
 	end
 	if id ~= skyId then
 		clearSky()
 		skyId = id
-		local model = GodSkins.build(id, CO.SkyScale)
-		-- high quality from below: crisp edges, a coloured outline and a glow that lights
-		-- the arena under the hand, plus a slow sparkle aura
-		local tint = Color3.fromRGB(255, 255, 255)
-		for _, def in CO.Items do
-			if def.Id == id and def.Color then
-				tint = def.Color
-			end
-		end
-		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.CastShadow = false
-				if d.Material == Enum.Material.SmoothPlastic then
-					d.Reflectance = 0.08
-				end
-			end
-		end
-		local outline = Instance.new("Highlight")
-		outline.FillTransparency = 1
-		outline.OutlineColor = tint
-		outline.OutlineTransparency = CO.SkyOutline
-		outline.DepthMode = Enum.HighlightDepthMode.Occluded
-		outline.Parent = model
-		local core = model.PrimaryPart
-		if core then
-			local light = Instance.new("PointLight")
-			light.Color = tint
-			light.Range = CO.SkyLightRange
-			light.Brightness = 1.4
-			light.Shadows = false
-			light.Parent = core
-			if not touch then
-				local aura = Instance.new("ParticleEmitter")
-				aura.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-				aura.Color = ColorSequence.new(tint)
-				aura.LightEmission = 1
-				aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0) })
-				aura.Transparency = NumberSequence.new(0.3)
-				aura.Lifetime = NumberRange.new(1, 1.8)
-				aura.Rate = 14
-				aura.Speed = NumberRange.new(2, 5)
-				aura.SpreadAngle = Vector2.new(180, 180)
-				aura.Parent = core
-			end
-		end
-		model.Parent = fxFolder
-		sky = model
+		buildSky(id)
 	end
-	local model = sky
-	if model then
-		local isGod = player:GetAttribute(Attributes.Role) == "DisasterGod"
-		setTransparency(model, if isGod then CO.GodSkyTransparency else 0)
-		local outline = model:FindFirstChildOfClass("Highlight")
-		if outline then
-			outline.OutlineTransparency = if isGod then 0.9 else CO.SkyOutline
+	godAlpha = -1 -- re-evaluate the God's own fade next frame
+end
+
+-- The God sees their own rig faintly, and not at all once the camera is close to it.
+local function godFade(model: Model)
+	local alpha = 0
+	if isGod() then
+		local camera = workspace.CurrentCamera
+		local near = camera and skyPos and (camera.CFrame.Position - (skyPos :: Vector3)).Magnitude < CO.GodHideDistance
+		alpha = if near then 1 else CO.GodSkyTransparency
+	end
+	if alpha ~= godAlpha then
+		godAlpha = alpha
+		setTransparency(model, alpha)
+		if outlineRef then
+			outlineRef.Enabled = alpha < 0.5
 		end
 	end
 end
 
 local function stepSky(dt: number)
 	local model = sky
-	local aim = ReplicatedStorage:GetAttribute(Attributes.GodAim)
-	if not model or typeof(aim) ~= "Vector3" then
+	local aim = targetAim()
+	if not model or not aim then
 		return
 	end
 	local goal = aim + Vector3.new(0, CO.SkyHeight, 0)
-	skyPos = if skyPos then skyPos:Lerp(goal, math.min(1, dt * CO.SkyFollow)) else goal
+	local prev = skyPos
+	local pos = if prev then prev:Lerp(goal, math.min(1, dt * CO.SkyFollow)) else goal
+	skyPos = pos
+	-- bank / tilt toward the direction of travel
+	local vel = if prev then (pos - prev) / math.max(dt, 1 / 240) else Vector3.zero
+	local maxBank = math.rad(CO.BankDegrees)
+	local goalBank = CFrame.Angles(math.clamp(vel.Z * 0.012, -maxBank, maxBank), 0, math.clamp(-vel.X * 0.012, -maxBank, maxBank))
+	bank = bank:Lerp(goalBank, math.min(1, dt * 5))
 	spin += dt * 0.4
 	local bob = math.sin(spin * 2) * 1.5
-	model:PivotTo(CFrame.new((skyPos :: Vector3) + Vector3.new(0, bob, 0)) * CFrame.Angles(0, spin, 0))
+	-- cast gesture: a quick slam toward the target and an emissive flash
+	local dip, flash = 0, 0
+	if gestureLeft > 0 then
+		gestureLeft = math.max(0, gestureLeft - dt)
+		local t = 1 - gestureLeft / CO.GestureSeconds
+		dip = math.sin(t * math.pi) * CO.GestureDrop
+		flash = 1 - t
+	end
+	local cf = CFrame.new(pos + Vector3.new(0, bob - dip, 0)) * bank * CFrame.Angles(0, spin * 0.5, 0)
+	model:PivotTo(cf)
+	-- orbiting rings / clouds / gems circle the core
+	for i, o in orbit do
+		o.Part.CFrame = cf * CFrame.Angles(0, spin * (1.6 + (i % 3) * 0.4), 0) * o.Offset
+	end
+	if outlineRef then
+		outlineRef.FillTransparency = 0.85 - flash * 0.6
+	end
+	if lightRef then
+		lightRef.Brightness = 1.4 + flash * 5
+	end
+	godFade(model)
+end
+
+-- the God (human or AI) cast: swoop to the target and gesture
+local function onGodCast(at: Vector3)
+	liveAim = at
+	if not sky then
+		refreshSky()
+	end
+	gestureLeft = CO.GestureSeconds
 end
 
 ---------------------------------------------------------------------------
@@ -253,9 +351,18 @@ function CosmeticController.Start()
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.GodSkin):Connect(refreshSky)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.GodAim):Connect(function()
 		if typeof(ReplicatedStorage:GetAttribute(Attributes.GodAim)) ~= "Vector3" then
-			clearSky() -- round over / the God left
+			liveAim = nil -- a new God / round: wait for their first aim
+			skyPos = nil
 		elseif not sky then
 			refreshSky()
+		end
+	end)
+	Remotes.unreliable("GodAimRelay").OnClientEvent:Connect(function(aim: any)
+		if typeof(aim) == "Vector3" then
+			liveAim = aim
+			if not sky then
+				refreshSky()
+			end
 		end
 	end)
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refreshSky)
@@ -264,6 +371,8 @@ function CosmeticController.Start()
 	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any, b: any)
 		if kind == "Finisher" and typeof(a) == "string" and typeof(b) == "Vector3" then
 			finisher(a, b)
+		elseif kind == "GodCast" and typeof(a) == "Vector3" then
+			onGodCast(a)
 		end
 	end)
 end

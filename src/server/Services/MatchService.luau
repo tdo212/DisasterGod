@@ -30,6 +30,7 @@ local ScoringService = require(script.Parent.ScoringService)
 local ShopService = require(script.Parent.ShopService)
 local VoteService = require(script.Parent.VoteService)
 local MutatorService = require(script.Parent.MutatorService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 type RoundPhase = Types.RoundPhase
 type SubPhase = Types.SubPhase
@@ -162,6 +163,7 @@ local function onDied(player: Player, character: Model)
 		-- the round's last survivor: everyone's camera plays the final-kill moment
 		local final = state.Phase == "Active" and survivorsAssigned and #RoleService.GetAliveSurvivors() == 0
 		local cause = ScoringService.GetLastCause(player)
+		AnalyticsService.SurvivorEliminated(player, cause or "Fall/Void", if cause then RoleService.GetGod() else nil)
 		ScoringService.OnEliminated(player, final)
 		SaveService.OfferAfterDeath(player, cause)
 		if final then
@@ -368,6 +370,7 @@ local function assignRoles(): Player?
 		end
 	end
 	ReplicatedStorage:SetAttribute(Attributes.GodName, if god then god.DisplayName else "The Storm")
+	AnalyticsService.RoundStarted(players, god)
 	return god
 end
 
@@ -399,6 +402,12 @@ local function active(god: Player?)
 			setSubPhase("SuddenDeath")
 			DisasterService.SetSuddenDeath(true)
 			MapService.StartFluid(M.SuddenDeathDuration)
+			local reached = RoleService.GetAliveSurvivors()
+			local godNow = RoleService.GetGod()
+			if godNow then
+				table.insert(reached, godNow)
+			end
+			AnalyticsService.SuddenDeath(reached)
 			EnvironmentService.SetMood("SuddenDeath", 3)
 			siren = AudioService.playGlobal("Siren", Config.Audio.SirenVolume, true)
 			local info = MapService.GetCurrent()
@@ -442,6 +451,13 @@ local function roundEnd(mapName: string)
 		end
 	end
 
+	local survivorCount = 0
+	for _, alive in survivedSet do
+		if alive then
+			survivorCount += 1
+		end
+	end
+	AnalyticsService.RoundEnded(list, survivorCount, if god then "Human" else "Director")
 	local summaries = ScoringService.FinishRound(mapName, god, list)
 	MutatorService.EndRound() -- after payouts (Gold Rush reads the twist)
 	for p, summary in summaries do
@@ -526,7 +542,14 @@ function MatchService.Init()
 	end)
 	RoleService.SoloSwapRequested:Connect(onSoloSwap)
 	Remotes.get("TutorialSeen").OnServerEvent:Connect(function(player, kind)
-		if kind == "God" or kind == "Survivor" then
+		if typeof(kind) ~= "string" then
+			return
+		end
+		local known = kind == "God" or kind == "Survivor"
+		for _, step in Config.Tutorial.Steps do
+			known = known or step.Id == kind
+		end
+		if known then
 			PlayerDataService.MarkTutorial(player, kind)
 		end
 	end)

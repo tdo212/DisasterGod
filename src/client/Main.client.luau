@@ -30,6 +30,7 @@ local order = {
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
 	"SaveController",
 	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)
+	"TutorialController", -- last: points at buttons the other controllers built
 }
 
 for _, name in order do

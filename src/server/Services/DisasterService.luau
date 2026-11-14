@@ -18,6 +18,7 @@ local Loadout = require(ReplicatedStorage.Shared.Loadout)
 local ComboService = require(script.Parent.ComboService)
 local CosmeticService = require(script.Parent.CosmeticService)
 local DestructionService = require(script.Parent.DestructionService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local EnvironmentService = require(script.Parent.EnvironmentService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
@@ -550,7 +551,7 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 		-- chase the nearest survivor (keeps hiding spots under pressure)
 		local nearest: Vector3? = nil
 		local best = 140
-		local aim = if steered then ReplicatedStorage:GetAttribute(Attributes.GodAim) else nil
+		local aim = if steered then CosmeticService.GetAim() else nil
 		if typeof(aim) == "Vector3" then
 			local flat = Vector3.new(aim.X - pos.X, 0, aim.Z - pos.Z)
 			nearest = flat
@@ -1196,6 +1197,8 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	if cue then
 		sound(cue.Key, ground, cue.Volume, cue.Speed)
 	end
+	CosmeticService.CastGesture(ground, id)
+	AnalyticsService.AbilityUsed(caster, id, def.Tier)
 	task.spawn(execute, def, ground, dir, caster)
 	return true
 end
@@ -1389,7 +1392,7 @@ function DisasterService.EndRound()
 	state.SuddenDeath = false
 	state.HunterPulse = false
 	state.God = nil
-	CosmeticService.SetGod(nil)
+	CosmeticService.ClearSky()
 	ReplicatedStorage:SetAttribute(Attributes.CastingOpen, false)
 	table.clear(pools)
 	table.clear(chains)

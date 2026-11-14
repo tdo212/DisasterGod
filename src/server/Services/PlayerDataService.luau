@@ -14,6 +14,8 @@ type Profile = Types.PlayerProfile
 local Attributes = Config.Attributes
 local STORE_NAME = "DisasterGodProfiles_v1"
 
+local AnalyticsService = require(script.Parent.AnalyticsService)
+
 local PlayerDataService = {}
 
 local profiles: { [Player]: Profile } = {}
@@ -318,13 +320,15 @@ function PlayerDataService.SaveNow(player: Player)
 	task.spawn(save, player)
 end
 
-function PlayerDataService.SpendCoins(player: Player, amount: number): boolean
+-- `sku` names what the coins bought (economy analytics; optional).
+function PlayerDataService.SpendCoins(player: Player, amount: number, sku: string?): boolean
 	local profile = profiles[player]
 	if not profile or profile.Coins < amount then
 		return false
 	end
 	profile.Coins -= amount
 	publish(player, profile)
+	AnalyticsService.CoinsSpent(player, amount, sku)
 	return true
 end
 

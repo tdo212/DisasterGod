@@ -257,14 +257,30 @@ local function onStress(center: Vector3, size: Vector3, radius: number, shake: n
 end
 
 ---------------------------------------------------------------------------
--- Arena Cam (lodge hologram)
+-- Arena Cam (lodge hologram): a live broadcast of the match, separate from the God view.
+-- The arena's big parts are mirrored into a ViewportFrame once per round and kept in
+-- sync (collapses fall, debris tumbles); disasters (Hazards), survivors (little figures
+-- with beacons) and the God's sky rig are mirrored every few frames. A director camera
+-- cuts between an orbit, the latest disaster and a survivor close-up. Only runs while
+-- you are up in the lodge and near the screen; off in Low-FX.
 
 local camScreen: Part? = nil
 local viewport: ViewportFrame? = nil
 local camWorld: Model? = nil
+local camFx: Model? = nil
 local mirrors: { [BasePart]: BasePart } = {}
-local dots: { [Player]: BasePart } = {}
+local fxMirrors: { [BasePart]: BasePart } = {}
+local figures: { [Player]: Model } = {}
+local godMirror: Model? = nil
 local camAngle = 0
+local camCf: CFrame? = nil
+local shot = "Orbit"
+local shotUntil = 0
+local shotTarget: Vector3? = nil
+local lastAction: Vector3? = nil
+local lastActionAt = 0
+local shotLabel: TextLabel? = nil
+local fxAccum = 0
 
 local function buildScreen()
 	local origin = Config.World.LobbyOrigin
@@ -274,7 +290,7 @@ local function buildScreen()
 	screen.CanCollide = false
 	screen.CanQuery = false
 	screen.Size = Vector3.new(26, 14, 0.4)
-	screen.CFrame = CFrame.new(origin + Vector3.new(-48, 14, -48)) * CFrame.Angles(0, math.rad(35), 0)
+	screen.CFrame = CFrame.new(origin + PR.ArenaCamOffset) * CFrame.Angles(0, math.rad(PR.ArenaCamYaw), 0)
 	screen.Color = Color3.fromRGB(20, 30, 45)
 	screen.Material = Enum.Material.SmoothPlastic
 	screen.Parent = fxFolder
@@ -289,44 +305,89 @@ local function buildScreen()
 	frame.Material = Enum.Material.Neon
 	frame.Transparency = 0.4
 	frame.Parent = fxFolder
+	-- a ViewportFrame only renders when its SurfaceGui lives in PlayerGui (adorned to the
+	-- part); parented to the part itself it draws nothing
 	local surface = Instance.new("SurfaceGui")
+	surface.Name = "ArenaCamGui"
 	surface.Face = Enum.NormalId.Front
-	surface.PixelsPerStud = 24
+	surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	surface.PixelsPerStud = 32
 	surface.LightInfluence = 0
-	surface.Parent = screen
+	surface.ResetOnSpawn = false
+	surface.Adornee = screen
+	surface.Parent = player:WaitForChild("PlayerGui")
 	local vp = Instance.new("ViewportFrame")
 	vp.Size = UDim2.fromScale(1, 1)
-	vp.BackgroundColor3 = Color3.fromRGB(10, 16, 26)
+	vp.BackgroundColor3 = Color3.fromRGB(120, 170, 220)
 	vp.Ambient = Color3.fromRGB(170, 180, 200)
 	vp.LightColor = Color3.fromRGB(255, 245, 230)
+	vp.LightDirection = Vector3.new(-0.4, -1, -0.3)
 	vp.Parent = surface
+	vp.BackgroundColor3 = Color3.fromRGB(110, 160, 215) -- plain sky (a UIGradient would tint the whole render)
 	local cam = Instance.new("Camera")
-	cam.FieldOfView = 40
+	cam.FieldOfView = 45
 	cam.Parent = vp
 	vp.CurrentCamera = cam
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, 0, 0, 40)
+	title.Size = UDim2.new(1, -20, 0, 40)
+	title.Position = UDim2.fromOffset(10, 6)
 	title.FontFace = Theme.FontFace
 	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(120, 230, 255)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
 	title.Text = "🔴 ARENA CAM · LIVE"
 	title.ZIndex = 2
 	title.Parent = vp
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 3
+	stroke.Parent = title
+	local label = title:Clone()
+	label.Name = "Shot"
+	label.Position = UDim2.new(0, 10, 1, -40)
+	label.Size = UDim2.new(1, -20, 0, 32)
+	label.Text = ""
+	label.TextColor3 = Color3.fromRGB(255, 220, 90)
+	label.Parent = vp
+	shotLabel = label
+	-- between rounds: a title card instead of an empty feed
+	local idle = title:Clone()
+	idle.Name = "Idle"
+	idle.Position = UDim2.fromScale(0.5, 0.5)
+	idle.AnchorPoint = Vector2.new(0.5, 0.5)
+	idle.Size = UDim2.new(0.8, 0, 0, 56)
+	idle.TextXAlignment = Enum.TextXAlignment.Center
+	idle.Text = "NEXT ROUND SOON · WATCH IT LIVE HERE"
+	idle.TextColor3 = Color3.fromRGB(120, 230, 255)
+	idle.Parent = vp
 	camScreen = screen
 	viewport = vp
 end
 
 local function clearMirror()
-	if camWorld then
-		camWorld:Destroy()
-		camWorld = nil
+	for _, m in { camWorld, camFx } do
+		if m then
+			m:Destroy()
+		end
 	end
+	camWorld = nil
+	camFx = nil
+	godMirror = nil
 	table.clear(mirrors)
-	for _, dot in dots do
-		dot:Destroy()
+	table.clear(fxMirrors)
+	table.clear(figures)
+	camCf = nil
+end
+
+local function copyOf(part: BasePart): BasePart
+	local copy = part:Clone()
+	for _, c in copy:GetChildren() do
+		if not (c:IsA("SpecialMesh") or c:IsA("Decal") or c:IsA("Texture")) then
+			c:Destroy()
+		end
 	end
-	table.clear(dots)
+	copy.Anchored = true
+	return copy
 end
 
 local function mirrorArena()
@@ -340,59 +401,228 @@ local function mirrorArena()
 	world.Name = "Mirror"
 	local minSize = if Components.isTouch() then PR.ArenaCamMinSize * 1.6 else PR.ArenaCamMinSize
 	for _, d in arena:GetDescendants() do
-		if d:IsA("BasePart") and d.Anchored and d.Transparency < 0.9 and math.max(d.Size.X, d.Size.Y, d.Size.Z) >= minSize and d.Name ~= "Sea" then
-			local copy = d:Clone()
-			copy:ClearAllChildren()
+		if d:IsA("BasePart") and d.Transparency < 0.9 and math.max(d.Size.X, d.Size.Y, d.Size.Z) >= minSize and d.Name ~= "Sea" then
+			local copy = copyOf(d)
 			copy.Parent = world
 			mirrors[d] = copy
 		end
 	end
+	-- the sea / lava plane as a flat colour sheet
+	local sea = arena:FindFirstChild("Sea", true)
+	if sea and sea:IsA("BasePart") then
+		local s = copyOf(sea)
+		s.Size = Vector3.new(900, 1, 900)
+		s.Parent = world
+		mirrors[sea] = s
+	end
 	world.Parent = vp
 	camWorld = world
+	local fx = Instance.new("Model")
+	fx.Name = "Live"
+	fx.Parent = vp
+	camFx = fx
 end
 
-local function refreshMirror()
-	local vp = viewport
-	if not (vp and camWorld) then
-		return
-	end
+-- structure: collapses fall and tumble on the screen, destroyed parts vanish
+local function syncStructure()
 	for original, copy in mirrors do
-		if not original.Parent or not original.Anchored or original:GetAttribute("Broken") == true then
+		if not original.Parent then
 			copy:Destroy()
 			mirrors[original] = nil
-		elseif copy.CFrame ~= original.CFrame then
-			copy.CFrame = original.CFrame -- listing ships, toppling towers
+		elseif copy.CFrame ~= original.CFrame or copy.Size ~= original.Size then
+			copy.CFrame = original.CFrame
+			copy.Size = original.Size
+			copy.Transparency = original.Transparency
 		end
 	end
-	-- survivors as bright dots
+end
+
+local function figure(color: Color3): Model
+	local m = Instance.new("Model")
+	local function bit(size: Vector3, offset: Vector3, c: Color3, shape: Enum.PartType?, material: Enum.Material?)
+		local p = Instance.new("Part")
+		p.Anchored = true
+		if shape then
+			p.Shape = shape
+		end
+		p.Size = size
+		p.Color = c
+		p.Material = material or Enum.Material.SmoothPlastic
+		p:SetAttribute("Offset", offset)
+		p.Parent = m
+	end
+	bit(Vector3.new(2.4, 3, 1.4), Vector3.new(0, 0, 0), color)
+	bit(Vector3.one * 2, Vector3.new(0, 2.6, 0), Color3.fromRGB(255, 220, 180), Enum.PartType.Ball)
+	bit(Vector3.new(2.4, 2.6, 1.4), Vector3.new(0, -2.8, 0), Color3.fromRGB(50, 60, 90))
+	bit(Vector3.new(0.6, 30, 0.6), Vector3.new(0, 18, 0), color, nil, Enum.Material.Neon) -- beacon
+	return m
+end
+
+-- disasters, survivors and the God rig (several times a second)
+local function syncLive()
+	local fx = camFx
+	if not fx then
+		return
+	end
+	local hazards = workspace:FindFirstChild("Hazards")
+	local seen: { [BasePart]: boolean } = {}
+	if hazards then
+		local count = 0
+		for _, d in hazards:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 0.98 and count < PR.ArenaCamMaxFx then
+				count += 1
+				seen[d] = true
+				local copy = fxMirrors[d]
+				if not copy then
+					copy = copyOf(d)
+					copy.Parent = fx
+					fxMirrors[d] = copy
+					if d.Name == "Telegraph" or d.Name == "Ring" then
+						lastAction = d.Position
+						lastActionAt = os.clock()
+					end
+				end
+				local c = copy :: BasePart
+				c.CFrame = d.CFrame
+				c.Size = d.Size
+				c.Transparency = d.Transparency
+				c.Color = d.Color
+			end
+		end
+	end
+	for original, copy in fxMirrors do
+		if not seen[original] then
+			copy:Destroy()
+			fxMirrors[original] = nil
+		end
+	end
+	-- survivors
 	for _, p in Players:GetPlayers() do
 		local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local alive = p:GetAttribute(Attributes.Role) == "Survivor" and p:GetAttribute(Attributes.Alive) == true
-		local dot = dots[p]
+		local fig = figures[p]
 		if root and alive then
-			if not dot then
-				local d = Instance.new("Part")
-				d.Shape = Enum.PartType.Ball
-				d.Size = Vector3.one * 5
-				d.Material = Enum.Material.Neon
-				d.Color = Color3.fromRGB(90, 255, 140)
-				d.Anchored = true
-				d.Parent = camWorld
-				dots[p] = d
-				dot = d
+			if not fig then
+				fig = figure(if p == player then Color3.fromRGB(255, 220, 60) else Color3.fromRGB(90, 255, 140))
+				fig.Parent = fx
+				figures[p] = fig
 			end
-			(dot :: BasePart).CFrame = CFrame.new(root.Position + Vector3.new(0, 4, 0))
-		elseif dot then
-			dot:Destroy()
-			dots[p] = nil
+			local base = CFrame.new(root.Position) * (root.CFrame - root.CFrame.Position)
+			for _, part in (fig :: Model):GetChildren() do
+				if part:IsA("BasePart") then
+					part.CFrame = base * CFrame.new(part:GetAttribute("Offset") :: Vector3)
+				end
+			end
+		elseif fig then
+			fig:Destroy()
+			figures[p] = nil
 		end
 	end
-	local center, radius = arenaFocus()
-	camAngle += 0.12
-	local cam = vp.CurrentCamera
-	if cam then
-		cam.CFrame = CFrame.lookAt(center + Vector3.new(math.cos(camAngle) * radius * 1.5, radius * 0.9, math.sin(camAngle) * radius * 1.5), center)
+	for p, fig in figures do
+		if not p.Parent then
+			fig:Destroy()
+			figures[p] = nil
+		end
 	end
+	-- the God's hand in the sky
+	local skyRig = workspace:FindFirstChild("CosmeticFX")
+	local rig = skyRig and skyRig:FindFirstChildWhichIsA("Model")
+	if rig and rig.Name:sub(1, 8) == "GodSkin_" then
+		if not godMirror or godMirror.Name ~= rig.Name then
+			if godMirror then
+				godMirror:Destroy()
+			end
+			local m = Instance.new("Model")
+			m.Name = rig.Name
+			for _, part in rig:GetDescendants() do
+				if part:IsA("BasePart") then
+					local c = copyOf(part)
+					local base = part:GetAttribute("BaseTransparency")
+					c.Transparency = if typeof(base) == "number" then base else 0
+					c:SetAttribute("Source", part.Name)
+					c.Parent = m
+				end
+			end
+			m.Parent = fx
+			godMirror = m
+		end
+		local gm = godMirror :: Model
+		gm:PivotTo(rig:GetPivot())
+	elseif godMirror then
+		godMirror:Destroy()
+		godMirror = nil
+	end
+end
+
+-- director camera: orbit, the latest disaster, a survivor close-up
+local function pickShot(center: Vector3)
+	local now = os.clock()
+	local survivors: { Vector3 } = {}
+	for p in figures do
+		local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			table.insert(survivors, root.Position)
+		end
+	end
+	local roll = math.random()
+	if lastAction and now - lastActionAt < PR.ArenaCamActionMemory and roll < 0.55 then
+		shot, shotTarget = "Action", lastAction
+	elseif #survivors > 0 and roll < 0.8 then
+		shot, shotTarget = "Survivor", survivors[math.random(#survivors)]
+	else
+		shot, shotTarget = "Orbit", center
+	end
+	shotUntil = now + PR.ArenaCamShotSeconds
+	if shotLabel then
+		shotLabel.Text = if shot == "Action" then "⚡ DISASTER CAM" elseif shot == "Survivor" then "🏃 SURVIVOR CAM" else "🛰️ OVERVIEW"
+	end
+end
+
+local function stepCamera(dt: number)
+	local vp = viewport
+	local cam = vp and vp.CurrentCamera
+	if not cam then
+		return
+	end
+	local center, radius = arenaFocus()
+	if os.clock() > shotUntil then
+		pickShot(center)
+	end
+	camAngle += dt * 0.15
+	local goal: CFrame
+	if shot == "Orbit" or not shotTarget then
+		goal = CFrame.lookAt(center + Vector3.new(math.cos(camAngle) * radius * 1.2, radius * 0.95, math.sin(camAngle) * radius * 1.2), center)
+	else
+		-- close-ups look down from well above so walls and roofs never block the shot
+		local t = shotTarget :: Vector3
+		local dist = if shot == "Action" then 55 else 34
+		local height = if shot == "Action" then 70 else 52
+		goal = CFrame.lookAt(t + Vector3.new(math.cos(camAngle * 2) * dist, height, math.sin(camAngle * 2) * dist), t)
+	end
+	local prev = camCf
+	camCf = if prev then prev:Lerp(goal, math.min(1, dt * 2.5)) else goal
+	cam.CFrame = camCf :: CFrame
+end
+
+local function setIdle(on: boolean)
+	local vp = viewport
+	local idle = vp and vp:FindFirstChild("Idle")
+	if idle and idle:IsA("TextLabel") then
+		idle.Visible = on
+	end
+	if shotLabel then
+		shotLabel.Visible = not on
+	end
+end
+
+local function camVisible(): boolean
+	local camera = workspace.CurrentCamera
+	local screen = camScreen
+	if not (camera and screen) or lowFx() then
+		return false
+	end
+	local pos = camera.CFrame.Position
+	return pos.Y > Config.Weather.MaxCameraHeight and (pos - screen.Position).Magnitude < PR.ArenaCamViewDistance
 end
 
 local function updateChest()
@@ -454,19 +684,31 @@ function PolishController.Start()
 	end)
 
 	buildScreen()
+	-- structure sync (cheap-ish, a few times a second) + the lodge chest label
 	task.spawn(function()
 		while true do
 			task.wait(PR.ArenaCamInterval)
-			local camera = workspace.CurrentCamera
-			-- only worth drawing while you are up in the lodge
-			if camScreen and camera and camera.CFrame.Position.Y > Config.Weather.MaxCameraHeight and not lowFx() then
+			if camVisible() then
 				if not camWorld and ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" then
 					mirrorArena()
 				end
-				refreshMirror()
+				syncStructure()
 			end
+			setIdle(camWorld == nil)
 			updateChest()
 		end
+	end)
+	-- live layer + director camera, only while someone in the lodge can see the screen
+	RunService.RenderStepped:Connect(function(dt)
+		if not camWorld or not camVisible() then
+			return
+		end
+		fxAccum += dt
+		if fxAccum >= 1 / PR.ArenaCamLiveRate then
+			fxAccum = 0
+			syncLive()
+		end
+		stepCamera(dt)
 	end)
 end
 

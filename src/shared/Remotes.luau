@@ -23,11 +23,18 @@ local NAMES = {
 	"Emote", -- C->S (emoteId) taunt wheel
 	"Feed", -- S->C (text, color) kill feed / clutch callouts
 	"CosmeticAction", -- C->S ("Buy" | "Equip", cosmeticId) coin cosmetics + equipping
-	"GodAim", -- C->S (Vector3) the God's reticle, throttled, drives the sky skin
 	"MapVote", -- C->S (candidateIndex) intermission map vote
 	"Cheer", -- C->S (kind, targetUserId) spectator cheers / aid, paid in coins
 	"ClaimStreak", -- C->S () open today's lodge streak chest
 	"SaveSetting", -- C->S (key, value) quick settings (LowFx, Shake, Music, Sfx)
+	"Analytics", -- C->S (event, detail?) UI-only funnel steps (Config.Analytics.ClientEvents)
+}
+
+-- High-rate, loss-tolerant streams (UnreliableRemoteEvent): a dropped update is simply
+-- replaced by the next one.
+local UNRELIABLE = {
+	"GodAim", -- C->S (Vector3) the God's reticle, max 10 Hz, only after moving 1.5 studs
+	"GodAimRelay", -- S->C (Vector3) the latest aim (human God or AI Director) for the sky rig
 }
 
 local Remotes = {}
@@ -50,6 +57,13 @@ if RunService:IsServer() then
 			remote.Parent = folder
 		end
 	end
+	for _, name in UNRELIABLE do
+		if not folder:FindFirstChild(name) then
+			local remote = Instance.new("UnreliableRemoteEvent")
+			remote.Name = name
+			remote.Parent = folder
+		end
+	end
 else
 	folder = ReplicatedStorage:WaitForChild("Remotes")
 end
@@ -57,6 +71,12 @@ end
 function Remotes.get(name: string): RemoteEvent
 	local remote = if RunService:IsServer() then folder:FindFirstChild(name) else folder:WaitForChild(name)
 	assert(remote and remote:IsA("RemoteEvent"), "Unknown remote " .. name)
+	return remote
+end
+
+function Remotes.unreliable(name: string): UnreliableRemoteEvent
+	local remote = if RunService:IsServer() then folder:FindFirstChild(name) else folder:WaitForChild(name)
+	assert(remote and remote:IsA("UnreliableRemoteEvent"), "Unknown unreliable remote " .. name)
 	return remote
 end
 

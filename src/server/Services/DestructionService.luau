@@ -87,6 +87,12 @@ local function fade(part: BasePart)
 	end
 	part.CollisionGroup = FADING_GROUP
 	part.CastShadow = false
+	-- freeze it where it lies and stop it colliding with anything: a fading (soon
+	-- invisible) chunk must never become an invisible wall
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
 	TweenService:Create(part, TweenInfo.new(DC.DebrisFadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 		Transparency = 1,
 		Size = part.Size * DC.DebrisFadeScale,
@@ -480,12 +486,16 @@ function DestructionService.Init()
 		local step = accum
 		accum = 0
 		sleepResting(step)
-		-- sink debris that fell into the ocean / lava / void
+		-- sink debris that fell into the ocean / lava / void; anything broken that has gone
+		-- (nearly) invisible stops colliding (no invisible walls after a collapse)
 		for i = #debrisList, 1, -1 do
 			local part = debrisList[i]
 			if not part.Parent then
 				restingFor[part] = nil
 				table.remove(debrisList, i)
+			elseif part.Transparency >= DC.InvisibleCollideCutoff and part.CanCollide then
+				part.CanCollide = false
+				part.CanQuery = false
 			elseif part.Position.Y < Config.Player.KillPlaneY - 10 then
 				part:Destroy()
 				table.remove(debrisList, i)

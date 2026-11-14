@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config") :: ModuleScript)
+local Analytics = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Analytics") :: ModuleScript)
 
 local M = Config.Monetization
 local player = Players.LocalPlayer
@@ -24,6 +25,7 @@ function Store.promptProduct(key: string): boolean
 	if not def or def.Id == 0 then
 		return false
 	end
+	Analytics.track("PromptShown", key)
 	MarketplaceService:PromptProductPurchase(player, def.Id)
 	return true
 end
@@ -37,6 +39,7 @@ end
 function Store.promptPass(key: string)
 	local def = M.Passes[key]
 	if def then
+		Analytics.track("PromptShown", key)
 		MarketplaceService:PromptGamePassPurchase(player, def.Id)
 	end
 end

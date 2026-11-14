@@ -11,6 +11,7 @@ local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
 local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 
 local UI = script.Parent.Parent:WaitForChild("UI")
+local Analytics = require(script.Parent.Parent:WaitForChild("Util"):WaitForChild("Analytics") :: ModuleScript)
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
 local Store = require(UI:WaitForChild("Store") :: ModuleScript)
@@ -788,6 +789,7 @@ local function showRoleCard(kind: string)
 	local function dismiss()
 		if card.Parent then
 			card:Destroy()
+			Analytics.track("CardDismissed")
 		end
 		if openCard == card then
 			openCard = nil

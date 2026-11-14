@@ -514,7 +514,15 @@ local Config = {
 		SkyOutline = 0.2, -- outline highlight transparency so the silhouette reads against any sky
 		SkyLightRange = 60,
 		GodSkyTransparency = 0.8, -- how see-through the God sees their own skin
-		AimSendRate = 6, -- reticle updates per second sent to the server
+		AimSendRate = 10, -- max reticle updates per second (UnreliableRemoteEvent GodAim)
+		AimMinMove = 1.5, -- studs the reticle must move before another update is sent
+		AimAttributeInterval = 0.5, -- the GodAim attribute (late joiners, Maelstrom steering) updates at most this often
+		DirectorSkin = "StormEye", -- the AI Director's sky avatar, so solo rounds show a moving hand too
+		DirectorDriftSeconds = 2.5, -- between casts the AI's hand drifts to a new random spot this often
+		GestureSeconds = 0.45, -- cast gesture: slam down, flash, spring back
+		GestureDrop = 14, -- studs the rig dips toward the target on a cast
+		GodHideDistance = 70, -- the God's own skin hides when their camera is this close to it
+		BankDegrees = 18, -- max tilt toward the direction of travel
 		DisplayScale = 0.16, -- lodge display statues
 		BoingUpSpeed = 70, -- Cartoon Boing: the body is flung up and floats
 		BoingFloatSeconds = 3,
@@ -738,6 +746,30 @@ local Config = {
 		{ Id = "Menace", Name = "Menace", Icon = "😜", Stat = "Taunts", Text = "most Daredevil taunts" },
 	} :: { { Id: string, Name: string, Icon: string, Stat: string, Text: string } },
 
+	-- Hand-made prop models kept in the place file (Workspace.Models, moved to ServerStorage
+	-- at runtime) scattered onto the arenas where they make sense. Every part becomes
+	-- anchored, destructible structure; scripts, seats, sounds and emitters are stripped.
+	PropModels = {
+		Folder = "Models",
+		Cars = {
+			-- Surface "Terrain" = open ground; "Top" = the highest surface (ship decks)
+			NeoShibuya = { Count = 8, Surface = "Terrain" },
+			FractureBay = { Count = 4, Surface = "Terrain" },
+			MagmaCore = { Count = 3, Surface = "Top" },
+			IroncladArmada = { Count = 4, Surface = "Top" },
+			OutpostZero = { Count = 2, Surface = "Terrain" },
+			StarlightBoardwalk = { Count = 2, Surface = "Top" },
+		} :: { [string]: { Count: number, Surface: string } },
+		CarModel = "Car",
+		CarHealth = 140, -- per part
+		Tries = 60,
+	},
+
+	-- Map dressing pass (World/Details.luau) after each builder.
+	Details = {
+		MaxLights = 10, -- PointLights per map from dressing (lamps, holo boards)
+	},
+
 	-- Enterable interiors dropped onto empty ground on every arena (MapService). Each is a
 	-- normal destructible building: walls break, the God can see in through doorways and
 	-- windows, so hiding inside buys time but is never a safe room.
@@ -759,8 +791,15 @@ local Config = {
 		OutroSeconds = 2.2,
 		DangerDot = 0.35, -- telegraphs outside this view cone pulse the screen edge
 		DangerRange = 90,
-		ArenaCamInterval = 1, -- seconds between lobby Arena Cam refreshes
-		ArenaCamMinSize = 6, -- parts smaller than this (largest axis) are skipped
+		ArenaCamInterval = 0.4, -- seconds between Arena Cam structure syncs (collapses, debris)
+		ArenaCamLiveRate = 15, -- disasters / survivors / God rig mirror updates per second
+		ArenaCamMinSize = 4, -- arena parts smaller than this (largest axis) are skipped
+		ArenaCamMaxFx = 150, -- disaster parts mirrored at once
+		ArenaCamShotSeconds = 6, -- director camera cuts this often
+		ArenaCamActionMemory = 8, -- a disaster this recent can get the "Action" shot
+		ArenaCamViewDistance = 200, -- only rendered while your camera is this close to the screen
+		ArenaCamOffset = Vector3.new(-48, 14, -48), -- from Config.World.LobbyOrigin
+		ArenaCamYaw = 215, -- the SurfaceGui (Front face) looks into the hall, away from the back wall
 	},
 
 	Disasters = {
@@ -810,6 +849,42 @@ local Config = {
 		},
 	},
 
+	-- Creator Dashboard funnels + balance events (AnalyticsService). Step names are what
+	-- the dashboard shows; keep the order stable once live or funnels split.
+	Analytics = {
+		OnboardingSteps = { "Joined Lobby", "Dismissed Role Card / Moved", "Entered First Match", "Used Dash or Ability", "Completed First Round", "Opened Shop or Spin Wheel" },
+		MatchSteps = { "Map Vote Cast", "Role Assigned", "First Action", "Survived 60s / First Elimination", "Sudden Death Reached", "Round Completed" },
+		ShopSteps = { "Shop or Spin Opened", "Item Previewed", "Robux Prompt Shown", "Purchase Completed" },
+		-- UI-only steps clients may report on the Analytics remote
+		ClientEvents = { Moved = true, CardDismissed = true, Dash = true, Gear = true, HideoutEntered = true, ShopOpened = true, SpinOpened = true, ItemPreviewed = true, PromptShown = true, TutorialStep = true } :: { [string]: boolean },
+		ClientBurst = 6, -- client events: burst size, then ClientRate per second
+		ClientRate = 1,
+		SurviveMarkSeconds = 60,
+		CoinBuckets = { 100, 500, 2000, 10000 },
+		Debug = false, -- warn on analytics call failures
+	},
+
+	-- Guided tutorial (TutorialController): one step at a time, once per player, skippable.
+	Tutorial = {
+		Steps = {
+			{ Id = "Vote", Text = "Click a map card to vote for the next arena", TextTouch = "Tap a map card to vote for the next arena" },
+			{ Id = "Dash", Text = "Press Q (or click DASH) to dash out of danger", TextTouch = "Tap DASH to dash out of danger" },
+			{ Id = "Hide", Text = "Follow the arrows: hide indoors and stand still", TextTouch = "Follow the arrows: hide indoors and stand still" },
+			{ Id = "GodCast", Text = "Pick a disaster (keys 1-5), then click the arena to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
+			{ Id = "Spin", Text = "Free prize! Click SPIN to turn the wheel", TextTouch = "Free prize! Tap SPIN to turn the wheel" },
+			{ Id = "Shop", Text = "Gear keeps you alive: open the SHOP", TextTouch = "Gear keeps you alive: open the SHOP" },
+		} :: { { Id: string, Text: string, TextTouch: string? } },
+		ArrowImage = "rbxassetid://136636775487081", -- yellow pointer arrow (tools/icons/gen_tutorial.py)
+		BeamTexture = "rbxassetid://130409304561613", -- white chevron strip for the ground beam
+		ArrowSize = 64,
+		BeamWidth = 2.6,
+		BeamTileLength = 3.2, -- studs per chevron
+		BeamSpeed = 1.2,
+		ArriveDistance = 9, -- the Hide step completes this close to the doorway (or when Hidden)
+		StepTimeout = 40, -- a step left unfinished this long counts as shown
+		TickSeconds = 0.3,
+	},
+
 	Onboarding = {
 		CardDelay = 3, -- shown after the round-start banner clears
 		CardSeconds = 15,
@@ -852,6 +927,7 @@ local Config = {
 		DebrisLifetimeJitter = 3,
 		DebrisFadeTime = 2.5, -- then it ghosts through players, shrinks and fades
 		DebrisFadeScale = 0.35,
+		InvisibleCollideCutoff = 0.85, -- broken pieces at least this transparent stop colliding
 		MaxDebris = 600,
 		CreakCooldown = 2.5,
 		VolatileRadius = 16,
@@ -1090,6 +1166,24 @@ local Config = {
 		} :: { [string]: string },
 		NewMaps = { ChronoSpire = true, VerdantDome = true, IroncladArmada = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
+	},
+
+	-- Hand-picked Sky objects kept in the place file (Workspace.Skyboxes, moved to
+	-- ServerStorage at runtime), per lighting preset. Presets without one use Skies below.
+	Skyboxes = {
+		Folder = "Skyboxes",
+		ByPreset = {
+			Lodge = "CartoonSky",
+			Day = "CartoonSky", -- Fracture Bay: bright tropical
+			Night = "NightSky", -- Neo-Shibuya: dark night skyline
+			Desert = "Sky", -- Sunscorched Mirage: clear blue
+			Arctic = "Snow", -- Outpost Zero
+			Sunset = "Skybox_Sunset", -- Starlight Boardwalk
+			Foundry = "Skybox_Sunset", -- Chrono-Spire: golden hour
+			Conservatory = "Sky", -- Verdant Bio-Dome: clear sky through the glass
+			Tempest = "NightSky2", -- Ironclad Armada: dark stormy night
+			-- Volcanic (Magma Core) keeps the burning sky from Skies; NorthernLightsNight is spare
+		} :: { [string]: string },
 	},
 
 	-- stylised skyboxes per lighting preset (Bk, Dn, Ft, Lf, Rt, Up), applied by EnvironmentService
