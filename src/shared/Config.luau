@@ -13,7 +13,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cooldown = 3,
 		WarningTime = 1.5,
 		Radius = 10,
-		PlayerDamage = 55,
+		PlayerDamage = 42, -- three hits to kill, not two
 		StructureDamage = 170,
 	},
 	{
@@ -38,7 +38,7 @@ local Abilities: { Types.AbilityDefinition } = {
 		Cooldown = 10,
 		WarningTime = 2,
 		Radius = 28,
-		PlayerDamage = 45,
+		PlayerDamage = 40,
 		StructureDamage = 260,
 		Count = 6,
 		ImpactRadius = 12,
@@ -400,11 +400,12 @@ local Passes: { [string]: Types.PassDefinition } = {
 local Config = {
 	Match = {
 		MinPlayers = 1, -- 1 keeps Play Solo fully playable
-		IntermissionDuration = 20, -- map vote, then the build + countdown
+		IntermissionDuration = 30, -- lobby break, map vote, then the build + countdown
+		LobbyBreak = 10, -- first seconds of intermission: free time to shop, spin and explore before the vote
 		RoundDuration = 85,
 		PrepDuration = 10, -- survivors scatter, God charges energy
 		SuddenDeathDuration = 20, -- final seconds: rising fluid + double regen
-		RoundEndDuration = 8,
+		RoundEndDuration = 9,
 		RespawnDelay = 2,
 		AllowSoloRoleToggle = true, -- 1 player: toggle Survivor <-> God on the fly
 		MaxSpawnSpread = 4,
@@ -428,6 +429,8 @@ local Config = {
 		JumpPower = 50,
 		KillPlaneY = -14,
 		HazardFloorDamagePerSecond = 40,
+		RegenDelay = 5, -- seconds without taking damage before a survivor starts healing
+		RegenPerSecond = 4,
 		LobbyFallResetDepth = 60,
 	},
 
@@ -446,6 +449,17 @@ local Config = {
 		StartEnergy = 25,
 		RegenPerSecond = 8, -- raised with the bigger, more numerous buildings
 		SuddenDeathRegenMultiplier = 2,
+	},
+
+	-- God vs survivors balance (DisasterService / MatchService). The God should get some or
+	-- most survivors, not always all of them: casts are spaced out, the God's Chaos Energy
+	-- regen falls as the survivors thin out, and the last few take a little less damage.
+	Balance = {
+		CastGap = 0.6, -- seconds between any two casts (cooldowns are per ability)
+		RegenFloor = 0.55, -- regen multiplier with 1 survivor left of many (1 = all still alive)
+		GritAlive = 2, -- this many survivors or fewer left (of 3+) ...
+		GritDamage = 0.8, -- ... take this share of disaster damage
+		MaxHit = 48, -- no single disaster hit does more than this (fluid / void still kill)
 	},
 
 	Director = {
@@ -812,8 +826,16 @@ local Config = {
 		ArenaCamShotSeconds = 6, -- director camera cuts this often
 		ArenaCamActionMemory = 8, -- a disaster this recent can get the "Action" shot
 		ArenaCamViewDistance = 200, -- only rendered while your camera is this close to the screen
-		ArenaCamOffset = Vector3.new(-48, 14, -48), -- from Config.World.LobbyOrigin
-		ArenaCamYaw = 215, -- the SurfaceGui (Front face) looks into the hall, away from the back wall
+		ArenaCamOffset = Vector3.new(0, 24.5, -57.4), -- from Config.World.LobbyOrigin: high on the back wall, above the podium and boards
+		ArenaCamYaw = 180, -- the SurfaceGui (Front face) looks into the hall, away from the back wall
+		ArenaCamPitch = 14, -- tilted down at the room like a TV over a bar
+		ArenaCamWallZ = -60, -- back wall (from LobbyOrigin), for the mounting arm
+		-- round start: who is the God, who are the survivors (RoleRevealController)
+		RevealRoulette = 1.1, -- portraits flick through everyone before landing on the God
+		RevealHold = 2.4, -- the GOD vs SURVIVORS card stays up this long after landing
+		RevealMaxFaces = 6, -- survivor portraits shown (+N for the rest)
+		-- mid-round joiners / eliminated players (SpectateController)
+		WaitingAutoSpectate = 4, -- a mid-round joiner drops into spectate after this many seconds
 	},
 
 	Disasters = {
@@ -887,7 +909,7 @@ local Config = {
 			{ Id = "Hide", Text = "Follow the arrows: hide indoors and stand still", TextTouch = "Follow the arrows: hide indoors and stand still" },
 			{ Id = "GodCast", Text = "Pick a disaster (keys 1-5), then click the arena to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
 		} :: { { Id: string, Text: string, TextTouch: string? } },
-		Cinematics = { "IntroSurvivor", "IntroGod" }, -- first-round cinematics (saved like steps)
+		Cinematics = { "IntroSurvivor", "IntroGod" }, -- first-round cinematic (saved like steps); a player sees only one of them, once
 		ArrowImage = "rbxassetid://136636775487081", -- yellow pointer arrow (tools/icons/gen_tutorial.py)
 		BeamTexture = "rbxassetid://130409304561613", -- white chevron strip for the ground beam
 		ArrowSize = 64,
@@ -1004,10 +1026,11 @@ local Config = {
 	-- Numbers are asset ids; strings are built-in rbxasset paths.
 	Audio = {
 		Music = {
-			Lobby = 9045802707, -- "Some Happy for Ya" (APM)
-			Round = 9045941481, -- "Mission Danger" (APM)
-			SuddenDeath = 9044584220, -- "Evil Overlord (B)" (APM)
-		},
+			-- playlists: each track plays through, then the next one (shuffled start)
+			Lobby = { 114376757380093, 126637212383840, 9045802707 }, -- 9045802707: "Some Happy for Ya" (APM)
+			Round = { 9045941481, 1842286824 }, -- 9045941481: "Mission Danger" (APM)
+			SuddenDeath = { 9044584220 }, -- "Evil Overlord (B)" (APM)
+		} :: { [string]: { number } },
 		Stings = {
 			RoundStart = 9043151109, -- "Get Up And Go - Hit" (APM)
 			GodChosen = 9045702179, -- "Roll With The Punches" (APM)
@@ -1036,6 +1059,8 @@ local Config = {
 		} :: { [string]: number },
 		Ui = {
 			Click = 127005215501903, -- crisp UI click (every Components button)
+			SpinWhirl = 9126278342, -- wooden ratchet clicking (PSE): the wheel spinning
+			SpinWin = 9043151109, -- the wheel lands
 			Tab = "rbxasset://sounds/button.wav",
 			Open = 9119467553, -- short whoosh (PSE)
 			Coin = 93529351909119,
@@ -1123,6 +1148,7 @@ local Config = {
 		-- and at most MaxVoices play at once (extra ones are dropped, never queued)
 		Mix = { Scale = 0.6, Max = 1.1, MaxVoices = 14, RollOffMin = 14, RollOffMax = 420 },
 		CrossfadeSeconds = 2.5,
+		MusicLoadTimeout = 8, -- a playlist track still not loaded after this is skipped
 		CountdownTicks = 5, -- intermission seconds that tick
 		CollapseSoundCooldown = 0.4,
 		GlassSoundCooldown = 0.25,

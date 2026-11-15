@@ -206,8 +206,12 @@ local function buildRoundBar()
 		local fraction: number? = nil -- nil = no bar (text is enough)
 		if phase == "Intermission" then
 			if ReplicatedStorage:GetAttribute(Attributes.VoteOpen) == true then
-				local left = t - (M.IntermissionDuration - Config.Voting.Duration)
+				local left = t - (M.IntermissionDuration - M.LobbyBreak - Config.Voting.Duration)
 				title.Text = string.format("🗳️ Map vote closes in <font color=\"#FFD23C\">%ds</font>", math.max(0, left))
+			elseif t > M.IntermissionDuration - M.LobbyBreak then
+				-- the lobby break: free time to shop, spin and explore before the vote
+				local left = t - (M.IntermissionDuration - M.LobbyBreak)
+				title.Text = string.format("🛒 Lobby break · shop & explore · vote in <font color=\"#FFD23C\">%ds</font>", left)
 			else
 				title.Text = string.format("Round starts in <font color=\"#FFD23C\">%ds</font>", t)
 			end
@@ -527,8 +531,8 @@ local Stage = {
 local STAGE_MAX = 4
 
 local function stageNext()
-	-- the first-round cinematic owns the screen: banners wait until it ends
-	if player:GetAttribute("Cinematic") == true then
+	-- the first-round cinematic and the GOD vs SURVIVORS reveal own the screen: banners wait
+	if player:GetAttribute("Cinematic") == true or player:GetAttribute("RoleReveal") == true then
 		Stage.busy = true
 		task.delay(0.4, stageNext)
 		return

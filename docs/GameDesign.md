@@ -8,13 +8,21 @@ With no human God (solo play, or nobody picked), the **Storm Director** AI plays
 ## Core loop (target: zero downtime)
 | Phase | Length | What happens |
 |---|---|---|
-| Intermission | 12 s | Next map builds in view of the lobby; the **God Chance %** card counts up |
+| Intermission | 30 s | A 10 s **lobby break** (shop, spin, explore), the 9 s map vote, then the winner builds in view of the lobby while the **God Chance %** card counts up |
 | Prep | first 10 s of the round | Survivors scatter and claim high ground; the God's energy charges and powers are locked |
 | Escalation | 10 s – 65 s | The God fires disasters from the hotbar and knocks out supports so buildings collapse |
 | Sudden Death | final 20 s | The sea (water/lava) rises to the map's flood line; God energy regen doubles |
-| Round End | 8 s | Payout breakdown, podium, everyone back to the Sky Lodge |
+| Round End | 9 s | Payout breakdown, podium, everyone back to the Sky Lodge |
 
 The round ends early as soon as no survivors are left.
+
+**Round start: GOD vs SURVIVORS** (RoleRevealController, every round, for everyone): a card slams in over the fly-by. Portraits flick through every player like a roulette and land on the God (purple side, horns), a big VS hits, then the survivors' faces pop in on the green side. Your own face gets a gold ring and a YOU chip. Banners and the tutorial wait until it lifts away. It replaces the old "SURVIVE!" banner.
+
+**Balance** (`Config.Balance`): the God should catch some or most survivors, not always all of them, and abilities improve a survivor's odds.
+- Any two casts are at least 0.6 s apart (cooldowns stay per ability), and no single disaster hit does more than 48 damage (Lightning 42 = three hits, Meteors 40). Rising fluid and the void still kill.
+- The God's Chaos Energy regen falls as survivors are eliminated, down to 55% with one survivor left of many.
+- With 2 or fewer survivors left (of 3+), they take 80% of disaster damage.
+- Survivors heal 4 HP/s after 5 s without taking damage.
 
 ## Roles
 ### Disaster God
@@ -59,6 +67,7 @@ Every arena has, on scanned free ground away from spawns and hazards:
 
 ### Eliminated / waiting players
 - Respawn straight into the **Sky Lodge** lobby (watch from the observation deck).
+- **Waiting card** (SpectateController): while a round runs without you, a card at the bottom says ELIMINATED or ROUND IN PROGRESS, when you're back in ("in the next round, about 1:20"), with SPECTATE / LODGE and SHOP buttons. A player who joins mid-round drops into spectate on their own after 4 s.
 - **Spectate** opens a free orbit camera over the arena. **Haunt**: click to drop harmless 👻 ghost pings (5 s cooldown).
 - Run the Neon Climb obby for coins and check the leaderboards and Hall of Legends.
 
@@ -108,7 +117,7 @@ The three newest arenas are about 40% wider than the originals and lean on hidin
 **Studio testing:** set the workspace attribute `ForceMap` (for example `"OutpostZero"`) during Play to pin the next map (this also skips the vote). Set `ForceTouchUI = true` before Play to preview the touch layout with a mouse.
 
 ### Audio
-- **Music** (`Config.Audio.Music`): calm lobby track, tense round track, boss track in sudden death. `AudioController` crossfades between them.
+- **Music** (`Config.Audio.Music`): playlists. The lobby has three tracks, the round has two, and sudden death has one boss track. Each track plays through, then the next one starts; a list of one loops, and a track that fails to load is skipped. `AudioController` crossfades between lists.
 - **Ambience** (`Config.Audio.Ambience` / `AmbienceLayer`): birds in the lobby, plus a per-map bed and layer in the arena, picked from the replicated `MapKey` attribute: waves and seagulls (Fracture Bay), city night, lava, desert wind, howling wind and surf, carnival crowd and surf, refinery hiss and metal groans (Chrono-Spire), jungle birds and a waterfall (Bio-Dome), thunder, rain and heavy surf (Armada).
 - **Weather** (`Config.Weather`, MapFxController): client particles that follow the camera while it is down in the arena. Rain on the Armada (with lightning flashes and thunder every 7-15 s) and a lighter rain in Neo-Shibuya, snow on Outpost Zero, pollen in the Bio-Dome, embers on Chrono-Spire and Magma Core, drifting dust on Sunscorched Mirage.
 - **Round cues:** countdown ticks with rising pitch in the last 5 s of intermission, tocks before casting opens, ticks in the last 5 s of the round, a round-start hit, a God stinger, a sudden-death alarm, and win/lose stingers.
@@ -211,14 +220,14 @@ Three quests a day, the same for everyone: two drawn from `Config.Quests.Pool` p
 ## Presentation and settings
 - **Round intro**: a 2.5 s swooping fly-by of the arena while the God's sky avatar fades in overhead. **Outro**: the camera sweeps up to the Hall of Legends.
 - **Danger edges**: a telegraph that lands outside your view pulses a red glow on that edge of the screen.
-- **Arena Cam**: a holographic screen in the lodge broadcasts the match live, separate from the God view. The arena is mirrored into a ViewportFrame (its SurfaceGui lives in PlayerGui, adorned to the screen: a ViewportFrame on a part's own SurfaceGui renders nothing), collapses and debris stay in sync, and disasters, survivors (little figures with beacons; yours is gold) and the God's sky rig update 15 times a second. A director camera cuts every 6 s between an overview orbit, the latest disaster and a survivor close-up, always from above so walls never block it. Between rounds it shows a "next round soon" card. It only renders while you are in the lodge near the screen.
+- **Arena Cam**: a holographic screen mounted high on the lodge's back wall above the Hall of Legends and the boards, tilted down like a TV over a bar, broadcasts the match live, separate from the God view. The arena is mirrored into a ViewportFrame (its SurfaceGui lives in PlayerGui, adorned to the screen: a ViewportFrame on a part's own SurfaceGui renders nothing), collapses and debris stay in sync, and disasters, survivors (little figures with beacons; yours is gold) and the God's sky rig update 15 times a second. A director camera cuts every 6 s between an overview orbit, the latest disaster and a survivor close-up, always from above so walls never block it. Between rounds it shows a "next round soon" card. It only renders while you are in the lodge near the screen.
 - **UI juice**: spring-bounce buttons, a coin counter that rolls up, click / whoosh sounds.
 - **One thing at a time** (HUDController stage queue): banners, first-time tutorial cards and centre popups wait their turn instead of stacking. While a banner or card is up, short popups go to the feed.
 - **Action buttons**: on PC, DASH and the taunt button sit side by side in the bottom-right corner with white key chips (Q, T); the God hotbar and gear slots use the same chips. On phones DASH sits above and left of the jump button, never on it.
 - **Quick settings** (gear tile, SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
 
 ## Prize wheel
-Every slice shows its icon, the prize in words ("1,500 COINS", "BE THE GOD", "FREE GOD KIT") and its odds.
+Every slice shows its icon, the prize in words ("1,500 COINS", "BE THE GOD", "FREE GOD KIT") and its odds. A big **SPINS** counter in the window's top-left shows how many spins you have (gold, red at zero) and pops when it changes. While the wheel turns, a ratchet whirl (`Config.Audio.Ui.SpinWhirl`) slows with it under the per-slice ticks, and a hit plays when it lands.
 Players bank spins: one to start, a free one every 10 minutes (5 for VIP, banking stops at 3), one for finishing the daily quests, and Robux packs of 1 or 10. The server rolls the weighted reward and the wheel shows the real odds on every segment.
 
 | Reward | Odds |
@@ -237,7 +246,7 @@ Each board's first-place pedestal holds a clone of the `dancinggirl` model (`Con
 ## Onboarding (the first 60 seconds)
 Show, don't tell. The old three-bullet role cards are off (`Config.Onboarding.RoleCards`).
 
-**First-round cinematic** (`Config.Presentation`, PolishController): the first time a player is a survivor, and the first time they are the God, the round's fly-by continues into a short letterboxed sequence during the prep phase. The rest of the HUD hides while it plays, banners wait, and it is saved as `Tut_IntroSurvivor` / `Tut_IntroGod`.
+**First-round cinematic** (`Config.Presentation`, PolishController): once per player, ever, in their very first round. The fly-by continues into a short letterboxed sequence for the role they got, during the prep phase. The rest of the HUD hides while it plays, banners wait, and seeing either one saves both `Tut_IntroSurvivor` and `Tut_IntroGod` on the profile. From then on, the round-start GOD vs SURVIVORS card covers both roles.
 - **Survivor** (about 7 s): the God's hand in the sky ("THIS IS THE GOD: <name> controls every disaster, and is hunting you"), then a harmless client-only demo right in front of them: a pulsing red zone and a meteor slamming into it ("RED ZONE = INCOMING DISASTER"), then back to their own character ("YOU ARE A SURVIVOR").
 - **God** (about 5 s): the survivors, highlighted green ("THESE ARE THE SURVIVORS: real players hiding from you"), then the arena from above while a demo strike lands ("YOU ARE THE GOD: you control the disasters").
 

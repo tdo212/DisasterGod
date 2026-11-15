@@ -674,6 +674,7 @@ function MenuController.Start()
 		MenuController.OpenShop("Passes")
 	end)
 
+	SpectateController.SetShopOpener(MenuController.OpenShop)
 	local spectateTile = Components.tile(sidebar, "Spectate", "Spectate", C.Blue, 5)
 	spectateTile.Activated:Connect(SpectateController.Toggle)
 

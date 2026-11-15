@@ -27,7 +27,7 @@ local ScoringService = require(script.Parent.ScoringService)
 local StealthService = require(script.Parent.StealthService)
 
 type Ability = Types.AbilityDefinition
-type Pool = { Energy: number, Ready: { [string]: number } }
+type Pool = { Energy: number, Ready: { [string]: number }, NextCast: number }
 
 local Attributes = Config.Attributes
 local Chaos = Config.Chaos
@@ -104,8 +104,21 @@ local function hrpAndHumanoid(player: Player): (BasePart?, Humanoid?)
 end
 
 -- `cause` names what hit them for the kill feed ("Meteors", "Tornado", ...).
+-- the last few survivors of a bigger round take a little less (Config.Balance)
+local survivorPeak = 0
+
+local function balanced(damage: number): number
+	local B = Config.Balance
+	damage = math.min(damage, B.MaxHit)
+	if survivorPeak >= 3 and #RoleService.GetAliveSurvivors() <= B.GritAlive then
+		damage *= B.GritDamage
+	end
+	return damage
+end
+
 local function hurt(player: Player, damage: number, caster: Player?, cause: string?)
 	local _, humanoid = hrpAndHumanoid(player)
+	damage = balanced(damage)
 	if humanoid and humanoid.Health > 0 and damage > 0 then
 		ScoringService.NoteHit(player, caster, cause)
 		if not SaveService.AllowHit(player, humanoid, damage) then
@@ -1133,7 +1146,7 @@ end
 local function poolFor(key: any): Pool
 	local pool = pools[key]
 	if not pool then
-		pool = { Energy = Chaos.StartEnergy, Ready = {} }
+		pool = { Energy = Chaos.StartEnergy, Ready = {}, NextCast = 0 }
 		pools[key] = pool
 	end
 	return pool
@@ -1165,11 +1178,12 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	end
 	local pool = poolFor(key)
 	local now = workspace:GetServerTimeNow()
-	if (pool.Ready[id] or 0) > now or pool.Energy < def.Cost then
+	if (pool.Ready[id] or 0) > now or pool.Energy < def.Cost or pool.NextCast > now then
 		return false
 	end
 	pool.Energy -= def.Cost
 	pool.Ready[id] = now + def.Cooldown
+	pool.NextCast = now + Config.Balance.CastGap -- no machine-gunning separate abilities
 	if caster then
 		lastCastId[caster] = id
 	end
@@ -1354,6 +1368,7 @@ end
 
 function DisasterService.BeginRound(god: Player?)
 	table.clear(pools)
+	survivorPeak = 0
 	ComboService.Reset()
 	StealthService.Reset()
 	state.Active = true
@@ -1445,13 +1460,14 @@ function DisasterService.Init()
 		end
 	end)
 
-	-- energy regen
+	-- energy regen: slows as the survivors thin out, so the last few have a real chance
 	local publishTimer = 0
+	local aliveFactor = 1
 	RunService.Heartbeat:Connect(function(dt)
 		if not state.Active then
 			return
 		end
-		local mult = if state.SuddenDeath then Chaos.SuddenDeathRegenMultiplier else 1
+		local mult = (if state.SuddenDeath then Chaos.SuddenDeathRegenMultiplier else 1) * aliveFactor
 		if ReplicatedStorage:GetAttribute(Attributes.Mutator) == "Hyperdrive" then
 			mult *= Config.Mutators.HyperdriveScale -- Chaos Twist: everything recharges faster
 		end
@@ -1462,6 +1478,10 @@ function DisasterService.Init()
 		if publishTimer >= 0.1 then
 			publishTimer = 0
 			publish(state.God)
+			local alive = #RoleService.GetAliveSurvivors()
+			survivorPeak = math.max(survivorPeak, alive)
+			local floor = Config.Balance.RegenFloor
+			aliveFactor = if survivorPeak > 1 then floor + (1 - floor) * math.clamp((alive - 1) / (survivorPeak - 1), 0, 1) else 1
 		end
 	end)
 

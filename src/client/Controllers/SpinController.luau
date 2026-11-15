@@ -74,6 +74,8 @@ local icons: { GuiObject } = {}
 local prizes: { TextLabel } = {} -- what the slice wins, in words ("1,500 COINS")
 local odds: { TextLabel } = {}
 local spinTag: TextLabel
+local countLabel: TextLabel -- the big "spins left" number in the window
+local countPanel: Frame
 local timerLabel: TextLabel
 local buyButtons: { TextButton } = {}
 local wheelAngle = 0
@@ -310,20 +312,33 @@ local function spinTo(index: number, text: string, color: Color3?)
 	local began = os.clock()
 	local lastSegment = math.floor(wheelAngle / THETA)
 	local lastTick = 0
+	-- the ratchet whirls fast, then slows with the wheel
+	local whirl = Sound.loop("SpinWhirl", 0.9, 1.25)
 	local connection: RBXScriptConnection
 	connection = RunService.RenderStepped:Connect(function()
 		local alpha = math.min(1, (os.clock() - began) / S.SpinSeconds)
 		wheelAngle = from + total * (1 - (1 - alpha) ^ 4)
 		render()
+		if whirl then
+			-- speed of the ease-out (1 - (1-a)^4)' = 4(1-a)^3, mapped to pitch and volume
+			local speed = (1 - alpha) ^ 3
+			whirl.PlaybackSpeed = 0.7 + speed * 0.65
+			whirl.Volume = 0.25 + speed * 0.65
+		end
 		local segment = math.floor(wheelAngle / THETA)
 		if segment ~= lastSegment and os.clock() - lastTick > 0.05 then
 			lastSegment = segment
 			lastTick = os.clock()
-			Sound.play("Tick", 0.45, 1.1 + alpha * 0.3)
+			Sound.play("Tick", 0.75, 1.1 + alpha * 0.3)
 		end
 		if alpha >= 1 then
 			connection:Disconnect()
 			spinning = false
+			if whirl then
+				whirl:Stop()
+				whirl:Destroy()
+			end
+			Sound.play("SpinWin", 0.9)
 			wheelAngle %= 360
 			local icon = icons[index]
 			local pop = Instance.new("UIScale")
@@ -340,8 +355,20 @@ end
 ---------------------------------------------------------------------------
 -- window
 
+local shownCount = -1
 local function refreshCounts()
-	spinTag.Text = "x" .. tostring(spins())
+	local n = spins()
+	spinTag.Text = "x" .. tostring(n)
+	countLabel.Text = tostring(n)
+	countLabel.TextColor3 = if n > 0 then C.GoldLight else C.RedLight
+	if shownCount >= 0 and n ~= shownCount then
+		local pop = countPanel:FindFirstChildOfClass("UIScale")
+		if pop then
+			pop.Scale = 1.25
+			Components.tween(pop, Theme.Tweens.Pop, { Scale = 1 })
+		end
+	end
+	shownCount = n
 end
 
 local function refreshTimer()
@@ -419,6 +446,29 @@ local function build()
 		OnClick = function()
 			SpinController.Close()
 		end,
+	})
+
+	-- how many spins you have, big and in the window
+	countPanel = Components.panel({
+		Name = "SpinCount",
+		Size = UDim2.fromOffset(128, 104),
+		Position = UDim2.fromOffset(6, 10),
+		Color = C.Window,
+		Transparency = 0.05,
+		Parent = root,
+	})
+	local countScale = Instance.new("UIScale")
+	countScale.Parent = countPanel
+	Components.label({ Name = "Title", Text = "🎡 SPINS", TextSize = 20, Color = C.HeaderLight, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = countPanel })
+	countLabel = Components.label({
+		Name = "Count",
+		Text = "0",
+		TextSize = 56,
+		Color = C.GoldLight,
+		StrokeThickness = Theme.Stroke.Heavy,
+		Size = UDim2.new(1, 0, 0, 64),
+		Position = UDim2.fromOffset(0, 32),
+		Parent = countPanel,
 	})
 
 	buyButton(root, "Spin1", -144, 1)

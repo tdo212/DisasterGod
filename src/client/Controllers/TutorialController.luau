@@ -74,7 +74,7 @@ end
 -- the direct children of each HUD's scaled layer (Components.window names them "...Window").
 local IGNORE = { TutorialHUD = true, VoteHUD = true, CinematicHUD = true }
 local function busy(): boolean
-	if player:GetAttribute("Cinematic") == true then
+	if player:GetAttribute("Cinematic") == true or player:GetAttribute("RoleReveal") == true then
 		return true
 	end
 	for _, sg in playerGui():GetChildren() do

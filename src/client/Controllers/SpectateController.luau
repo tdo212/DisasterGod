@@ -2,6 +2,9 @@
 -- SpectateController: eliminated / waiting players fly a free orbit camera over
 -- the arena and can "haunt" it with harmless ghost pings (Poltergeist mode), and spend a
 -- few coins on a survivor: a firework cheer, a speed berry or a bandage (Config.Cheers).
+-- Anyone not in the live round (joined mid-round, or eliminated) also gets the Waiting
+-- card: when the next round starts, plus SPECTATE / LODGE and SHOP buttons. A mid-round
+-- joiner drops into spectate on their own after a few seconds.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +32,17 @@ local layer: Frame -- viewport-scaled root for all UI content
 local hint: TextLabel
 local inputConn: RBXScriptConnection? = nil
 local nextPing = 0
+local waitingGui: ScreenGui
+local waitingCard: Frame
+local waitingTitle: TextLabel
+local waitingTimer: TextLabel
+local toggleText: TextLabel? = nil
+local openShop: ((string?) -> ())? = nil
+
+-- MenuController hands over its shop opener (it requires this module, not the reverse)
+function SpectateController.SetShopOpener(fn: (string?) -> ())
+	openShop = fn
+end
 
 local function allowed(): boolean
 	local role = player:GetAttribute(Attributes.Role)
@@ -45,12 +59,19 @@ function SpectateController.IsActive(): boolean
 	return active
 end
 
+local function refreshToggle()
+	if toggleText then
+		toggleText.Text = if active then "🏠 LODGE" else "👁 SPECTATE"
+	end
+end
+
 function SpectateController.Exit()
 	if not active then
 		return
 	end
 	active = false
 	gui.Enabled = false
+	refreshToggle()
 	if inputConn then
 		inputConn:Disconnect()
 		inputConn = nil
@@ -64,6 +85,7 @@ function SpectateController.Enter()
 	end
 	active = true
 	gui.Enabled = true
+	refreshToggle()
 	OrbitCamera.Enable(Config.World.ArenaCenter)
 	inputConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
@@ -221,13 +243,106 @@ function SpectateController.Start()
 		end
 	end)
 
+	-- the Waiting card: shown while a round runs without you
+	waitingGui = Instance.new("ScreenGui")
+	waitingGui.Name = "WaitingHUD"
+	waitingGui.ResetOnSpawn = false
+	waitingGui.Enabled = true
+	waitingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	waitingGui.Parent = player:WaitForChild("PlayerGui")
+	local waitingLayer = Components.scaledRoot(waitingGui)
+	waitingCard = Components.panel({
+		Name = "Waiting",
+		Size = UDim2.fromOffset(540, 84),
+		Position = UDim2.new(0.5, 0, 1, -150),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Color = C.Window,
+		Transparency = 0.1,
+		Parent = waitingLayer,
+	})
+	waitingCard.Visible = false
+	waitingTitle = Components.label({ Name = "Title", Text = "", TextSize = 22, Color = C.GoldLight, XAlign = Enum.TextXAlignment.Left, Size = UDim2.fromOffset(290, 28), Position = UDim2.fromOffset(14, 10), Parent = waitingCard })
+	waitingTimer = Components.label({ Name = "Timer", Text = "", TextSize = 18, Color = C.Text, XAlign = Enum.TextXAlignment.Left, Size = UDim2.fromOffset(290, 24), Position = UDim2.fromOffset(14, 44), Parent = waitingCard })
+	local toggle = Components.button({
+		Name = "SpectateToggle",
+		Text = "👁 SPECTATE",
+		TextSize = 17,
+		Size = UDim2.fromOffset(112, 60),
+		Position = UDim2.new(1, -134, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Color = C.Purple,
+		ColorLight = C.PurpleLight,
+		Parent = waitingCard,
+		OnClick = SpectateController.Toggle,
+	})
+	toggleText = toggle:FindFirstChild("Text") :: TextLabel?
+	Components.button({
+		Name = "Shop",
+		Text = "🛒 SHOP",
+		TextSize = 17,
+		Size = UDim2.fromOffset(104, 60),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Color = C.Blue,
+		ColorLight = C.BlueLight,
+		Parent = waitingCard,
+		OnClick = function()
+			if active then
+				SpectateController.Exit() -- the shop is a lodge thing
+			end
+			if openShop then
+				openShop(nil)
+			end
+		end,
+	})
+
+	local M = Config.Match
+	local joinedMid = false -- this player arrived while a round was running
+	local autoAt = 0
+	local function inRound(): boolean
+		local role = player:GetAttribute(Attributes.Role)
+		return role == "DisasterGod" or (role == "Survivor" and player:GetAttribute(Attributes.Alive) == true)
+	end
+	local function refreshWaiting()
+		local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
+		local waiting = phase == "Active" and not inRound() and player:GetAttribute("Cinematic") ~= true
+		waitingCard.Visible = waiting
+		if not waiting then
+			if phase ~= "Active" then
+				joinedMid = false
+			end
+			return
+		end
+		local t = ReplicatedStorage:GetAttribute(Attributes.TimeRemaining) :: number? or 0
+		local nextRound = t + M.RoundEndDuration + M.IntermissionDuration
+		waitingTitle.Text = if player:GetAttribute(Attributes.Role) == "Survivor" then "💀 ELIMINATED" else "⏳ ROUND IN PROGRESS"
+		waitingTimer.Text = string.format("You're in the next round · about %d:%02d", nextRound // 60, nextRound % 60)
+		if joinedMid and autoAt > 0 and os.clock() >= autoAt then
+			autoAt = 0
+			SpectateController.Enter()
+		end
+	end
+	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" and not inRound() then
+		joinedMid = true
+		autoAt = os.clock() + Config.Presentation.WaitingAutoSpectate
+	end
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.TimeRemaining):Connect(refreshWaiting)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(function()
+		if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" and active then
+			SpectateController.Exit() -- round over: back to the lodge view
+		end
+		refreshWaiting()
+	end)
+
 	local function evaluate()
 		if active and not allowed() then
 			SpectateController.Exit()
 		end
+		refreshWaiting()
 	end
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(evaluate)
 	player:GetAttributeChangedSignal(Attributes.Alive):Connect(evaluate)
+	refreshWaiting()
 end
 
 return SpectateController

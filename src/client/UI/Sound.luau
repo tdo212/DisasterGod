@@ -65,4 +65,19 @@ function Sound.play(key: string, volume: number?, pitch: number?)
 	Debris:AddItem(s, math.max(2, s.TimeLength + 0.5))
 end
 
+-- A looping UI sound (the spinning wheel). The caller stops and destroys it.
+function Sound.loop(key: string, volume: number?, pitch: number?): Sound?
+	local base = template(key)
+	if not base then
+		return nil
+	end
+	local s = base:Clone()
+	s.Looped = true
+	s.Volume = volume or 1
+	s.PlaybackSpeed = pitch or 1
+	s.Parent = uiGroup()
+	s:Play()
+	return s
+end
+
 return Sound

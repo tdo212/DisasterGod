@@ -1,7 +1,7 @@
 --!strict
 -- AudioController: adaptive music + environment ambience + round-flow cues.
---   Music:    lobby track in the Sky Lodge, tense track in the arena, boss track in
---             sudden death (crossfaded).
+--   Music:    lobby playlist in the Sky Lodge, tense playlist in the arena, boss track in
+--             sudden death (crossfaded; each track plays through, then the next).
 --   Ambience: birds in the lobby; per-map beds in the arena (waves, city, lava, wind...).
 --   Cues:     intermission countdown ticks, prep tocks, round-start hit, sudden-death
 --             alarm, win/lose stingers on the round summary.
@@ -43,11 +43,11 @@ local function channel(name: string, volume: number): Channel
 	return c
 end
 
--- Crossfade a channel to a looping track (nil = silence).
-local function crossfade(c: Channel, id: (number | string)?, volume: number?)
+-- Crossfade a channel to a track (nil = silence). Looping unless `looped` is false.
+local function crossfade(c: Channel, id: (number | string)?, volume: number?, looped: boolean?): Sound?
 	local sid = if id then Sound.idOf(id) else nil
 	if sid == c.CurrentId then
-		return
+		return c.Current
 	end
 	local fade = TweenInfo.new(A.CrossfadeSeconds, Enum.EasingStyle.Sine)
 	local old = c.Current
@@ -63,7 +63,7 @@ local function crossfade(c: Channel, id: (number | string)?, volume: number?)
 	if sid then
 		local s = Instance.new("Sound")
 		s.SoundId = sid
-		s.Looped = true
+		s.Looped = looped ~= false
 		s.Volume = 0
 		s.SoundGroup = c.Group
 		s.Parent = c.Group
@@ -71,6 +71,48 @@ local function crossfade(c: Channel, id: (number | string)?, volume: number?)
 		TweenService:Create(s, fade, { Volume = volume or 1 }):Play()
 		c.Current = s
 	end
+	return c.Current
+end
+
+-- Music playlists (Config.Audio.Music): a track plays through, then the next one starts.
+-- A list of one loops. A track that fails to load is skipped.
+local playlist: string? = nil
+local trackIndex = 0
+
+local function playTrack(c: Channel)
+	local name = playlist
+	local list = if name then A.Music[name] else nil
+	if not (name and list and #list > 0) then
+		crossfade(c, nil)
+		return
+	end
+	local single = #list == 1
+	local s = crossfade(c, list[trackIndex], nil, single)
+	if single or not s then
+		return
+	end
+	local function advance()
+		if playlist == name and c.Current == s then
+			trackIndex = trackIndex % #list + 1
+			playTrack(c)
+		end
+	end
+	s.Ended:Once(advance)
+	task.delay(A.MusicLoadTimeout, function()
+		if not s.IsLoaded then
+			advance()
+		end
+	end)
+end
+
+local function playList(c: Channel, name: string)
+	if playlist == name then
+		return
+	end
+	playlist = name
+	local list = A.Music[name]
+	trackIndex = if list and #list > 0 then math.random(1, #list) else 1
+	playTrack(c)
 end
 
 local function inArena(): boolean
@@ -89,13 +131,13 @@ local function evaluate()
 		-- the boss track for Sudden Death and for a Last Stand showdown
 		local lastStand = ReplicatedStorage:GetAttribute(Attributes.LastStand)
 		local sudden = ReplicatedStorage:GetAttribute(Attributes.SubPhase) == "SuddenDeath" or (typeof(lastStand) == "string" and lastStand ~= "")
-		crossfade(music, if sudden then A.Music.SuddenDeath else A.Music.Round)
+		playList(music, if sudden then "SuddenDeath" else "Round")
 		local key = ReplicatedStorage:GetAttribute(Attributes.MapKey)
 		local mapKey = if typeof(key) == "string" then key else ""
 		crossfade(ambience, A.Ambience[mapKey] or A.Ambience.Lobby)
 		crossfade(layer, A.AmbienceLayer[mapKey])
 	else
-		crossfade(music, A.Music.Lobby)
+		playList(music, "Lobby")
 		crossfade(ambience, A.Ambience.Lobby)
 		crossfade(layer, nil)
 	end

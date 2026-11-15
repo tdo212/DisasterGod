@@ -175,7 +175,7 @@ local function onDied(player: Player, character: Model)
 			end
 		end
 		updateAlive()
-		banner:FireClient(player, "ELIMINATED", "Watch from the Sky Lodge deck, run the obby, or Spectate & haunt!", RED)
+		banner:FireClient(player, "ELIMINATED", "Spectate & haunt, or shop and explore the lodge until the next round", RED)
 	end
 end
 
@@ -267,6 +267,22 @@ local function setSlowed(player: Player, humanoid: Humanoid, walkSpeed: number?)
 	end
 end
 
+-- out-of-danger healing: a survivor who hasn't been hurt for a few seconds recovers
+local lastHealth: { [Player]: number } = {}
+local hurtAt: { [Player]: number } = {}
+
+local function regen(player: Player, humanoid: Humanoid, dt: number)
+	local now = os.clock()
+	local before = lastHealth[player]
+	if before and humanoid.Health < before - 0.01 then
+		hurtAt[player] = now
+	end
+	if now - (hurtAt[player] or 0) >= Config.Player.RegenDelay and humanoid.Health < humanoid.MaxHealth then
+		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + Config.Player.RegenPerSecond * dt)
+	end
+	lastHealth[player] = humanoid.Health
+end
+
 local function hazardStep(dt: number)
 	if state.Phase ~= "Active" then
 		return
@@ -280,6 +296,7 @@ local function hazardStep(dt: number)
 		if not (hrp and humanoid) or humanoid.Health <= 0 then
 			continue
 		end
+		regen(player, humanoid, dt)
 		-- hazard zones under the feet (quicksand, vents)
 		local floor = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), footParams)
 		local zone = floor and floor.Instance
@@ -319,11 +336,16 @@ local function intermission(): (boolean, string)
 	ReplicatedStorage:SetAttribute(Attributes.GodName, "")
 	updateAlive()
 
-	-- players vote on the lobby pads first; the winner is built for the rest of the countdown
+	-- a short lobby break first: shop, spin, explore (eliminated players get here too)
+	ReplicatedStorage:SetAttribute(Attributes.MapName, "Lobby break")
+	while state.TimeRemaining > M.IntermissionDuration - M.LobbyBreak do
+		tick()
+	end
+	-- then players vote on the lobby pads; the winner is built for the rest of the countdown
 	local mapName: string
 	if VoteService.Begin() then
 		ReplicatedStorage:SetAttribute(Attributes.MapName, "Vote for the next map!")
-		local voteEnds = M.IntermissionDuration - Config.Voting.Duration
+		local voteEnds = M.IntermissionDuration - M.LobbyBreak - Config.Voting.Duration
 		while state.TimeRemaining > voteEnds do
 			tick()
 		end
@@ -365,8 +387,7 @@ local function assignRoles(): Player?
 			survivorsAssigned = true
 			RoleService.SetRole(p, "Survivor")
 			task.spawn(sendToArena, p, index)
-			local godText = if god then god.DisplayName .. " is the Disaster God" else "The Storm Director controls the disasters"
-			banner:FireClient(p, "SURVIVE!", godText, SURVIVOR_GREEN)
+			-- no survivor banner: the GOD vs SURVIVORS reveal shows it (RoleRevealController)
 		end
 	end
 	ReplicatedStorage:SetAttribute(Attributes.GodName, if god then god.DisplayName else "The Storm")
@@ -538,6 +559,8 @@ function MatchService.Init()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		participants[player] = nil
+		lastHealth[player] = nil
+		hurtAt[player] = nil
 		task.defer(updateAlive)
 	end)
 	RoleService.SoloSwapRequested:Connect(onSoloSwap)

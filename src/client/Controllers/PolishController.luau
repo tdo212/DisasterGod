@@ -275,6 +275,23 @@ local function markSeen(id: string)
 	player:SetAttribute(Attributes.TutorialPrefix .. id, true) -- locally at once; the profile follows
 end
 
+-- one intro per player, ever: whichever role they get first. The round-start GOD vs
+-- SURVIVORS reveal (RoleRevealController) covers the other role every round.
+local function introSeen(): boolean
+	for _, id in Config.Tutorial.Cinematics do
+		if player:GetAttribute(Attributes.TutorialPrefix .. id) == true then
+			return true
+		end
+	end
+	return false
+end
+
+local function markIntroSeen()
+	for _, id in Config.Tutorial.Cinematics do
+		markSeen(id)
+	end
+end
+
 local function survivorCinematic()
 	local center = arenaFocus()
 	local godName = ReplicatedStorage:GetAttribute(Attributes.GodName)
@@ -323,7 +340,7 @@ local function survivorCinematic()
 			end,
 		},
 	}, function()
-		markSeen("IntroSurvivor")
+		markIntroSeen()
 	end)
 end
 
@@ -381,19 +398,19 @@ local function godCinematic()
 			end,
 		},
 	}, function()
-		markSeen("IntroGod")
+		markIntroSeen()
 	end)
 end
 
--- after the fly-by: the first time in each role, play its cinematic
+-- after the fly-by of a player's very first round: the cinematic for the role they got
 local function firstTimeCinematic()
-	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
+	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" or introSeen() then
 		return
 	end
 	local role = player:GetAttribute(Attributes.Role)
-	if role == "Survivor" and player:GetAttribute(Attributes.TutorialPrefix .. "IntroSurvivor") ~= true then
+	if role == "Survivor" then
 		survivorCinematic()
-	elseif role == "DisasterGod" and player:GetAttribute(Attributes.TutorialPrefix .. "IntroGod") ~= true then
+	elseif role == "DisasterGod" then
 		godCinematic()
 	end
 end
@@ -632,7 +649,8 @@ local function buildScreen()
 	screen.CanCollide = false
 	screen.CanQuery = false
 	screen.Size = Vector3.new(26, 14, 0.4)
-	screen.CFrame = CFrame.new(origin + PR.ArenaCamOffset) * CFrame.Angles(0, math.rad(PR.ArenaCamYaw), 0)
+	-- mounted high on the back wall above the boards, tilted down at the room like a bar TV
+	screen.CFrame = CFrame.new(origin + PR.ArenaCamOffset) * CFrame.Angles(0, math.rad(PR.ArenaCamYaw), 0) * CFrame.Angles(-math.rad(PR.ArenaCamPitch), 0, 0)
 	screen.Color = Color3.fromRGB(20, 30, 45)
 	screen.Material = Enum.Material.SmoothPlastic
 	screen.Parent = fxFolder
@@ -647,6 +665,24 @@ local function buildScreen()
 	frame.Material = Enum.Material.Neon
 	frame.Transparency = 0.4
 	frame.Parent = fxFolder
+	-- a dark mounting arm from the back of the screen into the wall
+	local mount = screen.Position + screen.CFrame.LookVector * -0.4
+	local wallZ = origin.Z + PR.ArenaCamWallZ
+	local reach = math.abs(mount.Z - wallZ)
+	if reach > 0.2 then
+		local arm = Instance.new("Part")
+		arm.Name = "ArenaCamMount"
+		arm.Anchored = true
+		arm.CanCollide = false
+		arm.CanQuery = false
+		arm.CanTouch = false
+		arm.CastShadow = false
+		arm.Size = Vector3.new(4, 2, reach)
+		arm.CFrame = CFrame.new(mount.X, mount.Y, (mount.Z + wallZ) / 2)
+		arm.Color = Color3.fromRGB(35, 38, 45)
+		arm.Material = Enum.Material.Metal
+		arm.Parent = fxFolder
+	end
 	-- a ViewportFrame only renders when its SurfaceGui lives in PlayerGui (adorned to the
 	-- part); parented to the part itself it draws nothing
 	local surface = Instance.new("SurfaceGui")

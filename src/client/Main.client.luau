@@ -30,6 +30,7 @@ local order = {
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
 	"SaveController",
 	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)
+	"RoleRevealController", -- round-start GOD vs SURVIVORS card
 	"TutorialController", -- last: points at buttons the other controllers built
 }
 
