@@ -534,8 +534,9 @@ function SpinController.Open()
 	Sound.play("Open", 0.5, 1.2)
 	dim.Visible = true
 	root.Visible = true
-	rootScale.Scale = 0.7
-	Components.tween(rootScale, Theme.Tweens.Pop, { Scale = 1 })
+	local fit = Components.fitScale(root, rootScale)
+	rootScale.Scale = 0.7 * fit
+	Components.tween(rootScale, Theme.Tweens.Pop, { Scale = fit })
 	refreshCounts()
 	refreshTimer()
 end

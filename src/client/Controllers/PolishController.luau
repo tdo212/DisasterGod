@@ -79,6 +79,7 @@ local function cinematicGui()
 	end
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "CinematicHUD"
+	gui.ScreenInsets = Enum.ScreenInsets.None -- edge-to-edge tint, past a phone's notch
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 20
@@ -1035,6 +1036,7 @@ function PolishController.Start()
 	fxFolder.Parent = workspace
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "DangerHUD"
+	gui.ScreenInsets = Enum.ScreenInsets.None -- edge-to-edge tint, past a phone's notch
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true

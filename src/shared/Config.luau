@@ -618,6 +618,7 @@ local Config = {
 	Feed = {
 		TopOffset = 8, -- PC: feed hugs the top-right corner (the wallet is bottom-left)
 		TopOffsetTouch = 84, -- phones: just under the top-right wallet and streak line
+		DodgeTouch = Vector2.new(176, 112), -- phones, lobby: feed shifts this far left / sits this low beside the God card
 		MaxLines = 5,
 		LineSeconds = 6,
 		CauseWindow = 6, -- a hit this recent names the cause of death

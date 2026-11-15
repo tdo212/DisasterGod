@@ -205,10 +205,12 @@ local function followJumpButton()
 			if jump.AbsoluteSize.X < 1 then
 				return
 			end
-			local size = math.max(60, jump.AbsoluteSize.X * 0.8)
+			-- same row as the jump button, just left of it: the right edge above stays
+			-- free for the God card and offers
+			local size = math.max(56, jump.AbsoluteSize.X * 0.8)
 			dashButton.Size = UDim2.fromOffset(size, size)
 			dashButton.AnchorPoint = Vector2.new(1, 1)
-			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X + jump.AbsoluteSize.X * 0.2, jump.AbsolutePosition.Y - TOUCH_DASH_GAP)
+			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y + jump.AbsoluteSize.Y)
 		end
 		apply()
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
@@ -235,7 +237,7 @@ local function buildGui()
 		Name = "Dash",
 		Text = "DASH",
 		TextSize = if touch then 18 else 24,
-		-- touch: real pixels above-left of the jump button (not in the scaled layer);
+		-- touch: real pixels just left of the jump button (not in the scaled layer);
 		-- fallback spot (no TouchGui yet) is clear of where the jump button sits
 		Size = if touch then UDim2.fromOffset(TOUCH_DASH_SIZE, TOUCH_DASH_SIZE) else UDim2.fromOffset(150, 66),
 		Position = if touch then UDim2.new(1, -40, 1, -150) else UDim2.new(1, -24, 1, -24),
@@ -325,6 +327,7 @@ local function emp(seconds: number)
 	end
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "EmpScramble"
+	gui.ScreenInsets = Enum.ScreenInsets.None -- edge-to-edge tint, past a phone's notch
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = 20
 	gui.Parent = playerGui

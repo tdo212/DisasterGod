@@ -107,8 +107,10 @@ local function show()
 	end
 	window.Visible = true
 	reopen.Visible = false
-	windowScale.Scale = 0.8
-	Components.tween(windowScale, Theme.Tweens.Pop, { Scale = 1 })
+	-- phones: shrink below the round bar so the screen edges stay visible
+	local fit = Components.fitScale(window, windowScale, if Components.isTouch() then Theme.Layout.TouchModalMargin else nil)
+	windowScale.Scale = 0.8 * fit
+	Components.tween(windowScale, Theme.Tweens.Pop, { Scale = fit })
 	Sound.play("Open", 0.5, 1.1)
 end
 
@@ -253,7 +255,7 @@ function VoteController.Start()
 	window = Components.panel({
 		Name = "MapVote",
 		Size = UDim2.fromOffset(width, CARD_H + 122),
-		Position = UDim2.fromScale(0.5, 0.52),
+		Position = UDim2.fromScale(0.5, if Components.isTouch() then 0.57 else 0.52),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = C.Window,
 		Transparency = 0.18,

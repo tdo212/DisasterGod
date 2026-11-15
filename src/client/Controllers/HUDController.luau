@@ -450,8 +450,9 @@ local function buildWelcomeOffer()
 	offer.AutoButtonColor = false
 	offer.BackgroundColor3 = Color3.new(1, 1, 1)
 	if touch then
-		offer.Size = UDim2.fromOffset(164, 112)
-		offer.Position = UDim2.new(1, -12, 0, 288)
+		-- ends above the jump button (DASH sits beside it, not above)
+		offer.Size = UDim2.fromOffset(164, 98)
+		offer.Position = UDim2.new(1, -12, 0, 286)
 	else
 		offer.Size = UDim2.fromOffset(176, 126)
 		offer.Position = UDim2.new(1, -16, 0.5, 76)
@@ -462,14 +463,14 @@ local function buildWelcomeOffer()
 	Components.gradient(offer, C.OrangeLight, C.Orange, 90, true)
 	Components.studs(offer, nil, Theme.Radius.Large)
 	offer.Parent = layer
-	Components.label({ Name = "Title", Text = def.Icon .. " Welcome Pack", TextSize = 19, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = offer })
+	Components.label({ Name = "Title", Text = def.Icon .. " Welcome Pack", TextSize = 19, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, if touch then 3 else 6), Parent = offer })
 	Components.label({
 		Name = "Coins",
 		Text = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " Coins + Kit",
 		TextSize = 18,
 		Color = C.GoldLight,
 		Size = UDim2.new(1, 0, 0, 24),
-		Position = UDim2.fromOffset(0, 32),
+		Position = UDim2.fromOffset(0, if touch then 26 else 32),
 		Parent = offer,
 	})
 	local was = Components.label({
@@ -478,7 +479,7 @@ local function buildWelcomeOffer()
 		TextSize = 16,
 		Color = C.RedLight,
 		Size = UDim2.fromOffset(64, 22),
-		Position = UDim2.new(0, 8, 1, -42),
+		Position = UDim2.new(0, 8, 1, if touch then -36 else -42),
 		Parent = offer,
 	})
 	local strike = Instance.new("Frame")
@@ -490,8 +491,8 @@ local function buildWelcomeOffer()
 	strike.Parent = was
 	local price = Components.panel({
 		Name = "Price",
-		Size = UDim2.fromOffset(88, 32),
-		Position = UDim2.new(1, -8, 1, -14),
+		Size = UDim2.fromOffset(88, if touch then 30 else 32),
+		Position = UDim2.new(1, -8, 1, if touch then -9 else -14),
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Green,
 		Radius = Theme.Radius.Medium,

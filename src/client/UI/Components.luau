@@ -16,14 +16,40 @@ local C = Theme.Colors
 
 local Components = {}
 
--- Touch-first device (phone / tablet): bigger UI, thumb-friendly placement.
--- Studio testing: set the workspace attribute ForceTouchUI = true before Play to preview
--- the touch layout with a mouse.
+-- Touch-first device (phone / tablet): bigger UI, thumb-friendly placement. A touch
+-- screen counts even when a keyboard is reported, as long as the screen is phone-sized
+-- (Studio's device emulator, Android phones with a keyboard service).
+-- Studio testing: Studio's device emulator (a phone) picks this up; ForceTouchUI = true
+-- on the workspace forces the touch layout at any window size.
 function Components.isTouch(): boolean
 	if RunService:IsStudio() and workspace:GetAttribute("ForceTouchUI") == true then
 		return true
 	end
-	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	if not UserInputService.TouchEnabled then
+		return false
+	end
+	if not UserInputService.KeyboardEnabled then
+		return true
+	end
+	local camera = workspace.CurrentCamera
+	local view = if camera then camera.ViewportSize else Vector2.zero
+	return view.X > 1 and math.min(view.X, view.Y) <= Theme.Layout.PhoneMaxSide
+end
+
+-- How much a window (or any centred panel) must shrink to fit its parent with a margin.
+-- `scale` is the panel's own UIScale, whose current value is factored out.
+function Components.fitScale(panel: GuiObject, scale: UIScale?, margin: number?): number
+	local parent = panel.Parent
+	if not (parent and parent:IsA("GuiObject")) then
+		return 1
+	end
+	local own = if scale and scale.Scale > 0.01 then scale.Scale else 1
+	local natural = panel.AbsoluteSize / own
+	if natural.X < 1 or natural.Y < 1 then
+		return 1
+	end
+	local room = parent.AbsoluteSize * (margin or Theme.Layout.FitMargin)
+	return math.min(1, room.X / natural.X, room.Y / natural.Y)
 end
 
 -- Swap device words in server-sent hint text: {tap} -> "tap" on phones, "click" otherwise
@@ -417,6 +443,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 	content.Parent = root
 
 	local open = false
+	local fit = 1
 	local handle: WindowHandle
 
 	local function close()
@@ -425,7 +452,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		end
 		open = false
 		Sound.play("Click", 0.6, 0.8)
-		local t = Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.85 })
+		local t = Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.85 * fit })
 		t.Completed:Once(function()
 			if not open then
 				root.Visible = false
@@ -454,8 +481,10 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 			open = true
 			Sound.play("Open", 0.5, 1.2)
 			root.Visible = true
-			scale.Scale = 0.7
-			Components.tween(scale, Theme.Tweens.Pop, { Scale = 1 })
+			-- shrink to fit short screens (phones) instead of running off the bottom
+			fit = Components.fitScale(root, scale)
+			scale.Scale = 0.7 * fit
+			Components.tween(scale, Theme.Tweens.Pop, { Scale = fit })
 		end,
 		Close = close,
 		IsOpen = function()

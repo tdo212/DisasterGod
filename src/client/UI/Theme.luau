@@ -82,6 +82,9 @@ local Theme = {
 		TouchReference = Vector2.new(1040, 540), -- bigger relative UI for thumbs
 		MinScale = 0.45,
 		MaxScale = 1.25,
+		PhoneMaxSide = 600, -- a touch screen this short (points) gets the touch layout even with a keyboard
+		FitMargin = 0.94, -- windows shrink to fit this share of the screen
+		TouchModalMargin = 0.76, -- the map vote on phones leaves the round bar and side menu visible
 	},
 
 	Tweens = {

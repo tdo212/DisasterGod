@@ -149,6 +149,7 @@ function KillConfirmController.Start()
 	started = true
 	gui = Instance.new("ScreenGui")
 	gui.Name = "KillConfirmHUD"
+	gui.ScreenInsets = Enum.ScreenInsets.None -- edge-to-edge tint, past a phone's notch
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = 7
