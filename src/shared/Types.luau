@@ -147,6 +147,7 @@ export type MapInfo = {
 	KnockbackMultiplier: number?, -- slippery maps make knockback stronger
 	Center: Vector3,
 	Radius: number,
+	Walled: boolean?, -- a walled arena (impassable perimeter, no edge drop): no rim buoys
 }
 
 export type PlayerProfile = {

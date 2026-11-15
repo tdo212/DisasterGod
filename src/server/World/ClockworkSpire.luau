@@ -1,38 +1,36 @@
 --!strict
--- Arena 13: Clockwork Spire. A jagged, overgrown sky island floating above a sea of cloud
--- under a starry nebula night; golden gaslight, copper and amber.
---   * The Cog Tower in the middle: three stacked clockwork tiers on brass columns, giant
---     gears turning on every tier, a great clock face on top, stairs winding up between
---     the tiers and machinery to hide in under the first one.
---   * The Grand Observatory (east): two storeys under twin copper domes, with a massive
---     telescope spire and a ladder spiralling up the outside.
---   * The Grand Library (west): two storeys, a labyrinth of bookshelves on the ground
---     floor, reading balconies above; catwalks from the Cog Tower reach both roofs.
---   * A hollow fallen gear makes a crawlspace; stone archways choked with vines and
---     gas lamps line the cobbled paths.
--- Sudden death: the cloud tide rises over the island. Climb the tower.
+-- Arena 13: Clockwork Spire. An open-sky steampunk foundry yard at golden hour, walled in
+-- by massive brick-and-iron blast walls.
+--   * A walled arena: brick walls with iron pilasters, brass pipe runs, glowing furnace
+--     arches and giant brass gears turning on every wall (impassable, with an invisible cap).
+--   * Two brick-and-brass clocktowers (4 and 5 storeys) with lit clock faces, an open belfry
+--     on the roof under a pointed spire; stairwell ladders reach every floor and the roof.
+--   * Three multi-floor brick factories and a small foundry, all with window holes and
+--     stairwells; iron skybridges link the clocktower roofs to the factories.
+--   * Four free-standing smokestacks that topple when their base is blasted, steam-vent
+--     launch pads that fling survivors onto the roofs, glowing furnace pans, brass rail
+--     tracks and minecarts across the cobbled yard.
+-- Sudden death: molten brass floods the yard. Get up the towers.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = require(script.Parent.Builder)
 local Types = require(ReplicatedStorage.Shared.Types)
 
-local ROCK = Color3.fromRGB(82, 78, 92)
-local ROCK_DARK = Color3.fromRGB(56, 52, 66)
-local MOSS = Color3.fromRGB(70, 120, 70)
-local COBBLE = Color3.fromRGB(120, 112, 118)
-local BRASS = Color3.fromRGB(196, 150, 70)
-local COPPER = Color3.fromRGB(184, 108, 60)
-local STONE = Color3.fromRGB(196, 186, 170)
-local WOOD = Color3.fromRGB(110, 70, 44)
-local AMBER = Color3.fromRGB(255, 180, 80)
-local VINE = Color3.fromRGB(60, 130, 60)
+local BRICK = Color3.fromRGB(150, 72, 50)
+local BRICK_DARK = Color3.fromRGB(110, 52, 40)
+local IRON = Color3.fromRGB(52, 50, 54)
+local BRASS = Color3.fromRGB(200, 150, 60)
+local BRASS_DARK = Color3.fromRGB(160, 110, 45)
+local YARD = Color3.fromRGB(88, 80, 76)
+local GLOW = Color3.fromRGB(255, 140, 40)
+local CLOCK = Color3.fromRGB(255, 236, 180)
+local ROOF = Color3.fromRGB(90, 60, 50)
 
-local TIERS = {
-	{ Radius = 25, Top = 12 },
-	{ Radius = 18, Top = 24 },
-	{ Radius = 11, Top = 36 },
-}
+local HALF = 115 -- interior half-size
+local WALL_T = 14
+local WALL_H = 52
+local FLOOR_H = 12
 
 local ClockworkSpire = {}
 
@@ -44,307 +42,250 @@ local function deco(part: BasePart): BasePart
 	return part
 end
 
-local function polar(r: number, a: number, y: number): Vector3
-	return Vector3.new(math.cos(a) * r, y, math.sin(a) * r)
-end
+local BRICK_STYLE: Builder.HighriseStyle = {
+	SlabColor = IRON,
+	SlabMaterial = Enum.Material.DiamondPlate,
+	ColumnColor = IRON,
+	ColumnMaterial = Enum.Material.Metal,
+	WallColor = BRICK,
+	WallMaterial = Enum.Material.Brick,
+	WallTransparency = 0,
+	Stairwell = true,
+	Windows = true,
+}
 
-local function island(model: Model, rng: Random)
+local function grounds(model: Model)
 	local g = Instance.new("Folder")
 	g.Name = "Ground"
 	g.Parent = model
-	Builder.block(g, "IslandTop", Vector3.new(0, -4, 0), Vector3.new(250, 8, 220), ROCK, Enum.Material.Slate)
-	Builder.block(g, "Grass", Vector3.new(0, 0.1, 0), Vector3.new(240, 0.2, 210), MOSS, Enum.Material.Grass)
-	-- cobbled paths: a cross through the middle and a ring around the tower
-	Builder.block(g, "Path", Vector3.new(0, 0.25, 0), Vector3.new(220, 0.3, 10), COBBLE, Enum.Material.Cobblestone)
-	Builder.block(g, "Path", Vector3.new(0, 0.25, 0), Vector3.new(10, 0.3, 190), COBBLE, Enum.Material.Cobblestone)
-	for i = 0, 11 do
-		local a0, a1 = i * math.pi / 6, (i + 1) * math.pi / 6
-		local p0, p1 = polar(34, a0, 0.26), polar(34, a1, 0.26)
-		Builder.part(g, { Name = "PathRing", Size = Vector3.new(8, 0.3, (p1 - p0).Magnitude + 1), CFrame = CFrame.lookAt((p0 + p1) / 2, p1), Color = COBBLE, Material = Enum.Material.Cobblestone })
+	Builder.block(g, "Yard", Vector3.new(0, -3, 0), Vector3.new(500, 6, 500), YARD, Enum.Material.Cobblestone)
+	-- brass rail tracks: a loop round the yard and a cross line
+	local function rail(a: Vector3, b: Vector3)
+		local mid = (a + b) / 2
+		local len = (b - a).Magnitude
+		for _, off in { -1.6, 1.6 } do
+			local side = CFrame.lookAt(mid, b) * CFrame.new(off, 0, 0)
+			deco(Builder.part(g, { Name = "Rail", Size = Vector3.new(0.5, 0.3, len), CFrame = side + Vector3.new(0, 0.15, 0), Color = BRASS, Material = Enum.Material.Metal }))
+		end
 	end
-	-- jagged, mossy crags around the rim (solid ground, climbable)
-	for i = 0, 27 do
-		local a = i * math.pi * 2 / 28 + rng:NextNumber(-0.05, 0.05)
-		local rx, rz = 118 + rng:NextNumber(-6, 4), 102 + rng:NextNumber(-6, 4)
-		local h = rng:NextNumber(4, 22)
-		local w = rng:NextNumber(10, 18)
-		local p = Vector3.new(math.cos(a) * rx, h / 2, math.sin(a) * rz)
-		Builder.part(g, { Name = "Crag", Size = Vector3.new(w, h, w * 0.8), CFrame = CFrame.new(p) * CFrame.Angles(0, -a, math.rad(rng:NextNumber(-8, 8))), Color = ROCK_DARK, Material = Enum.Material.Slate })
-		Builder.part(g, { Name = "CragMoss", Size = Vector3.new(w * 0.9, 1, w * 0.7), CFrame = CFrame.new(p + Vector3.new(0, h / 2 + 0.4, 0)) * CFrame.Angles(0, -a, 0), Color = MOSS, Material = Enum.Material.LeafyGrass })
-	end
-	-- the island's underside hanging into the clouds, and the cloud sea (decor)
-	for i = 1, 10 do
-		local a = rng:NextNumber(0, math.pi * 2)
-		local d = rng:NextNumber(0, 70)
-		local h = rng:NextNumber(30, 70)
-		deco(Builder.part(model, { Name = "Underside", Size = Vector3.new(rng:NextNumber(50, 90), h, rng:NextNumber(50, 90)), CFrame = CFrame.new(math.cos(a) * d, -8 - h / 2, math.sin(a) * d) * CFrame.Angles(0, a, 0), Color = ROCK_DARK, Material = Enum.Material.Slate }))
-		local _ = i
-	end
-	for _ = 1, 12 do
-		local a = rng:NextNumber(0, math.pi * 2)
-		local d = rng:NextNumber(150, 300)
-		local cloud = Builder.part(model, { Name = "Cloud", Size = Vector3.new(rng:NextNumber(80, 160), rng:NextNumber(8, 16), rng:NextNumber(60, 120)), CFrame = CFrame.new(math.cos(a) * d, rng:NextNumber(-60, -30), math.sin(a) * d), Color = Color3.fromRGB(200, 196, 230), Material = Enum.Material.SmoothPlastic, Transparency = 0.35 })
-		deco(cloud)
-	end
+	local r = 102
+	rail(Vector3.new(-r, 0, -r), Vector3.new(r, 0, -r))
+	rail(Vector3.new(r, 0, -r), Vector3.new(r, 0, r))
+	rail(Vector3.new(r, 0, r), Vector3.new(-r, 0, r))
+	rail(Vector3.new(-r, 0, r), Vector3.new(-r, 0, -r))
+	rail(Vector3.new(-r, 0, 0), Vector3.new(r, 0, 0))
 end
 
--- a gear disc with teeth (decor: it turns)
-local function gear(parent: Instance, cf: CFrame, diameter: number, rate: number, color: Color3)
-	local disc = Builder.part(parent, { Name = "Gear", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, diameter, diameter), CFrame = cf, Color = color, Material = Enum.Material.Metal })
-	Builder.spin(disc, Vector3.new(rate, 0, 0))
-	deco(disc)
-	local hub = Builder.part(parent, { Name = "GearHub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.8, diameter * 0.3, diameter * 0.3), CFrame = cf, Color = ROCK_DARK, Material = Enum.Material.Metal })
-	deco(hub)
+-- A giant brass gear that turns on a wall (purely visual: every piece spins about the same
+-- axis through the hub, so the teeth turn with the rim).
+local function wallGear(parent: Instance, center: Vector3, normal: Vector3, diameter: number, rate: number)
+	local axis = CFrame.lookAt(center, center + normal) * CFrame.Angles(0, math.rad(90), 0) -- local X along the normal
+	local rim = Builder.part(parent, { Name = "GearRim", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, diameter, diameter), CFrame = axis, Color = BRASS, Material = Enum.Material.Metal })
+	Builder.spin(rim, Vector3.new(rate, 0, 0))
+	for i = 0, 3 do
+		local bar = Builder.part(parent, { Name = "GearTeeth", Size = Vector3.new(1.4, diameter + 3, 2), CFrame = axis * CFrame.Angles(i * math.pi / 4, 0, 0), Color = BRASS_DARK, Material = Enum.Material.Metal })
+		Builder.spin(bar, Vector3.new(rate, 0, 0))
+		bar.CastShadow = false
+	end
+	local hub = Builder.part(parent, { Name = "GearHub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, diameter * 0.25, diameter * 0.25), CFrame = axis, Color = IRON, Material = Enum.Material.Metal })
+	Builder.spin(hub, Vector3.new(rate, 0, 0))
 end
 
--- the three-tier Cog Tower with a clock on top
-local function cogTower(model: Model): Model
-	local t = Builder.building(model, "CogTower")
-	local prevTop = 0
-	for k, tier in TIERS do
-		local h = tier.Top - prevTop - 1.5
-		-- brass columns under the tier
-		local n = if k == 1 then 10 else 8
-		for i = 0, n - 1 do
-			local a = i * math.pi * 2 / n
-			local col = Builder.block(t, "BrassColumn", polar(tier.Radius - 2, a, prevTop + h / 2), Vector3.new(2.2, h, 2.2), BRASS, Enum.Material.Metal)
-			Builder.structural(col, k, true, 240)
-		end
-		-- the tier's floor disc and a copper rim
-		local slab = Builder.part(t, { Name = "Slab", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.5, tier.Radius * 2, tier.Radius * 2), CFrame = CFrame.new(0, tier.Top - 0.75, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE, Material = Enum.Material.Cobblestone })
-		Builder.structural(slab, k + 1, false, 260)
-		local rim = Builder.part(t, { Name = "Rim", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, tier.Radius * 2 + 1.2, tier.Radius * 2 + 1.2), CFrame = CFrame.new(0, tier.Top - 1.8, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = COPPER, Material = Enum.Material.Metal })
-		Builder.structural(rim, k + 1, false, 60)
-		-- giant gears turning on the tier's flanks (decor)
-		for i = 0, 3 do
-			local a = i * math.pi / 2 + k * 0.4
-			local p = polar(tier.Radius + 0.8, a, prevTop + h * 0.55)
-			gear(t, CFrame.lookAt(p, Vector3.new(0, p.Y, 0)) * CFrame.Angles(0, math.rad(90), 0), math.min(h * 0.9, 12), if i % 2 == 0 then 0.5 else -0.7, if i % 2 == 0 then BRASS else COPPER)
-		end
-		prevTop = tier.Top
-	end
-	-- machinery under the first tier: a turning flywheel and crates to hide among
-	local fly = Builder.part(t, { Name = "Flywheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.5, 18, 18), CFrame = CFrame.new(0, 6, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = BRASS, Material = Enum.Material.Metal })
-	Builder.spin(fly, Vector3.new(0.6, 0, 0))
-	deco(fly)
-	local shaft = Builder.block(t, "Driveshaft", Vector3.new(0, 18, 0), Vector3.new(3, 36, 3), ROCK_DARK, Enum.Material.Metal)
-	Builder.structural(shaft, 1, true, 400)
-	-- the clock: a spire on the top tier with a great face and turning hands
-	local top = TIERS[3].Top
-	local spire = Builder.block(t, "ClockSpire", Vector3.new(0, top + 8, 0), Vector3.new(7, 16, 7), STONE, Enum.Material.Cobblestone)
-	Builder.structural(spire, 4, false, 220)
-	local roof = Builder.part(t, { Name = "SpireRoof", Shape = Enum.PartType.Ball, Size = Vector3.new(8, 8, 8), CFrame = CFrame.new(0, top + 16.5, 0), Color = COPPER, Material = Enum.Material.Metal })
-	Builder.structural(roof, 4, false, 60)
-	for _, face in { Vector3.new(0, 0, -1), Vector3.new(0, 0, 1) } do
-		local c = Vector3.new(0, top + 11, 0) + face * 3.7
-		local dial = Builder.part(t, { Name = "ClockFace", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 6.4, 6.4), CFrame = CFrame.lookAt(c, c + face) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(250, 236, 200), Material = Enum.Material.Neon })
-		Builder.structural(dial, 4, false, 30)
-		local hand = Builder.part(t, { Name = "ClockHand", Size = Vector3.new(0.3, 2.8, 0.3), CFrame = CFrame.lookAt(c + face * 0.3, c + face * 2), Color = ROCK_DARK, Material = Enum.Material.Metal })
-		Builder.spin(hand, Vector3.new(0, 0, 0.4))
-		deco(hand)
-	end
-	local glow = t:FindFirstChild("ClockFace") :: BasePart?
-	if glow then
-		local light = Instance.new("PointLight")
-		light.Color = AMBER
-		light.Range = 40
-		light.Brightness = 1.4
-		light.Parent = glow
-	end
-	-- stairs winding up: ground -> tier 1 -> tier 2 -> tier 3 (each a chord across the ring)
-	local legs = {
-		{ R0 = 40, Y0 = 0, R1 = TIERS[1].Radius - 1, Y1 = TIERS[1].Top, A = 0.3 },
-		{ R0 = TIERS[1].Radius - 2, Y0 = TIERS[1].Top, R1 = TIERS[2].Radius - 1, Y1 = TIERS[2].Top, A = 2.4 },
-		{ R0 = TIERS[2].Radius - 2, Y0 = TIERS[2].Top, R1 = TIERS[3].Radius - 1, Y1 = TIERS[3].Top, A = 4.4 },
+-- The blast walls: brick, iron pilasters and cap, brass pipes, furnace arches and gears.
+local function perimeter(model: Model)
+	local w = Instance.new("Folder")
+	w.Name = "Perimeter"
+	w.Parent = model
+	local o = HALF + WALL_T / 2
+	local sides = {
+		{ Vector3.new(0, 0, o), true, Vector3.new(0, 0, -1) },
+		{ Vector3.new(0, 0, -o), true, Vector3.new(0, 0, 1) },
+		{ Vector3.new(o, 0, 0), false, Vector3.new(-1, 0, 0) },
+		{ Vector3.new(-o, 0, 0), false, Vector3.new(1, 0, 0) },
 	}
-	for i, leg in legs do
-		local chord = (leg.Y1 - leg.Y0) * 1.35
-		local cosPhi = math.clamp((leg.R0 * leg.R0 + leg.R1 * leg.R1 - chord * chord) / (2 * leg.R0 * leg.R1), -1, 1)
-		local phi = math.acos(cosPhi)
-		local stair = Builder.stairs(t, polar(leg.R0, leg.A, leg.Y0), polar(leg.R1, leg.A + phi, leg.Y1), 5, WOOD, Enum.Material.WoodPlanks, i)
-		stair.Name = "TowerStair"
+	for i, side in sides do
+		local c, alongX, inward = side[1] :: Vector3, side[2] :: boolean, side[3] :: Vector3
+		local len = HALF * 2 + WALL_T * 2
+		local size = if alongX then Vector3.new(len, WALL_H, WALL_T) else Vector3.new(WALL_T, WALL_H, len)
+		Builder.block(w, "BlastWall", c + Vector3.new(0, WALL_H / 2, 0), size, BRICK, Enum.Material.Brick)
+		Builder.block(w, "WallCap", c + Vector3.new(0, WALL_H + 1, 0), size + Vector3.new(if alongX then 0 else 3, 2 - WALL_H, if alongX then 3 else 0), IRON, Enum.Material.Metal)
+		local face = c + inward * (WALL_T / 2 + 0.6)
+		local along = if alongX then Vector3.new(1, 0, 0) else Vector3.new(0, 0, 1)
+		-- iron pilasters every 38 studs
+		for k = -3, 3 do
+			Builder.block(w, "Pilaster", face + along * (k * 38) + Vector3.new(0, WALL_H / 2, 0), Vector3.new(4, WALL_H, 4), IRON, Enum.Material.Metal)
+		end
+		-- a brass steam main along the wall, with a drop pipe at each end
+		local pipeY = 14
+		Builder.part(w, { Name = "SteamMain", Shape = Enum.PartType.Cylinder, Size = Vector3.new(len - 40, 3, 3), CFrame = CFrame.lookAt(face + inward * 2 + Vector3.new(0, pipeY, 0), face + inward * 2 + Vector3.new(0, pipeY, 0) + along) * CFrame.Angles(0, math.rad(90), 0), Color = BRASS, Material = Enum.Material.Metal, CastShadow = false })
+		-- a glowing furnace arch in the middle of the wall
+		Builder.block(w, "FurnaceArch", face + Vector3.new(0, 9, 0), if alongX then Vector3.new(20, 18, 2) else Vector3.new(2, 18, 20), IRON, Enum.Material.Metal)
+		deco(Builder.block(w, "FurnaceGlow", face + inward * 1.1 + Vector3.new(0, 7, 0), if alongX then Vector3.new(14, 12, 0.4) else Vector3.new(0.4, 12, 14), GLOW, Enum.Material.Neon))
+		-- two giant turning gears
+		for _, k in { -1, 1 } do
+			wallGear(w, face + inward * 1.2 + along * (k * 60) + Vector3.new(0, 30, 0), inward, 24, (if (i + k) % 2 == 0 then 0.35 else -0.35))
+		end
+		Builder.boundary(w, c + Vector3.new(0, WALL_H + 80, 0), size + Vector3.new(0, 160 - WALL_H, 0))
 	end
-	return t
-end
-
--- twin domes, a telescope spire and an outside spiral ladder
-local function observatory(model: Model): (Model, number)
-	local base = Vector3.new(74, 0, -6)
-	local obs, roofY = Builder.highrise(model, "Observatory", base, 34, 26, 2, 11, {
-		SlabColor = STONE,
-		SlabMaterial = Enum.Material.Cobblestone,
-		ColumnColor = BRASS,
-		ColumnMaterial = Enum.Material.Metal,
-		WallColor = STONE,
-		WallMaterial = Enum.Material.Limestone,
-		WallTransparency = 0,
-		Windows = true,
-		Stairwell = true,
-	})
-	local domes = Builder.building(model, "ObservatoryDomes")
-	Builder.restsOn(domes, obs)
-	for _, dx in { -8, 8 } do
-		local c = Vector3.new(base.X + dx, roofY, base.Z + 4)
-		local drum = Builder.cylinder(domes, "DomeDrum", c + Vector3.new(0, 1.5, 0), 3, 13, STONE, Enum.Material.Limestone)
-		Builder.structural(drum, 1, true, 160)
-		Builder.domeCap(domes, c + Vector3.new(0, 3, 0), 6.4, 5.5, COPPER, Enum.Material.Metal, 0, 2, 8, 2)
-	end
-	-- the telescope spire: a huge brass tube angled at the nebula
-	local scope = Builder.building(model, "TelescopeSpire")
-	Builder.restsOn(scope, obs)
-	local foot = Vector3.new(base.X + 8, roofY + 6, base.Z + 4)
-	local tip = foot + Vector3.new(10, 26, -6)
-	local tube = Builder.part(scope, { Name = "Tube", Shape = Enum.PartType.Cylinder, Size = Vector3.new((tip - foot).Magnitude, 4, 4), CFrame = CFrame.lookAt((foot + tip) / 2, tip) * CFrame.Angles(0, math.rad(90), 0), Color = BRASS, Material = Enum.Material.Metal })
-	Builder.structural(tube, 2, false, 120)
-	local lens = Builder.part(scope, { Name = "Lens", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 4.6, 4.6), CFrame = CFrame.lookAt(tip, tip + (tip - foot)) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(160, 220, 255), Material = Enum.Material.Neon })
-	Builder.structural(lens, 2, false, 20)
-	local mount = Builder.block(scope, "Mount", foot - Vector3.new(0, 3, 0), Vector3.new(4, 6, 4), COPPER, Enum.Material.Metal)
-	Builder.structural(mount, 1, true, 140)
-	-- a ladder up the outside (the "spiral" is a ladder per face, offset)
-	local ladder = Builder.part(model, { Name = "SpiralLadder", Class = "TrussPart", Size = Vector3.new(2, roofY, 2), CFrame = CFrame.new(base.X + 18, roofY / 2, base.Z - 8), Color = BRASS, Material = Enum.Material.Metal })
-	Builder.structural(ladder, 1, false, 60)
-	return obs, roofY
-end
-
--- the library: bookshelf labyrinth on the ground floor, balcony on the north side
-local function library(model: Model): (Model, number)
-	local base = Vector3.new(-74, 0, 8)
-	local lib, roofY = Builder.highrise(model, "GrandLibrary", base, 46, 32, 2, 12, {
-		SlabColor = WOOD,
-		SlabMaterial = Enum.Material.WoodPlanks,
-		ColumnColor = STONE,
-		ColumnMaterial = Enum.Material.Limestone,
-		WallColor = Color3.fromRGB(140, 70, 60),
-		WallMaterial = Enum.Material.Brick,
-		WallTransparency = 0,
-		Windows = true,
-		Stairwell = true,
-		OpenSide = "East",
-	})
-	local bookColors = { Color3.fromRGB(150, 40, 40), Color3.fromRGB(40, 80, 140), Color3.fromRGB(50, 110, 60), Color3.fromRGB(180, 140, 60), Color3.fromRGB(90, 50, 110) }
-	-- the labyrinth: rows of tall shelves with gaps that don't line up
-	local rows = { { Z = -6, Gaps = { -12, 8 } }, { Z = 0, Gaps = { -2, 14 } }, { Z = 6, Gaps = { -16, 4 } } }
-	for r, row in ipairs(rows) do
-		for x = -18, 18, 6 do
-			local gap = false
-			for _, gx in row.Gaps do
-				if math.abs(x - gx) < 3.5 then
-					gap = true
-				end
-			end
-			if not gap then
-				local shelf = Builder.block(lib, "Bookshelf", Vector3.new(base.X + x, 4.5, base.Z + row.Z), Vector3.new(5.6, 9, 1.6), WOOD, Enum.Material.Wood)
-				Builder.structural(shelf, 1, false, 70)
-				local books = Builder.block(lib, "Books", Vector3.new(base.X + x, 4.5, base.Z + row.Z), Vector3.new(5.2, 7.4, 1.8), bookColors[(x // 6 + r) % #bookColors + 1], Enum.Material.Fabric)
-				Builder.structural(books, 1, false, 20)
-			end
+	-- corner turrets
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local c = Vector3.new(sx * (HALF + 4), 0, sz * (HALF + 4))
+			Builder.cylinder(w, "Turret", c + Vector3.new(0, 30, 0), 60, 26, BRICK_DARK, Enum.Material.Brick)
+			Builder.cylinder(w, "TurretCap", c + Vector3.new(0, 61, 0), 2, 28, IRON, Enum.Material.Metal)
 		end
 	end
-	-- reading balcony on the north side of the upper floor
-	local balcony = Builder.building(model, "ReadingBalcony")
-	Builder.restsOn(balcony, lib)
-	local deckY = base.Y + 12
-	local deck = Builder.block(balcony, "Deck", Vector3.new(base.X, deckY - 0.75, base.Z + 16 + 3), Vector3.new(26, 1.5, 6), WOOD, Enum.Material.WoodPlanks)
-	Builder.structural(deck, 1, false, 80)
-	for _, x in { -12, 0, 12 } do
-		local strut = Builder.block(balcony, "Corbel", Vector3.new(base.X + x, deckY - 1.5, base.Z + 17), Vector3.new(1.2, 3, 2.4), STONE, Enum.Material.Limestone)
-		Builder.structural(strut, 1, true, 100)
-	end
-	local rail = Builder.block(balcony, "Rail", Vector3.new(base.X, deckY + 2.6, base.Z + 21.6), Vector3.new(26, 0.4, 0.4), BRASS, Enum.Material.Metal)
-	Builder.structural(rail, 1, false, 15)
-	Builder.stairs(model, Vector3.new(base.X + 13 + 18, 0, base.Z + 19), Vector3.new(base.X + 13, deckY, base.Z + 19), 5, STONE, Enum.Material.Cobblestone)
-	return lib, roofY
 end
 
--- a fallen giant gear lying flat: a ring of teeth with a low hub roof (crawl inside)
-local function hollowGear(model: Model, at: Vector3)
-	local g = Builder.building(model, "HollowGear")
-	for i = 0, 13 do
-		if i % 5 == 0 then
-			continue -- gaps to crawl in through
-		end
-		local a = i * math.pi * 2 / 14
-		local tooth = Builder.part(g, { Name = "Tooth", Size = Vector3.new(3, 4.4, 4.4), CFrame = CFrame.lookAt(at + polar(11, a, 2.2), at + Vector3.new(0, 2.2, 0)), Color = COPPER, Material = Enum.Material.Metal })
-		Builder.structural(tooth, 1, true, 90)
+-- A clocktower: a brick highrise with clock faces on its top storey and an open belfry with
+-- a pointed spire on the roof.
+local function clocktower(model: Model, at: Vector3, floors: number): (Model, number)
+	local tower, roofY = Builder.highrise(model, "Clocktower", at, 20, 20, floors, FLOOR_H, BRICK_STYLE)
+	Builder.facadeTrim(tower, BRASS, Enum.Material.Metal, IRON, Enum.Material.Metal)
+	local faceY = roofY - FLOOR_H / 2
+	for _, n in { Vector3.new(0, 0, 1), Vector3.new(0, 0, -1), Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0) } do
+		local p = at + n * 10.8 + Vector3.new(0, faceY - at.Y, 0)
+		local face = Builder.part(tower, { Name = "ClockFace", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 9, 9), CFrame = CFrame.lookAt(p, p + n) * CFrame.Angles(0, math.rad(90), 0), Color = CLOCK, Material = Enum.Material.Neon })
+		Builder.structural(face, floors, false, 30)
+		local hand = Builder.part(tower, { Name = "ClockHand", Size = Vector3.new(0.5, 3.6, 0.3), CFrame = CFrame.lookAt(p + n * 0.5, p + n) * CFrame.new(0, 1.6, 0), Color = IRON, Material = Enum.Material.Metal, CastShadow = false })
+		hand.CanCollide = false
+		Builder.structural(hand, floors, false, 10)
 	end
-	local roof = Builder.part(g, { Name = "Hub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 24, 24), CFrame = CFrame.new(at + Vector3.new(0, 4.9, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = BRASS, Material = Enum.Material.Metal })
-	Builder.structural(roof, 2, false, 120)
-	local axle = Builder.cylinder(g, "Axle", at + Vector3.new(0, 2.2, 0), 4.4, 3, ROCK_DARK, Enum.Material.Metal)
-	Builder.structural(axle, 1, true, 120)
+	-- a brick belfry in the middle of the roof (a walkway rings it), then a stepped spire
+	local lvl = floors + 2
+	local belfry = Builder.block(tower, "Belfry", Vector3.new(at.X, roofY + 4, at.Z), Vector3.new(9, 8, 9), BRICK_DARK, Enum.Material.Brick)
+	Builder.structural(belfry, lvl, true, 160)
+	local bell = Builder.block(tower, "BellGlow", Vector3.new(at.X, roofY + 5, at.Z), Vector3.new(9.4, 3, 9.4), CLOCK, Enum.Material.Neon)
+	bell.CanCollide = false
+	Builder.structural(bell, lvl, false, 10)
+	local tiers = { { 11, 1.5 }, { 8, 4 }, { 5, 4 }, { 2.5, 4 } }
+	local y = roofY + 8
+	for _, t in tiers do
+		local roof = Builder.block(tower, "SpireRoof", Vector3.new(at.X, y + t[2] / 2, at.Z), Vector3.new(t[1], t[2], t[1]), ROOF, Enum.Material.Slate)
+		Builder.structural(roof, lvl + 1, false, 60)
+		y += t[2]
+	end
+	local tip = Builder.cylinder(tower, "Spire", Vector3.new(at.X, y + 5, at.Z), 10, 1, BRASS, Enum.Material.Metal)
+	Builder.structural(tip, lvl + 1, false, 20)
+	return tower, roofY
 end
 
--- a stone archway choked with hanging vines
-local function archway(model: Model, at: Vector3, yaw: number, rng: Random)
-	local a = Builder.building(model, "VineArch")
+-- A brick factory with a sawtooth roof light (on the east half, clear of the stairwell in
+-- the north-west corner and of the skybridge landings) and a brass sign.
+local function factory(model: Model, at: Vector3, w: number, d: number, floors: number, title: string): (Model, number)
+	local m, roofY = Builder.highrise(model, "Factory", at, w, d, floors, FLOOR_H + 2, BRICK_STYLE)
+	Builder.facadeTrim(m, IRON, Enum.Material.Metal)
+	local light = Builder.part(m, { Name = "Rooflight", Class = "WedgePart", Size = Vector3.new(w * 0.3, 4, d * 0.5), CFrame = CFrame.new(at.X + w * 0.22, roofY + 2, at.Z), Color = ROOF, Material = Enum.Material.Slate })
+	Builder.structural(light, floors + 2, false, 40)
+	local sign = Builder.block(m, "FactorySign", Vector3.new(at.X, roofY - 3, at.Z - d / 2 - 0.8), Vector3.new(w * 0.6, 3.2, 0.5), IRON, Enum.Material.Metal)
+	Builder.structural(sign, floors, false, 20)
+	Builder.sign(sign, Enum.NormalId.Front, title, BRASS, Color3.new(0, 0, 0))
+	return m, roofY
+end
+
+-- A free-standing brick smokestack: three stacked drums (each a support for the ones above)
+-- with an iron collar and steam; it topples toward `fall` when its base goes.
+local function smokestack(model: Model, at: Vector3, height: number, fall: Vector3)
+	local m = Builder.building(model, "Smokestack")
+	local seg = height / 3
+	for i = 1, 3 do
+		local drum = Builder.cylinder(m, "Stack", at + Vector3.new(0, (i - 0.5) * seg, 0), seg, 7 - i * 0.6, if i % 2 == 0 then BRICK_DARK else BRICK, Enum.Material.Brick)
+		Builder.structural(drum, i, true, 160)
+	end
+	local collar = Builder.cylinder(m, "Collar", at + Vector3.new(0, height + 0.6, 0), 1.2, 6.6, IRON, Enum.Material.Metal)
+	Builder.structural(collar, 3, false, 40)
+	local smoke = Instance.new("Smoke")
+	smoke.Color = Color3.fromRGB(235, 230, 225)
+	smoke.Opacity = 0.18
+	smoke.RiseVelocity = 6
+	smoke.Size = 6
+	smoke.Parent = collar
+	Builder.fallDirection(m, fall)
+end
+
+-- A steam vent: an iron grate that launches survivors (Builder.launchPad) with a hiss of steam.
+local function vent(model: Model, at: Vector3)
+	local f = Instance.new("Folder")
+	f.Name = "SteamVent"
+	f.Parent = model
+	local rim = Builder.block(f, "VentRim", at + Vector3.new(0, 0.3, 0), Vector3.new(10, 0.6, 10), IRON, Enum.Material.Metal)
+	rim.CanTouch = false
+	local grate = Builder.block(f, "SteamVent", at + Vector3.new(0, 0.7, 0), Vector3.new(7, 0.2, 7), BRASS_DARK, Enum.Material.DiamondPlate)
+	Builder.launchPad(grate, 88)
+	deco(Builder.block(f, "VentGlow", at + Vector3.new(0, 0.62, 0), Vector3.new(8, 0.1, 8), GLOW, Enum.Material.Neon))
+	local steam = Instance.new("Smoke")
+	steam.Color = Color3.fromRGB(250, 250, 250)
+	steam.Opacity = 0.12
+	steam.RiseVelocity = 14
+	steam.Size = 3
+	steam.Parent = grate
+end
+
+-- A glowing furnace pan of molten brass behind a low iron kerb (solid; just looks hot).
+local function furnacePan(model: Model, at: Vector3)
+	local m = Builder.building(model, "FurnacePan")
+	local kerb = Builder.block(m, "Kerb", at + Vector3.new(0, 1, 0), Vector3.new(16, 2, 12), IRON, Enum.Material.Metal)
+	Builder.structural(kerb, 1, true, 200)
+	local melt = Builder.block(m, "Melt", at + Vector3.new(0, 2.05, 0), Vector3.new(13, 0.1, 9), GLOW, Enum.Material.Neon)
+	melt.CanCollide = false
+	Builder.structural(melt, 1, false, 10)
+end
+
+local function minecart(model: Model, at: Vector3, yaw: number)
+	local m = Builder.building(model, "Minecart")
 	local cf = CFrame.new(at) * CFrame.Angles(0, yaw, 0)
-	for _, side in { -1, 1 } do
-		local pillar = Builder.part(a, { Name = "Pillar", Size = Vector3.new(2.4, 12, 2.4), CFrame = cf * CFrame.new(side * 6, 6, 0), Color = STONE, Material = Enum.Material.Cobblestone })
-		Builder.structural(pillar, 1, true, 150)
-	end
-	local lintel = Builder.part(a, { Name = "Lintel", Size = Vector3.new(15, 2.4, 2.8), CFrame = cf * CFrame.new(0, 13.2, 0), Color = STONE, Material = Enum.Material.Cobblestone })
-	Builder.structural(lintel, 2, false, 120)
-	for i = 1, 5 do
-		local len = rng:NextNumber(3, 8)
-		local vine = Builder.part(a, { Name = "Vine", Size = Vector3.new(0.6, len, 0.6), CFrame = cf * CFrame.new(rng:NextNumber(-6.5, 6.5), 12 - len / 2, rng:NextNumber(-1.2, 1.2)), Color = VINE:Lerp(Color3.fromRGB(110, 170, 80), rng:NextNumber()), Material = Enum.Material.LeafyGrass })
-		deco(vine)
-		Builder.structural(vine, 2, false, 5)
-		local _ = i
-	end
-	local moss = Builder.part(a, { Name = "Moss", Size = Vector3.new(15.4, 0.8, 3.2), CFrame = cf * CFrame.new(0, 14.7, 0), Color = MOSS, Material = Enum.Material.LeafyGrass })
-	Builder.structural(moss, 2, false, 10)
+	local body = Builder.part(m, { Name = "Cart", Size = Vector3.new(5, 3, 7), CFrame = cf * CFrame.new(0, 2, 0), Color = IRON, Material = Enum.Material.Metal })
+	Builder.structural(body, 1, true, 80)
+	local ore = Builder.part(m, { Name = "Ore", Size = Vector3.new(4.2, 0.8, 6), CFrame = cf * CFrame.new(0, 3.6, 0), Color = BRASS, Material = Enum.Material.Pebble })
+	Builder.structural(ore, 1, false, 20)
 end
 
 function ClockworkSpire.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "ClockworkSpire"
 	model.Parent = parent
-	local rng = Random.new(13)
 
-	island(model, rng)
-	local tower = cogTower(model)
-	local obs, obsRoof = observatory(model)
-	local lib, libRoof = library(model)
+	grounds(model)
+	perimeter(model)
 
-	-- catwalks from the second tier out to both roofs
-	local t2 = TIERS[2]
-	Builder.restsOn(Builder.bridge(model, "Catwalk", Vector3.new(t2.Radius - 1, t2.Top + 0.3, -4), Vector3.new(57.5, obsRoof + 0.3, -4), 5, WOOD, Enum.Material.WoodPlanks, BRASS, COPPER, 60), obs)
-	Builder.restsOn(Builder.bridge(model, "Catwalk", Vector3.new(-t2.Radius + 1, t2.Top + 0.3, 6), Vector3.new(-50.5, libRoof + 0.3, 6), 5, WOOD, Enum.Material.WoodPlanks, BRASS, COPPER, 60), lib)
-	local _ = tower
+	-- two clocktowers and four factories; every skybridge runs straight from one roof edge
+	-- to the next (the clocktower belfries sit in the middle of their roofs)
+	local westClock, westRoof = clocktower(model, Vector3.new(-24, 0, 30), 5)
+	local eastClock, eastRoof = clocktower(model, Vector3.new(34, 0, -22), 4)
+	local nw, nwRoof = factory(model, Vector3.new(-24, 0, 82), 32, 24, 4, "FOUNDRY No.1")
+	local ne, neRoof = factory(model, Vector3.new(40, 0, 30), 30, 28, 4, "GEARWORKS")
+	local se, seRoof = factory(model, Vector3.new(34, 0, -76), 26, 22, 3, "SMELTERY")
+	local sw, swRoof = factory(model, Vector3.new(-72, 0, -24), 32, 28, 3, "BOILER HOUSE")
 
-	-- a clockmaker's workshop and a gatehouse (more interiors)
-	Builder.highrise(model, "Workshop", Vector3.new(10, 0, 70), 24, 18, 2, 10, {
-		SlabColor = WOOD,
-		SlabMaterial = Enum.Material.WoodPlanks,
-		ColumnColor = COPPER,
-		ColumnMaterial = Enum.Material.Metal,
-		WallColor = Color3.fromRGB(120, 90, 70),
-		WallMaterial = Enum.Material.Brick,
-		WallTransparency = 0,
-		Windows = true,
-		Stairwell = true,
-	})
-	Builder.highrise(model, "Gatehouse", Vector3.new(-14, 0, -74), 20, 14, 2, 10, {
-		SlabColor = STONE,
-		SlabMaterial = Enum.Material.Cobblestone,
-		ColumnColor = STONE,
-		ColumnMaterial = Enum.Material.Limestone,
-		WallColor = STONE,
-		WallMaterial = Enum.Material.Cobblestone,
-		WallTransparency = 0,
-		Windows = true,
-		OpenSide = "West",
-	})
-
-	hollowGear(model, Vector3.new(50, 0, 56))
-	for _, spec in { { Vector3.new(0, 0, -44), 0 }, { Vector3.new(0, 0, 46), 0 }, { Vector3.new(-40, 0, 0), math.pi / 2 }, { Vector3.new(-30, 0, -60), 0.6 }, { Vector3.new(60, 0, -60), -0.5 } } do
-		archway(model, spec[1] :: Vector3, spec[2] :: number, rng)
+	local function skybridge(name: string, a: Vector3, b: Vector3, base: Model)
+		local bridge = Builder.bridge(model, name, a, b, 12, IRON, Enum.Material.DiamondPlate, BRASS, IRON, 90)
+		Builder.restsOn(bridge, base)
 	end
+	skybridge("Skybridge", Vector3.new(-24, westRoof + 0.5, 39), Vector3.new(-24, nwRoof + 0.5, 71), nw)
+	skybridge("Skybridge", Vector3.new(-15, westRoof + 0.5, 27), Vector3.new(26, neRoof + 0.5, 27), westClock)
+	skybridge("Skybridge", Vector3.new(34, eastRoof + 0.5, -13), Vector3.new(34, neRoof + 0.5, 17), eastClock)
+	skybridge("Skybridge", Vector3.new(34, eastRoof + 0.5, -31), Vector3.new(34, seRoof + 0.5, -66), se)
+	skybridge("Skybridge", Vector3.new(25, eastRoof + 0.5, -27), Vector3.new(-57, swRoof + 0.5, -27), sw)
+
+	-- smokestacks, steam vents, furnace pans and minecarts across the yard
+	smokestack(model, Vector3.new(-96, 0, 44), 46, Vector3.new(1, 0, 0))
+	smokestack(model, Vector3.new(96, 0, -10), 42, Vector3.new(-1, 0, 0.3))
+	smokestack(model, Vector3.new(-20, 0, -86), 40, Vector3.new(0.4, 0, 1))
+	smokestack(model, Vector3.new(16, 0, 92), 44, Vector3.new(0, 0, -1))
+	for _, p in { Vector3.new(0, 0, 0), Vector3.new(-50, 0, 10), Vector3.new(80, 0, 0), Vector3.new(10, 0, -60) } do
+		vent(model, p)
+	end
+	furnacePan(model, Vector3.new(-6, 0, 58))
+	furnacePan(model, Vector3.new(75, 0, -45))
+	minecart(model, Vector3.new(0, 0, -102), math.rad(90))
+	minecart(model, Vector3.new(-102, 0, -70), 0)
 
 	local spawns = {}
 	for _, p in {
-		Vector3.new(0, 3, -30), Vector3.new(30, 3, 30), Vector3.new(-30, 3, 30), Vector3.new(74, 3, -6),
-		Vector3.new(-74, 3, 8), Vector3.new(10, 3, 70), Vector3.new(-14, 3, -74), Vector3.new(50, 3, 56),
-		Vector3.new(0, TIERS[1].Top + 3, 18), Vector3.new(-90, 3, -50), Vector3.new(90, 3, 50), Vector3.new(40, 3, -40),
+		Vector3.new(-30, 3, -10), Vector3.new(20, 3, 20), Vector3.new(-90, 3, 0), Vector3.new(90, 3, -30),
+		Vector3.new(0, 3, 96), Vector3.new(0, 3, -96), Vector3.new(-96, 3, -96), Vector3.new(96, 3, 96),
+		Vector3.new(-60, 3, 100), Vector3.new(60, 3, -100),
+		Vector3.new(-24, 3.5, 26), Vector3.new(44, 3.5, 26), -- inside the west clocktower and the gearworks
 	} do
 		table.insert(spawns, CFrame.new(p))
 	end
@@ -354,17 +295,17 @@ function ClockworkSpire.build(parent: Instance): Types.MapInfo
 		DisplayName = "Clockwork Spire",
 		Model = model,
 		SpawnPoints = spawns,
-		-- the cloud sea far below the island rises to swallow it
-		FluidStartY = -40,
+		FluidStartY = -6,
 		FluidEndY = 14,
-		FluidColor = Color3.fromRGB(205, 198, 240),
-		FluidMaterial = Enum.Material.Glass,
+		FluidColor = Color3.fromRGB(255, 150, 40),
+		FluidMaterial = Enum.Material.CrackedLava,
 		HazardFloorY = nil,
-		FluidName = "CLOUD TIDE",
-		Lighting = "Nebula",
+		FluidName = "MOLTEN BRASS",
+		Lighting = "Foundry",
 		KnockbackMultiplier = 1,
 		Center = Vector3.new(0, 0, 0),
 		Radius = 125,
+		Walled = true,
 	}
 end
 

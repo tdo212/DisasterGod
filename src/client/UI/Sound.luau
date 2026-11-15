@@ -53,6 +53,10 @@ end
 
 -- Fire-and-forget UI sound. Overlapping plays use clones so rapid clicks don't cut off.
 function Sound.play(key: string, volume: number?, pitch: number?)
+	local variants = A.Variants[key]
+	if variants then
+		key = variants[math.random(1, #variants)]
+	end
 	local base = template(key)
 	if not base then
 		return

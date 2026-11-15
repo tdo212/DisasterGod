@@ -765,6 +765,7 @@ local Config = {
 
 	-- 7-day play streak chest in the lodge, and the first-win-of-the-day bonus.
 	Daily = {
+		OpenMinBreak = 6, -- the reward window opens only with at least this many lobby-break seconds left
 		-- 7-day login streak (the Daily Reward window on arrival, or the lodge chest). Day 2 is
 		-- the Solar Flare dash trail (300 coins + a spin if already owned); day 7 the
 		-- exclusive Sunforged God skin (1,500 coins if already owned).
@@ -803,7 +804,7 @@ local Config = {
 			OutpostZero = { Count = 2, Surface = "Terrain" },
 			StarlightBoardwalk = { Count = 2, Surface = "Top" },
 			CasinoRoyale = { Count = 4, Surface = "Terrain" }, -- the plaza, and a prize car on the floor
-			OasisBazaar = { Count = 3, Surface = "Terrain" },
+			OasisBazaar = { Count = 1, Surface = "Terrain" },
 		} :: { [string]: { Count: number, Surface: string } },
 		CarModel = "Car",
 		CarHealth = 140, -- per part
@@ -833,8 +834,22 @@ local Config = {
 		Bearings = 72, -- directions used to find how far the island reaches
 		ChannelCells = 6, -- a hole with ground on both sides within this many cells is a channel
 		Margin = 16, -- studs inside the island's reach before a hole is filled (the rim stays a drop)
-		WaterDepth = 1.5, -- shallow floor top below the resting waterline
-		LavaDepth = 4, -- lava maps: shallow floor top below the hazard line (it still burns)
+		FloorLift = 0.6, -- the shallows' floor sits just above the dark outer sea, so it stays visible
+		WaterDepth = 1.5, -- the translucent turquoise water layer over that floor (no damage)
+		WaterColor = Color3.fromRGB(70, 215, 205),
+		WaterTransparency = 0.45,
+		SandColor = Color3.fromRGB(236, 214, 160),
+		LavaDepth = 1.5, -- lava maps: basalt crust top this far under the hazard line (safe to walk)
+		CrustColor = Color3.fromRGB(46, 40, 40),
+		SeamColor = Color3.fromRGB(255, 110, 30),
+		-- the outer sea reads as the lethal edge: dark opaque navy (water maps), glowing magma (lava)
+		SeaShade = Color3.fromRGB(12, 30, 70),
+		SeaShadeAmount = 0.55,
+		-- warning buoys float just past the island rim where the lethal drop begins
+		BuoyEvery = 3, -- one buoy per this many bearings
+		BuoyOffset = 12, -- studs past the rim
+		BuoyColor = Color3.fromRGB(235, 60, 50),
+		BuoyLight = Color3.fromRGB(255, 220, 90),
 		LadderMinClimb = 5, -- edges higher than this above the shallows get a ladder
 		LadderSpacing = 28,
 		MaxLadders = 28,
@@ -843,7 +858,7 @@ local Config = {
 	Hideouts = {
 		PerMap = 8,
 		-- maps that are mostly interior already get fewer
-		PerMapOverride = { CasinoRoyale = 0, AbyssalAquaDome = 5, OasisBazaar = 6, ClockworkSpire = 6 } :: { [string]: number },
+		PerMapOverride = { CasinoRoyale = 2, AbyssalAquaDome = 4, OasisBazaar = 2, ClockworkSpire = 3 } :: { [string]: number },
 		Tries = 90,
 		Variants = {
 			-- Floors / FloorHeight follow Builder.highrise; Weight picks how often
@@ -1100,10 +1115,10 @@ local Config = {
 			ChronoSpire = 9112839913, -- Oil Refinery: burners, pump clatter, machine hiss (PSE)
 			VerdantDome = 9112803829, -- Jungle Birds, exotic calls (PSE)
 			IroncladArmada = 82247046952844, -- Thunder & Rain (TooLost)
-			AbyssalAquaDome = 9120621792, -- Waves Rolling (PSE), muffled under the dome
-			CasinoRoyale = 82247046952844, -- Thunder & Rain (TooLost) on the skylight
+			AbyssalAquaDome = 9120621792, -- Waves Rolling (PSE), deep in the trench
+			CasinoRoyale = 82247046952844, -- Thunder & Rain (TooLost) on the neon strip
 			OasisBazaar = 9125742262, -- airy desert wind (PSE)
-			ClockworkSpire = 81404060588532, -- Howling Wind, high above the clouds
+			ClockworkSpire = 81404060588532, -- Howling Wind over the foundry walls
 		} :: { [string]: number },
 		AmbienceLayer = {
 			StarlightBoardwalk = 9117143228, -- Ocean Surf (PSE)
@@ -1118,7 +1133,11 @@ local Config = {
 			ClockworkSpire = 9112839913, -- clockwork: burners, pump clatter, machine hiss (PSE)
 		} :: { [string]: number },
 		Ui = {
-			Click = 127005215501903, -- crisp UI click (every Components button)
+			Click = 124993589864467, -- UI click (every Components button)
+			Pop = 72264591133889, -- UI pop: centre-screen popups
+			Hover = 131677038997771, -- pointer over a button (mouse only, throttled)
+			Achievement = 8486683243, -- quest / daily reward claimed
+			Countdown = 117649901456711, -- "3, 2, 1" voice/beeps, played once at 3 seconds
 			SpinWhirl = 9126278342, -- wooden ratchet clicking (PSE): the wheel spinning
 			SpinWin = 9043151109, -- the wheel lands
 			Hitmarker = 75881627871349, -- "heavy hitmarker": the God's kill confirm
@@ -1135,6 +1154,8 @@ local Config = {
 			Warning = 125227661736774,
 			Lightning = 93403424380357,
 			Thunder = 95410087861011,
+			Thunder2 = 139319051979882, -- extra thunder clap (a variant of Thunder)
+			Thunder3 = 136217358874957, -- secondary rolling thunder (a variant of Thunder)
 			MeteorFall = 9119467553,
 			MeteorImpact = 7157159568,
 			Explosion = 125127520917980,
@@ -1199,6 +1220,11 @@ local Config = {
 		SmashCooldown = 0.35,
 		BreakCooldown = 0.09, -- per material family, so a collapse is a rumble of distinct cracks, not a wall of noise
 		SirenVolume = 0.3,
+		-- a key listed here plays one of its variants at random (AudioService / UI Sound)
+		Variants = {
+			Thunder = { "Thunder", "Thunder2", "Thunder3" },
+		} :: { [string]: { string } },
+		HoverCooldown = 0.08, -- seconds between two hover sounds
 		Volume = {
 			Music = 0.3,
 			Ambience = 0.45,
@@ -1276,10 +1302,10 @@ local Config = {
 			SunscorchedMirage = "rbxassetid://109383400239121",
 			OutpostZero = "rbxassetid://89934695715065",
 			StarlightBoardwalk = "rbxassetid://110223167570976",
-			AbyssalAquaDome = "rbxassetid://77388193228611",
-			CasinoRoyale = "rbxassetid://111737162787584",
-			OasisBazaar = "rbxassetid://99320055045674",
-			ClockworkSpire = "rbxassetid://109579151256350",
+			AbyssalAquaDome = "rbxassetid://101435533797228",
+			CasinoRoyale = "rbxassetid://71195517455664",
+			OasisBazaar = "rbxassetid://127909441616793",
+			ClockworkSpire = "rbxassetid://104746382014309",
 		} :: { [string]: string },
 		NewMaps = { AbyssalAquaDome = true, CasinoRoyale = true, OasisBazaar = true, ClockworkSpire = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
@@ -1297,13 +1323,13 @@ local Config = {
 			Desert = "Sky", -- Sunscorched Mirage: clear blue
 			Arctic = "Snow", -- Outpost Zero
 			Sunset = "Skybox_Sunset", -- Starlight Boardwalk
-			Foundry = "Skybox_Sunset", -- Chrono-Spire: golden hour
+			Foundry = "Skybox_Sunset", -- Chrono-Spire and the Clockwork foundry yard: golden hour
 			Conservatory = "Sky", -- Verdant Bio-Dome: clear sky through the glass
 			Tempest = "NightSky2", -- Ironclad Armada: dark stormy night
-			Abyss = "NightSky2", -- Abyssal Aqua-Dome: the dark ocean overhead
+			Abyss = "NightSky2", -- Abyssal Aqua-Dome: the dark ocean over the open trench
 			Casino = "NightSky", -- Casino Royale: rainy twilight city
 			Canyon = "Skybox_Sunset", -- Oasis Bazaar: golden dusk
-			Nebula = "NorthernLightsNight", -- Clockwork Spire: starry nebula night
+			Nebula = "NorthernLightsNight", -- (spare: Clockwork Spire now uses Foundry)
 			-- Volcanic (Magma Core) keeps the burning sky from Skies; NorthernLightsNight is spare
 		} :: { [string]: string },
 	},
@@ -1436,6 +1462,7 @@ local Config = {
 		SolarFlare = "SolarFlare", -- Player: owns the day-2 Solar Flare dash trail
 		GodRounds = "GodRounds", -- Player: rounds played as the God
 		FriendBoost = "FriendBoost", -- Player: a Roblox friend is in the server (+20% round coins)
+		PaidRandomRestricted = "PaidRandomRestricted", -- Player: PolicyService forbids paid random items (no Robux spins)
 		GhostReadyAt = "GhostReadyAt", -- Player: server time their next ghost bolt is ready
 		FinalRush = "FinalRush", -- ReplicatedStorage: the Final Rush has started this round
 		SpeedUntil = "SpeedUntil", -- Player: server time a speed pickup ends

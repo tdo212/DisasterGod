@@ -290,8 +290,12 @@ local function requestSpin()
 	end
 	if spins() <= 0 then
 		Sound.play("Error", 0.7)
-		HUDController.Popup("NO SPINS LEFT — BUY MORE OR WAIT", C.RedLight)
-		nudgeBuyButtons()
+		if Store.paidRandomAllowed() then
+			HUDController.Popup("NO SPINS LEFT — BUY MORE OR WAIT", C.RedLight)
+			nudgeBuyButtons()
+		else
+			HUDController.Popup("NO SPINS LEFT — EARN MORE FROM QUESTS", C.RedLight)
+		end
 		return
 	end
 	waiting = true
@@ -484,6 +488,26 @@ local function build()
 	})
 	spinTag = Components.tag(spin, "x0", UDim2.new(1, 10, 0, -10), Vector2.new(1, 0))
 	buyButton(root, "Spin10", 144, 0)
+
+	-- where Robux spins aren't allowed (PolicyService), the buy buttons give way to a note
+	local freeNote = Components.label({
+		Name = "FreeSpinsNote",
+		Text = "Earn Free Spins via Quests & Daily Login!",
+		TextSize = 20,
+		Color = C.GoldLight,
+		Size = UDim2.new(1, 0, 0, 26),
+		Position = UDim2.fromOffset(0, 362),
+		Parent = root,
+	})
+	local function refreshPolicy()
+		local allowed = Store.paidRandomAllowed()
+		for _, button in buyButtons do
+			button.Visible = allowed
+		end
+		freeNote.Visible = not allowed
+	end
+	player:GetAttributeChangedSignal(Attributes.PaidRandomRestricted):Connect(refreshPolicy)
+	refreshPolicy()
 
 	timerLabel = Components.label({
 		Name = "Timer",

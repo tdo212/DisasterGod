@@ -20,9 +20,18 @@ function Store.robux(price: number): string
 end
 
 -- Prompt a developer product. Returns false for placeholders (Id 0, not on sale yet).
+-- Robux wheel spins are paid random items: hidden where PolicyService restricts them
+-- (MonetizationService sets the attribute; unknown counts as restricted).
+function Store.paidRandomAllowed(): boolean
+	return player:GetAttribute(Config.Attributes.PaidRandomRestricted) == false
+end
+
 function Store.promptProduct(key: string): boolean
 	local def = M.Products[key]
 	if not def or def.Id == 0 then
+		return false
+	end
+	if (def.Spins or 0) > 0 and not Store.paidRandomAllowed() then
 		return false
 	end
 	Analytics.track("PromptShown", key)

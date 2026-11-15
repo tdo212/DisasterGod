@@ -515,14 +515,23 @@ local function buildWelcomeOffer()
 	refresh()
 end
 
+local reviveButton: TextButton? = nil
+
+-- The Second Chance offer is up (SaveController holds its own offer until it goes).
+function HUDController.ReviveOfferVisible(): boolean
+	local b = reviveButton
+	return b ~= nil and b.Visible
+end
+
 local function buildReviveOffer()
 	local def = Config.Monetization.Products.Revive
 	local button = Components.button({
 		Name = "SecondChance",
 		Text = def.Icon .. " SECOND CHANCE  " .. Store.robux(def.Price),
 		TextSize = 24,
-		Size = UDim2.fromOffset(340, 60),
-		Position = UDim2.new(0.5, 0, 1, -120),
+		Size = UDim2.fromOffset(340, 56),
+		-- above the Waiting card (SpectateController), never on top of it
+		Position = UDim2.new(0.5, 0, 1, -246),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Pink,
 		ColorLight = C.PinkLight,
@@ -532,6 +541,7 @@ local function buildReviveOffer()
 		end,
 	})
 	button.Visible = false
+	reviveButton = button
 	local token = 0
 	local function eliminated(): boolean
 		return player:GetAttribute(Attributes.Role) == "Survivor"
@@ -660,6 +670,7 @@ showNextPopup = function()
 		return
 	end
 	popupBusy = true
+	Sound.play("Pop", 0.6)
 	local text, color = item.Text, item.Color
 	local label = Components.label({
 		Name = "Popup",

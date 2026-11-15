@@ -217,8 +217,8 @@ local PRESETS: { [string]: Preset } = {
 	},
 	-- Oasis Bazaar: golden-orange dusk in a dusty canyon
 	Canyon = {
-		ClockTime = 17.4,
-		Brightness = 2.2,
+		ClockTime = 15.6, -- high afternoon sun: a bright, sun-drenched city between the cliffs
+		Brightness = 2.6,
 		Ambient = Color3.fromRGB(118, 100, 92),
 		OutdoorAmbient = Color3.fromRGB(176, 146, 124),
 		Tint = Color3.fromRGB(255, 238, 220),

@@ -1067,18 +1067,18 @@ local PASSES: { [string]: (Ctx) -> () } = {
 		edgeSign(ctx, "OASIS BAZAAR", rgb(120, 60, 30), rgb(255, 220, 120), 14, "Terrain")
 		local stripes = { { rgb(200, 60, 50), rgb(245, 230, 200) }, { rgb(40, 120, 180), rgb(245, 230, 200) }, { rgb(240, 180, 50), rgb(200, 90, 40) }, { rgb(60, 150, 90), rgb(245, 230, 200) } }
 		local names = { "DATES", "SPICES", "FIGS", "RUGS", "LAMPS", "SILK", "FRUIT" }
-		onGround(ctx, 10, Vector3.new(9, 10, 6), "Terrain", function(at)
+		onGround(ctx, 5, Vector3.new(9, 10, 6), "Terrain", function(at)
 			local s = stripes[ctx.Rng:NextInteger(1, #stripes)]
 			Kit.stall(ctx, at, randomYaw(ctx), s[1], s[2], names[ctx.Rng:NextInteger(1, #names)])
 		end)
-		onGround(ctx, 10, Vector3.new(3, 4, 3), "Terrain", function(at)
+		onGround(ctx, 6, Vector3.new(3, 4, 3), "Terrain", function(at)
 			Kit.barrel(ctx, at, rgb(130, 84, 50))
 		end)
 		onGround(ctx, 6, Vector3.new(9, 9, 5), "Terrain", function(at)
 			Builder.crates(ctx.Info.Model, at, ctx.Rng:NextInteger(1, 4))
 		end)
 		local lamps: { Vector3 } = {}
-		onGround(ctx, 8, Vector3.new(3, 10, 3), "Terrain", function(at)
+		onGround(ctx, 5, Vector3.new(3, 10, 3), "Terrain", function(at)
 			Kit.lamp(ctx, at, rgb(255, 170, 80), 8)
 			table.insert(lamps, at + Vector3.new(0, 8.5, 0))
 		end)
@@ -1088,7 +1088,7 @@ local PASSES: { [string]: (Ctx) -> () } = {
 				Kit.stringLights(ctx, lamps[i], lamps[i + 1], bulbs)
 			end
 		end
-		onGround(ctx, 6, Vector3.new(6, 4, 6), "Terrain", function(at)
+		onGround(ctx, 3, Vector3.new(6, 4, 6), "Terrain", function(at)
 			Kit.rock(ctx, at, ctx.Rng:NextNumber(2, 4), rgb(205, 140, 90), Enum.Material.Sandstone)
 		end)
 	end,

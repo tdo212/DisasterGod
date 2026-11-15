@@ -333,7 +333,9 @@ function Builder.highrise(
 			local segLen = length / segs
 			for i = 1, segs do
 				-- leave a doorway in the middle of the ground floor front
-				if groundFloor and sideName == "South" and i == math.ceil(segs / 2) then
+				-- (two segments when one is narrower than Config.World.MinWalkWidth)
+				local door = math.ceil(segs / 2)
+				if groundFloor and sideName == "South" and (i == door or (segLen < Config.World.MinWalkWidth and i == door + 1)) then
 					continue
 				end
 				local offset = -length / 2 + segLen * (i - 0.5)
@@ -408,6 +410,79 @@ function Builder.highrise(
 		model:SetAttribute("Stairwell", true)
 	end
 	return model, roofY
+end
+
+-- Facade trim for a highrise made by Builder.highrise: a band at every floor line (it falls
+-- with the floor it belongs to) and, optionally, four full-height corner pilasters. Decor:
+-- non-colliding, low health, no shadows.
+function Builder.facadeTrim(model: Model, band: Color3, bandMaterial: Enum.Material, pilaster: Color3?, pilasterMaterial: Enum.Material?)
+	local base = model:GetAttribute("BaseCenter")
+	local fp = model:GetAttribute("Footprint")
+	local roofY = model:GetAttribute("RoofY")
+	local raw = model:GetAttribute("FloorYs")
+	if typeof(base) ~= "Vector3" or typeof(fp) ~= "Vector3" or typeof(roofY) ~= "number" or typeof(raw) ~= "string" then
+		return
+	end
+	local hx, hz = fp.X / 2 + 0.35, fp.Z / 2 + 0.35
+	local lines: { { number } } = {}
+	local last = 1
+	for entry in string.gmatch(raw, "[^,]+") do
+		local y, l = string.match(entry, "([%-%d%.]+):(%d+)")
+		local yy, ll = tonumber(y), tonumber(l)
+		if yy and ll then
+			last = ll
+			if yy > base.Y + 1 then
+				table.insert(lines, { yy - 0.75, ll })
+			end
+		end
+	end
+	table.insert(lines, { roofY - 0.75, last + 1 })
+	for _, ln in lines do
+		for _, side in { { 0, hz, true }, { 0, -hz, true }, { hx, 0, false }, { -hx, 0, false } } do
+			local alongX = side[3] :: boolean
+			local trim = Builder.part(model, {
+				Name = "Trim",
+				Size = if alongX then Vector3.new(fp.X + 1.4, 1.3, 0.5) else Vector3.new(0.5, 1.3, fp.Z + 1.4),
+				CFrame = CFrame.new(base.X + (side[1] :: number), ln[1], base.Z + (side[2] :: number)),
+				Color = band,
+				Material = bandMaterial,
+				CanCollide = false,
+				CastShadow = false,
+			})
+			Builder.structural(trim, ln[2], false, 20)
+		end
+	end
+	if pilaster then
+		local h = roofY - base.Y
+		for _, c in { Vector3.new(hx, 0, hz), Vector3.new(-hx, 0, hz), Vector3.new(hx, 0, -hz), Vector3.new(-hx, 0, -hz) } do
+			local p = Builder.part(model, {
+				Name = "Pilaster",
+				Size = Vector3.new(1.4, h, 1.4),
+				CFrame = CFrame.new(base + c + Vector3.new(0, h / 2, 0)),
+				Color = pilaster,
+				Material = pilasterMaterial or Enum.Material.Neon,
+				CanCollide = false,
+				CastShadow = false,
+			})
+			Builder.structural(p, 1, false, 30)
+		end
+	end
+end
+
+-- An invisible, unclimbable barrier on top of a walled arena's perimeter (rays and the
+-- God's aim pass through it: CanQuery is off).
+function Builder.boundary(parent: Instance, center: Vector3, size: Vector3): BasePart
+	local p = Builder.part(parent, {
+		Name = "Boundary",
+		Size = size,
+		CFrame = CFrame.new(center),
+		Color = Color3.new(0, 0, 0),
+		Transparency = 1,
+		CastShadow = false,
+	})
+	p.CanQuery = false
+	p.CanTouch = false
+	return p
 end
 
 -- Standing on this part hurts and/or slows (quicksand, vents). Read by MatchService.
@@ -584,6 +659,12 @@ end
 -- the disasters land on whatever is under it. Impacts still crack the panels above.
 function Builder.canopy(part: BasePart): BasePart
 	part:SetAttribute("Canopy", true)
+	-- Roblox doesn't draw transparent parts behind Glass material, which hid the God's
+	-- reticle under a dome; see-through canopies use smooth plastic with a sheen instead
+	if part.Material == Enum.Material.Glass then
+		part.Material = Enum.Material.SmoothPlastic
+		part.Reflectance = math.max(part.Reflectance, 0.12)
+	end
 	return part
 end
 
@@ -773,6 +854,9 @@ function Builder.domeCap(model: Model, center: Vector3, radius: number, rise: nu
 		Transparency = transparency,
 		CastShadow = false,
 	})
+	if material == Enum.Material.Glass then
+		Builder.canopy(cap)
+	end
 	Builder.structural(cap, level, false, 40)
 end
 

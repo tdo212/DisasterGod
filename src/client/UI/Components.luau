@@ -4,8 +4,10 @@
 
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config") :: ModuleScript)
 local Theme = require(script.Parent:WaitForChild("Theme") :: ModuleScript)
 local Sound = require(script.Parent:WaitForChild("Sound") :: ModuleScript)
 local Icons = require(script.Parent:WaitForChild("Icons") :: ModuleScript)
@@ -169,13 +171,20 @@ function Components.panel(props: PanelProps): Frame
 	return frame
 end
 
--- Hover / press scale juice shared by every clickable surface.
+local lastHover = 0
+
+-- Hover / press scale juice (and the hover sound) shared by every clickable surface.
 function Components.pressable(button: GuiButton, hover: number?): UIScale
 	local scale = Instance.new("UIScale")
 	scale.Parent = button
 	local over = hover or 1.06
 	button.MouseEnter:Connect(function()
 		Components.tween(scale, Theme.Tweens.Fast, { Scale = over })
+		local now = os.clock()
+		if not Components.isTouch() and now - lastHover >= Config.Audio.HoverCooldown then
+			lastHover = now
+			Sound.play("Hover", 0.5)
+		end
 	end)
 	button.MouseLeave:Connect(function()
 		Components.tween(scale, Theme.Tweens.Fast, { Scale = 1 })

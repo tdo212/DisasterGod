@@ -2,9 +2,10 @@
 -- DailyRewardController: the Daily Reward window, once a day on arrival in the Sky Lodge.
 -- Seven day tiles (Config.Daily.Rewards): today's glows gold with CLAIM, tomorrow's is
 -- highlighted with "COME BACK TOMORROW" so there is a reason to return. Claiming fires the
--- same ClaimStreak remote as the lodge chest (ProgressionService), so either works. It only
--- opens in the lodge, never mid-round or over the first-round cinematic, and waits for the
--- HUD banners to clear.
+-- same ClaimStreak remote as the lodge chest (ProgressionService), so either works.
+-- Calm first join: it never opens until a round has ended since you joined, and then only at
+-- the start of a lobby break (Config.Daily.OpenMinBreak seconds left before the vote), never
+-- mid-round, over the cinematic, the vote or another window.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,7 @@ local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 
 local UI = script.Parent.Parent:WaitForChild("UI")
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
+local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 
 local Attributes = Config.Attributes
@@ -27,6 +29,7 @@ local DailyRewardController = {}
 local started = false
 local window: any = nil
 local shownToday = false
+local roundEnded = false -- a round has finished since this player joined
 
 local function rewardText(r: any): (string, string)
 	if r.SolarFlare then
@@ -111,6 +114,7 @@ local function build(layer: Frame)
 		Parent = content,
 		OnClick = function()
 			Remotes.get("ClaimStreak"):FireServer()
+			Sound.play("Achievement", 0.9)
 			window.Close()
 		end,
 	})
@@ -134,7 +138,13 @@ local function tryShow(layer: Frame)
 	if shownToday or player:GetAttribute(Attributes.StreakReady) ~= true then
 		return
 	end
-	if not inLobby() or player:GetAttribute("Cinematic") == true or player:GetAttribute("RoleReveal") == true then
+	if not roundEnded or not inLobby() or player:GetAttribute("Cinematic") == true or player:GetAttribute("RoleReveal") == true then
+		return
+	end
+	-- only in the lobby break, with enough of it left to read and claim before the vote
+	local t = ReplicatedStorage:GetAttribute(Attributes.TimeRemaining) :: number? or 0
+	local voteAt = Config.Match.IntermissionDuration - Config.Match.LobbyBreak
+	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Intermission" or t - voteAt < D.OpenMinBreak then
 		return
 	end
 	if ReplicatedStorage:GetAttribute(Attributes.VoteOpen) == true or otherWindowOpen() then
@@ -184,15 +194,17 @@ function DailyRewardController.Start()
 		end
 	end)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(function()
-		if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" then
+		local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
+		if phase == "Active" then
 			yield()
+		elseif phase == "RoundEnd" then
+			roundEnded = true
 		end
 	end)
 	task.spawn(function()
-		task.wait(4) -- let the lodge, the profile and the welcome banners settle first
 		while true do
 			tryShow(layer)
-			task.wait(2)
+			task.wait(1)
 		end
 	end)
 end

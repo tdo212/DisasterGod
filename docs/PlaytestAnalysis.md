@@ -114,8 +114,8 @@ Very engaged in round 1-3 (the God hand, the VS card, destruction, colourful map
 ## Suggested next steps (not done; for discussion)
 
 1. ~~Shorten dead time~~ **Done:** Final Rush (the clock jumps to sudden death once only a quarter of the survivors are left) and ghost bolts (the eliminated zap survivors from spectate for coins).
-2. A calmer first join: hold the Daily Reward until after the first round; hide the Welcome Pack and the God BUY button until round 2 or 3.
+2. ~~A calmer first join~~ **Done:** the Daily Reward waits until a round has ended and opens at the start of a lobby break (the Welcome Pack and the God BUY button stay).
 3. Simplify the economy view for new players (one "Coins" shop tab first, the rest unlocked later) and use simpler words on banners.
 4. Give survivors one active counter-play (a short-cooldown "brace" or "shield bash" against debris).
 5. Long-term goals for skilled players: seasonal ranks, per-map best survival streaks, a God rating.
-6. Review the paid wheel spins against Roblox's policy on paid random items for younger audiences.
+6. ~~Review the paid wheel spins~~ **Done:** Robux spins are hidden where PolicyService restricts paid random items.

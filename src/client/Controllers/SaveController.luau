@@ -61,8 +61,17 @@ local function showOffer(kind: string, seconds: number)
 	end
 	offerToken += 1
 	local token = offerToken
-	offer.Visible = true
-	task.delay(seconds, function()
+	task.spawn(function()
+		-- one offer at a time: wait for the Second Chance button to go first
+		local waited = 0
+		while HUDController.ReviveOfferVisible() and waited < M.ReviveOfferSeconds + 1 do
+			waited += task.wait(0.25)
+		end
+		if offerToken ~= token or ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
+			return
+		end
+		offer.Visible = true
+		task.wait(seconds)
 		if offerToken == token then
 			offer.Visible = false
 		end
@@ -99,8 +108,9 @@ function SaveController.Start()
 	offer = Components.panel({
 		Name = "SaveOffer",
 		Size = UDim2.fromOffset(470, 98),
-		Position = UDim2.fromScale(0.5, 0.6),
-		AnchorPoint = Vector2.new(0.5, 0.5),
+		-- the same slot as the Second Chance button: above the Waiting card
+		Position = UDim2.new(0.5, 0, 1, -246),
+		AnchorPoint = Vector2.new(0.5, 1),
 		Color = C.Panel,
 		Transparency = 0.1,
 		Parent = layer,

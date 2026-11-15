@@ -16,6 +16,7 @@ local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 local UI = script.Parent.Parent:WaitForChild("UI")
 local Theme = require(UI:WaitForChild("Theme") :: ModuleScript)
 local Components = require(UI:WaitForChild("Components") :: ModuleScript)
+local Sound = require(UI:WaitForChild("Sound") :: ModuleScript)
 
 local Attributes = Config.Attributes
 local C = Theme.Colors
@@ -115,12 +116,12 @@ local function rebuild()
 			Position = UDim2.new(1, -236, 0, 46),
 			Parent = row,
 		})
-		local label = if quest.Claimed then "DONE ✔" elseif done then "CLAIM" else "…"
+		local label = if quest.Claimed then "DONE ✔" elseif done then "CLAIM" else "IN PROGRESS"
 		local ready = done and not quest.Claimed
 		Components.button({
 			Name = "Claim",
 			Text = label,
-			TextSize = 22,
+			TextSize = if done or quest.Claimed then 22 else 15,
 			Size = UDim2.fromOffset(128, 56),
 			Position = UDim2.new(1, -12, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
@@ -130,6 +131,7 @@ local function rebuild()
 			OnClick = function()
 				if ready then
 					Remotes.get("QuestClaim"):FireServer(quest.Id)
+					Sound.play("Achievement", 0.9)
 				end
 			end,
 		})
@@ -213,6 +215,14 @@ local function buildTracker()
 		player:GetAttributeChangedSignal(attr):Connect(refreshTracker)
 	end
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refreshTracker)
+	-- the round takes the screen: put the window away when you are in play
+	local function closeInRound()
+		if inRound() and window and window.IsOpen() then
+			window.Close()
+		end
+	end
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(closeInRound)
+	player:GetAttributeChangedSignal(Attributes.Role):Connect(closeInRound)
 	changed.Event:Connect(refreshTracker)
 	refreshTracker()
 end

@@ -152,13 +152,15 @@ local function onTimer()
 		return
 	end
 	lastTick = t
-	if phase == "Intermission" and t > 0 and t <= A.CountdownTicks then
+	if phase == "Intermission" and t > 3 and t <= A.CountdownTicks then
 		-- rising pitch as the round approaches
 		Sound.play("Tick", 1, 1 + (A.CountdownTicks - t) * 0.08)
+	elseif phase == "Intermission" and t == 3 then
+		Sound.play("Countdown", 1) -- one "3, 2, 1" clip covers the last three seconds
 	elseif phase == "Active" and ReplicatedStorage:GetAttribute(Attributes.CastingOpen) ~= true then
 		local untilCast = t - (Config.Match.RoundDuration - Config.Match.PrepDuration)
-		if untilCast > 0 and untilCast <= 3 then
-			Sound.play("Tock", 1, 0.9)
+		if untilCast == 3 then
+			Sound.play("Countdown", 1)
 		end
 	elseif phase == "Active" and t > 0 and t <= 5 then
 		Sound.play("Tick", 0.8, 1.3)

@@ -351,7 +351,8 @@ local function sealInterior(info: Types.MapInfo)
 		end
 		return found == 2
 	end
-	local top = if info.HazardFloorY then info.HazardFloorY - SE.LavaDepth else info.FluidStartY - SE.WaterDepth
+	local lava = info.HazardFloorY ~= nil or info.FluidMaterial == Enum.Material.CrackedLava
+	local top = if info.HazardFloorY then info.HazardFloorY - SE.LavaDepth else info.FluidStartY + SE.FloorLift
 	local fill: { [number]: boolean } = {}
 	for ix = -n, n do
 		for iz = -n, n do
@@ -369,9 +370,25 @@ local function sealInterior(info: Types.MapInfo)
 	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Shallows"
-	local lava = info.HazardFloorY ~= nil
-	local color = if lava then Color3.fromRGB(230, 90, 30) else info.FluidColor:Lerp(Color3.fromRGB(150, 130, 100), 0.6)
-	local material = if lava then Enum.Material.CrackedLava else Enum.Material.Sand
+	-- safe interior shallows look nothing like the lethal outer sea: bright sand under
+	-- clear turquoise water, or dark basalt crust with glowing seams on lava maps
+	local color = if lava then SE.CrustColor else SE.SandColor
+	local material = if lava then Enum.Material.Basalt else Enum.Material.Sand
+	local function skin(name: string, size: Vector3, cf: CFrame, col: Color3, mat: Enum.Material, transparency: number)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Size = size
+		p.CFrame = cf
+		p.Color = col
+		p.Material = mat
+		p.Transparency = transparency
+		p.Parent = folder
+	end
 	-- merge each row's run of cells into one tile
 	for iz = -n, n do
 		local ix = -n
@@ -394,6 +411,12 @@ local function sealInterior(info: Types.MapInfo)
 				tile.CastShadow = false
 				tile.CanTouch = false
 				tile.Parent = folder
+				local mid = CFrame.new(c.X + (start + ix) / 2 * step, top, c.Z + iz * step)
+				if lava then
+					skin("CrustSeam", Vector3.new(count * step - 2, 0.12, 0.7), mid + Vector3.new(0, 0.04, (iz % 2 - 0.5) * 2), SE.SeamColor, Enum.Material.Neon, 0)
+				else
+					skin("ShallowWater", Vector3.new(count * step, SE.WaterDepth, step), mid + Vector3.new(0, SE.WaterDepth / 2, 0), SE.WaterColor, Enum.Material.SmoothPlastic, SE.WaterTransparency)
+				end
 			end
 			ix += 1
 		end
@@ -442,6 +465,25 @@ local function sealInterior(info: Types.MapInfo)
 			end
 		end
 	end
+	-- warning buoys just past the rim, where the lethal drop begins (not on walled arenas)
+	if not info.Walled then
+		for b = 1, SE.Bearings, SE.BuoyEvery do
+			local r = reach[b]
+			if r <= 0 then
+				continue
+			end
+			local a = (b - 0.5) / SE.Bearings * 2 * math.pi
+			local at = Vector3.new(c.X + math.cos(a) * (r + SE.BuoyOffset), info.FluidStartY + 0.5, c.Z + math.sin(a) * (r + SE.BuoyOffset))
+			local body = if lava then SE.CrustColor else SE.BuoyColor
+			skin("Buoy", Vector3.new(4, 2.4, 2.4), CFrame.new(at + Vector3.new(0, 1.6, 0)) * CFrame.Angles(0, 0, math.rad(90)), body, Enum.Material.SmoothPlastic, 0)
+			skin("BuoyLight", Vector3.new(1.2, 1.2, 1.2), CFrame.new(at + Vector3.new(0, 4.2, 0)), if lava then SE.SeamColor else SE.BuoyLight, Enum.Material.Neon, 0)
+		end
+		for _, p in folder:GetChildren() do
+			if p.Name == "Buoy" and p:IsA("Part") then
+				p.Shape = Enum.PartType.Cylinder
+			end
+		end
+	end
 	folder.Parent = info.Model
 end
 
@@ -463,9 +505,13 @@ function MapService.Build(name: string): Types.MapInfo
 	s.CanQuery = false
 	s.Size = Vector3.new(2048, 1, 2048)
 	s.CFrame = CFrame.new(info.Center.X, info.FluidStartY, info.Center.Z)
-	s.Color = info.FluidColor
-	s.Material = info.FluidMaterial
-	s.Transparency = if info.FluidMaterial == Enum.Material.Glass then 0.15 else 0
+	local lavaSea = info.HazardFloorY ~= nil or info.FluidMaterial == Enum.Material.CrackedLava
+	-- the lethal outer sea: dark opaque navy on water maps, glowing magma on lava maps
+	-- (walled arenas keep their own flood fluid: liquid gold, a flash flood, molten brass)
+	local keep = lavaSea or info.Walled == true
+	s.Color = if keep then info.FluidColor else info.FluidColor:Lerp(Config.Seal.SeaShade, Config.Seal.SeaShadeAmount)
+	s.Material = if keep then info.FluidMaterial else Enum.Material.SmoothPlastic
+	s.Transparency = 0
 	s.Parent = info.Model
 	sea = s
 
@@ -501,13 +547,16 @@ function MapService.GroundAt(position: Vector3): Vector3
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { arena }
 	local y = 250
-	for _ = 1, 8 do
+	for _ = 1, 24 do
 		local result = workspace:Raycast(Vector3.new(position.X, y, position.Z), Vector3.new(0, -400, 0), params)
 		if not result or result.Instance.Name == "Sea" then
 			break
 		end
-		-- glass canopies (the Bio-Dome roof) are seen through: aim at what is under them
-		if result.Instance:GetAttribute("Canopy") ~= true then
+		-- glass canopies (the Bio-Dome roof), see-through glass and non-solid trim are seen
+		-- through: aim at what is under them (the client's OrbitCamera.ScreenToWorld matches)
+		local hit = result.Instance
+		local seeThrough = hit:GetAttribute("Canopy") == true or (hit:IsA("BasePart") and (not hit.CanCollide or hit.Transparency >= 0.5))
+		if not seeThrough then
 			return result.Position
 		end
 		y = result.Position.Y - 0.05

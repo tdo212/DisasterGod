@@ -1,39 +1,42 @@
 --!strict
--- Arena 11: Casino Royale. A rain-soaked twilight metropolis; the whole arena is one Art
--- Deco grand casino: velvet red, warm gold and neon purple.
---   * The Grand Atrium: marble floor, red carpet runners and marble columns under a
---     massive glass skylight on steel beams. The God aims straight through the glass;
---     break a beam and its panes rain down on the tables below.
---   * A golden coin fountain in the middle, and a twin grand staircase up to the upper
---     galleries that ring the hall, with velvet lounges, a CASINO ROYALE marquee and three
---     hotel suites you can walk into.
---   * Slot machine lanes, roulette tables, room dividers, a check-in desk, a lounge bar
---     you can climb onto and a reinforced vault with a giant round door.
---   * Three glass arched entrances open onto a rainy plaza with cars and a neon skyline.
--- Sudden death: the fountain overflows with liquid gold. Get up to the galleries.
+-- Arena 11: Casino Royale. An open-air neon strip on a rainy night, walled in by the resort.
+--   * A walled arena: cream-and-gold resort facades ring the whole block (impassable, with
+--     an invisible cap), two CASINO gatehouses with marquees and red carpets, waterfalls on
+--     the east and west walls and pyramid-roofed corner pavilions.
+--   * Four 4-5 storey hotel skyscrapers (purple and magenta facades, neon pilasters, gold
+--     floor trim, red awnings): stairwell ladders inside every tower reach every floor and
+--     the roof. Rooftops: two pools with loungers, a helipad and a cabana.
+--   * Glass skybridges join the tower roofs; shear a tower's ground columns and its floors
+--     pancake while survivors dash across the bridges.
+--   * A central plaza with a golden coin fountain, limousines and palms, wet asphalt
+--     boulevards and lane markings all around.
+-- Sudden death: liquid gold floods the boulevard. Get up the towers.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = require(script.Parent.Builder)
 local Types = require(ReplicatedStorage.Shared.Types)
 
-local MARBLE = Color3.fromRGB(232, 222, 205)
-local MARBLE_DARK = Color3.fromRGB(70, 46, 52)
-local VELVET = Color3.fromRGB(130, 20, 40)
-local CARPET = Color3.fromRGB(110, 18, 34)
-local WALL = Color3.fromRGB(78, 24, 40)
+local CREAM = Color3.fromRGB(232, 214, 180)
+local CREAM_DARK = Color3.fromRGB(196, 172, 136)
 local GOLD = Color3.fromRGB(240, 190, 80)
-local PURPLE = Color3.fromRGB(170, 70, 255)
-local FELT = Color3.fromRGB(20, 110, 60)
-local STEEL = Color3.fromRGB(60, 56, 70)
-local GLASS = Color3.fromRGB(170, 150, 220)
-local ASPHALT = Color3.fromRGB(34, 34, 42)
+local MAROON = Color3.fromRGB(120, 24, 48)
+local PURPLE = Color3.fromRGB(110, 50, 170)
+local MAGENTA = Color3.fromRGB(170, 40, 120)
+local NEON_PINK = Color3.fromRGB(255, 80, 200)
+local NEON_PURPLE = Color3.fromRGB(190, 90, 255)
+local ASPHALT = Color3.fromRGB(38, 38, 48)
+local PAVING = Color3.fromRGB(150, 130, 140)
+local WATER = Color3.fromRGB(90, 190, 255)
+local AWNING = Color3.fromRGB(170, 30, 40)
+local BLACK = Color3.fromRGB(20, 20, 26)
 
-local HX = 88 -- hall half-width (x)
-local Z0, Z1 = -64, 64 -- hall front / back wall
-local WALL_H = 44
-local GALLERY_Y = 16 -- top of the gallery floor
-local GALLERY_W = 16
+local HALF = 120 -- interior half-size (x and z)
+local WALL_T = 14 -- perimeter wall thickness
+local WALL_H = 46
+local TOWER = 30 -- tower footprint
+local TC = 54 -- tower centre offset from the middle
+local FLOOR_H = 12
 
 local CasinoRoyale = {}
 
@@ -49,455 +52,270 @@ local function grounds(model: Model)
 	local g = Instance.new("Folder")
 	g.Name = "Ground"
 	g.Parent = model
-	Builder.block(g, "Foundation", Vector3.new(0, -6, -20), Vector3.new(300, 10, 290), Color3.fromRGB(40, 36, 44), Enum.Material.Concrete)
-	Builder.block(g, "MarbleFloor", Vector3.new(0, -0.5, 0), Vector3.new(HX * 2, 1, Z1 - Z0), MARBLE, Enum.Material.Marble)
-	-- red carpet runners: entrance to fountain to the grand stair, and across the hall
-	Builder.block(g, "Carpet", Vector3.new(0, 0.05, -24), Vector3.new(12, 0.1, 80), CARPET, Enum.Material.Fabric)
-	Builder.block(g, "Carpet", Vector3.new(0, 0.05, 12), Vector3.new(120, 0.1, 10), CARPET, Enum.Material.Fabric)
-	-- patterned carpet under the gaming floors
-	for _, x in { -54, 54 } do
-		Builder.block(g, "GamingCarpet", Vector3.new(x, 0.04, -18), Vector3.new(40, 0.08, 76), Color3.fromRGB(70, 14, 40), Enum.Material.Fabric)
-	end
-	-- the rainy plaza and avenue outside the entrances
-	Builder.block(g, "Plaza", Vector3.new(0, -0.5, -86), Vector3.new(220, 1, 44), Color3.fromRGB(90, 86, 96), Enum.Material.Pavement)
-	Builder.block(g, "Avenue", Vector3.new(0, -0.6, -134), Vector3.new(300, 1, 52), ASPHALT, Enum.Material.Asphalt)
-	for i = -7, 7 do
-		Builder.block(g, "LaneMark", Vector3.new(i * 18, -0.05, -134), Vector3.new(8, 0.1, 0.6), Color3.fromRGB(230, 220, 160), Enum.Material.SmoothPlastic)
-	end
-	-- walkways around the outside of the casino
-	for _, x in { -HX - 14, HX + 14 } do
-		Builder.block(g, "SideWalk", Vector3.new(x, -0.5, 0), Vector3.new(28, 1, Z1 - Z0 + 4), Color3.fromRGB(90, 86, 96), Enum.Material.Pavement)
-	end
-	Builder.block(g, "BackWalk", Vector3.new(0, -0.5, Z1 + 14), Vector3.new(HX * 2 + 56, 1, 28), Color3.fromRGB(90, 86, 96), Enum.Material.Pavement)
-end
-
--- the hall shell: destructible wall panels (the supports of the whole shell), gold and
--- neon bands, three glass arched entrances in the front wall
-local function shell(model: Model): Model
-	local hall = Builder.building(model, "HallShell")
-	local function panel(center: Vector3, size: Vector3)
-		local p = Builder.block(hall, "Wall", center, size, WALL, Enum.Material.SmoothPlastic)
-		Builder.structural(p, 1, true, 420)
-	end
-	-- panels about 12 wide that exactly tile each wall
-	local nx = math.ceil(HX * 2 / 12)
-	local seg = HX * 2 / nx
-	local nz = math.ceil((Z1 - Z0) / 12)
-	local segZ = (Z1 - Z0) / nz
-	-- back and side walls
-	for i = 0, nx - 1 do
-		panel(Vector3.new(-HX + seg * (i + 0.5), WALL_H / 2, Z1 + 0.6), Vector3.new(seg + 0.6, WALL_H, 1.2))
-	end
+	-- wet asphalt everywhere (it reaches past the walls so the arena has no edge to fall off)
+	local road = Builder.block(g, "Boulevard", Vector3.new(0, -3, 0), Vector3.new(520, 6, 520), ASPHALT, Enum.Material.Asphalt)
+	road.Reflectance = 0.12
+	-- the central plaza and the four tower blocks, a step up from the road
+	Builder.block(g, "Plaza", Vector3.new(0, 0.25, 0), Vector3.new(46, 0.5, 46), PAVING, Enum.Material.Marble)
 	for _, sx in { -1, 1 } do
-		for i = 0, nz - 1 do
-			panel(Vector3.new(sx * (HX + 0.6), WALL_H / 2, Z0 + segZ * (i + 0.5)), Vector3.new(1.2, WALL_H, segZ + 0.6))
+		for _, sz in { -1, 1 } do
+			Builder.block(g, "Sidewalk", Vector3.new(sx * TC, 0.25, sz * TC), Vector3.new(TOWER + 10, 0.5, TOWER + 10), PAVING, Enum.Material.Pavement)
 		end
 	end
-	-- the front wall with three arched entrances (gaps 14 wide, glass arch above)
-	local doors = { -44, 0, 44 }
-	for i = 0, nx - 1 do
-		local x = -HX + seg * (i + 0.5)
-		local inDoor = false
-		for _, dx in doors do
-			if math.abs(x - dx) < 7 then
-				inDoor = true
-			end
-		end
-		if inDoor then
-			panel(Vector3.new(x, (WALL_H + 22) / 2, Z0 - 0.6), Vector3.new(seg + 0.6, WALL_H - 22, 1.2))
-		else
-			panel(Vector3.new(x, WALL_H / 2, Z0 - 0.6), Vector3.new(seg + 0.6, WALL_H, 1.2))
+	-- dashed lane markings on the boulevards between the blocks and round the ring road
+	for i = -3, 3 do
+		Builder.block(g, "Lane", Vector3.new(i * 30, 0.03, 0), Vector3.new(12, 0.06, 0.8), GOLD, Enum.Material.SmoothPlastic)
+		Builder.block(g, "Lane", Vector3.new(0, 0.03, i * 30), Vector3.new(0.8, 0.06, 12), GOLD, Enum.Material.SmoothPlastic)
+		Builder.block(g, "Lane", Vector3.new(i * 30, 0.03, 96), Vector3.new(12, 0.06, 0.8), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic)
+		Builder.block(g, "Lane", Vector3.new(i * 30, 0.03, -96), Vector3.new(12, 0.06, 0.8), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic)
+	end
+	for _, p in g:GetChildren() do
+		if p:IsA("BasePart") and p.Name == "Lane" then
+			deco(p)
 		end
 	end
-	for _, dx in doors do
-		-- glass arch: a fan of panes over the doorway, gold frame
-		for i = 0, 4 do
-			local a = math.rad(i * 45)
-			local p = Vector3.new(dx + math.cos(a) * 6, 16 + math.sin(a) * 5, Z0 - 0.6)
-			local pane = Builder.part(hall, { Name = "ArchGlass", Size = Vector3.new(4, 4, 0.4), CFrame = CFrame.new(p) * CFrame.Angles(0, 0, a - math.pi / 2), Color = GLASS, Material = Enum.Material.Glass, Transparency = 0.4 })
-			Builder.structural(pane, 1, false, 25)
-		end
-		local lintel = Builder.block(hall, "ArchFrame", Vector3.new(dx, 22, Z0 - 0.6), Vector3.new(seg + 2, 1, 1.6), GOLD, Enum.Material.Metal)
-		Builder.structural(lintel, 1, false, 120)
-		-- gold door posts
-		for _, side in { -1, 1 } do
-			local post = Builder.block(hall, "DoorPost", Vector3.new(dx + side * 7, 8, Z0 - 0.6), Vector3.new(1.4, 16, 1.6), GOLD, Enum.Material.Metal)
-			Builder.structural(post, 1, true, 200)
-		end
-	end
-	-- gold and neon bands along the inner walls (decor)
-	for _, y in { GALLERY_Y - 1, WALL_H - 1 } do
-		deco(Builder.neon(model, Vector3.new(0, y, Z1 - 0.2), Vector3.new(HX * 2, 0.6, 0.3), if y > 20 then PURPLE else GOLD))
-		deco(Builder.neon(model, Vector3.new(-HX + 0.2, y, 0), Vector3.new(0.3, 0.6, Z1 - Z0), if y > 20 then PURPLE else GOLD))
-		deco(Builder.neon(model, Vector3.new(HX - 0.2, y, 0), Vector3.new(0.3, 0.6, Z1 - Z0), if y > 20 then PURPLE else GOLD))
-	end
-	-- the marquee on the front facade
-	local marquee = Builder.block(hall, "Marquee", Vector3.new(0, WALL_H - 6, Z0 - 1.6), Vector3.new(60, 8, 0.8), Color3.fromRGB(30, 12, 30), Enum.Material.SmoothPlastic)
-	Builder.structural(marquee, 1, false, 120)
-	Builder.sign(marquee, Enum.NormalId.Front, "CASINO ROYALE", GOLD, PURPLE)
-	return hall
 end
 
--- the skylight: steel beams (supports) carrying glass panes; the God aims through it
-local function skylight(model: Model, hall: Model): Model
-	local sky = Builder.building(model, "Skylight")
-	Builder.restsOn(sky, hall)
-	local nx, nz = 8, 8
-	local pw, pd = HX * 2 / nx, (Z1 - Z0) / nz
-	for ix = 0, nx do
-		local x = -HX + ix * pw
-		local beam = Builder.block(sky, "Beam", Vector3.new(x, WALL_H + 0.8, 0), Vector3.new(1.4, 1.6, Z1 - Z0 + 1), STEEL, Enum.Material.Metal)
-		Builder.structural(beam, 1, true, 200)
-		Builder.canopy(beam)
+-- The resort facades that wall the arena in: solid, indestructible, too tall to climb.
+local function perimeter(model: Model)
+	local w = Instance.new("Folder")
+	w.Name = "Perimeter"
+	w.Parent = model
+	local o = HALF + WALL_T / 2
+	for _, side in { { Vector3.new(0, 0, o), true, Vector3.new(0, 0, -1) }, { Vector3.new(0, 0, -o), true, Vector3.new(0, 0, 1) }, { Vector3.new(o, 0, 0), false, Vector3.new(-1, 0, 0) }, { Vector3.new(-o, 0, 0), false, Vector3.new(1, 0, 0) } } do
+		local c, alongX, inward = side[1] :: Vector3, side[2] :: boolean, side[3] :: Vector3
+		local len = HALF * 2 + WALL_T * 2
+		local size = if alongX then Vector3.new(len, WALL_H, WALL_T) else Vector3.new(WALL_T, WALL_H, len)
+		Builder.block(w, "ResortWall", c + Vector3.new(0, WALL_H / 2, 0), size, CREAM, Enum.Material.SmoothPlastic)
+		-- gold cornice and a darker plinth on the inner face
+		local face = c + inward * (WALL_T / 2 + 0.4)
+		Builder.block(w, "Cornice", face + Vector3.new(0, WALL_H - 1, 0), if alongX then Vector3.new(len - 28, 2, 1.6) else Vector3.new(1.6, 2, len - 28), GOLD, Enum.Material.Metal)
+		Builder.block(w, "Plinth", face + Vector3.new(0, 3, 0), if alongX then Vector3.new(len - 28, 6, 1.2) else Vector3.new(1.2, 6, len - 28), CREAM_DARK, Enum.Material.Marble)
+		-- two rows of warm lit windows and gold pilasters every 40 studs
+		for row = 0, 1 do
+			local band = Builder.block(w, "Windows", face + Vector3.new(0, 16 + row * 13, 0), if alongX then Vector3.new(len - 40, 4, 0.6) else Vector3.new(0.6, 4, len - 40), Color3.fromRGB(255, 220, 140), Enum.Material.Neon)
+			deco(band)
+		end
+		for i = -2, 2 do
+			local at = face + (if alongX then Vector3.new(i * 48, 0, 0) else Vector3.new(0, 0, i * 48))
+			Builder.block(w, "Pilaster", at + Vector3.new(0, WALL_H / 2, 0), Vector3.new(3, WALL_H, 3), CREAM_DARK, Enum.Material.Marble)
+		end
+		-- an invisible cap: nothing climbs, launches or gets flung out of the arena
+		Builder.boundary(w, c + Vector3.new(0, WALL_H + 80, 0), size + Vector3.new(0, 160 - WALL_H, 0))
 	end
-	for iz = 0, nz do
-		local z = Z0 + iz * pd
-		local purlin = Builder.block(sky, "Purlin", Vector3.new(0, WALL_H + 0.8, z), Vector3.new(HX * 2 + 1, 1.2, 1), STEEL, Enum.Material.Metal)
-		Builder.structural(purlin, 2, false, 90)
-		Builder.canopy(purlin)
-	end
-	for ix = 1, nx do
-		for iz = 1, nz do
-			local c = Vector3.new(-HX + (ix - 0.5) * pw, WALL_H + 0.9, Z0 + (iz - 0.5) * pd)
-			local pane = Builder.part(sky, { Name = "SkylightGlass", Size = Vector3.new(pw - 1.4, 0.4, pd - 1), CFrame = CFrame.new(c), Color = GLASS, Material = Enum.Material.Glass, Transparency = 0.6, CastShadow = false })
-			Builder.structural(pane, 2, false, 40)
-			Builder.canopy(pane)
+	-- corner pavilions with maroon pyramid roofs
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local c = Vector3.new(sx * (HALF + 4), 0, sz * (HALF + 4))
+			Builder.block(w, "Pavilion", c + Vector3.new(0, 27, 0), Vector3.new(34, 54, 34), CREAM, Enum.Material.SmoothPlastic)
+			Builder.block(w, "PavilionTrim", c + Vector3.new(0, 54.5, 0), Vector3.new(36, 1.5, 36), GOLD, Enum.Material.Metal)
+			Builder.block(w, "PavilionRoof", c + Vector3.new(0, 58, 0), Vector3.new(30, 6, 30), MAROON, Enum.Material.SmoothPlastic)
+			Builder.block(w, "PavilionRoof", c + Vector3.new(0, 62.5, 0), Vector3.new(18, 3, 18), MAROON, Enum.Material.SmoothPlastic)
 		end
 	end
-	-- three chandeliers hang from it (they come down with the glass)
-	for _, p in { Vector3.new(0, 0, -18), Vector3.new(-44, 0, -10), Vector3.new(44, 0, -10) } do
-		local chain = Builder.block(sky, "Chain", Vector3.new(p.X, WALL_H - 6, p.Z), Vector3.new(0.4, 12, 0.4), GOLD, Enum.Material.Metal)
-		deco(chain)
-		Builder.structural(chain, 2, false, 15)
-		local crown = Builder.part(sky, { Name = "Chandelier", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 9, 9), CFrame = CFrame.new(p.X, WALL_H - 12.5, p.Z) * CFrame.Angles(0, 0, math.rad(90)), Color = GOLD, Material = Enum.Material.Metal })
-		deco(crown)
-		Builder.structural(crown, 2, false, 40)
-		local glow = Builder.part(sky, { Name = "Crystals", Shape = Enum.PartType.Ball, Size = Vector3.new(5, 5, 5), CFrame = CFrame.new(p.X, WALL_H - 15, p.Z), Color = Color3.fromRGB(255, 235, 190), Material = Enum.Material.Neon, Transparency = 0.15 })
+	-- two CASINO gatehouses (north and south) with marquees and red carpets
+	for _, sz in { -1, 1 } do
+		local face = Vector3.new(0, 0, sz * HALF)
+		local inward = Vector3.new(0, 0, -sz)
+		Builder.block(w, "Gatehouse", face + inward * 4 + Vector3.new(0, 18, 0), Vector3.new(44, 36, 8), CREAM_DARK, Enum.Material.Marble)
+		local doors = Builder.block(w, "Doors", face + inward * 8.2 + Vector3.new(0, 7, 0), Vector3.new(18, 14, 0.4), BLACK, Enum.Material.Glass)
+		doors.Transparency = 0.2
+		local marquee = Builder.block(w, "Marquee", face + inward * 8.6 + Vector3.new(0, 23, 0), Vector3.new(30, 8, 1), MAROON, Enum.Material.SmoothPlastic)
+		Builder.sign(marquee, if sz > 0 then Enum.NormalId.Front else Enum.NormalId.Back, "CASINO", GOLD, Color3.fromRGB(60, 0, 20))
+		local glow = Builder.block(w, "MarqueeGlow", face + inward * 8.3 + Vector3.new(0, 23, 0), Vector3.new(32, 10, 0.4), NEON_PINK, Enum.Material.Neon)
 		deco(glow)
-		Builder.structural(glow, 2, false, 20)
-		local light = Instance.new("PointLight")
-		light.Color = Color3.fromRGB(255, 210, 150)
-		light.Range = 40
-		light.Brightness = 1.6
-		light.Parent = glow
+		Builder.block(w, "Pediment", face + inward * 4 + Vector3.new(0, 38, 0), Vector3.new(48, 4, 10), GOLD, Enum.Material.Metal)
+		for _, x in { -18, -10, 10, 18 } do
+			Builder.cylinder(w, "Column", face + inward * 9.5 + Vector3.new(x, 9, 0), 18, 2.4, CREAM, Enum.Material.Marble)
+		end
+		local carpet = Builder.block(w, "RedCarpet", face + inward * 22 + Vector3.new(0, 0.55, 0), Vector3.new(12, 0.1, 26), AWNING, Enum.Material.Fabric)
+		deco(carpet)
 	end
-	return sky
+	-- waterfalls on the east and west walls
+	for _, sx in { -1, 1 } do
+		local face = Vector3.new(sx * HALF, 0, 0)
+		local fall = Builder.block(w, "Waterfall", face + Vector3.new(-sx * 0.8, 20, 0), Vector3.new(0.6, 36, 14), WATER, Enum.Material.Neon)
+		fall.Transparency = 0.35
+		deco(fall)
+		Builder.block(w, "FallBasin", face + Vector3.new(-sx * 5, 1, 0), Vector3.new(10, 2, 20), CREAM_DARK, Enum.Material.Marble)
+		local pool = Builder.block(w, "FallPool", face + Vector3.new(-sx * 5, 2.05, 0), Vector3.new(8, 0.1, 18), WATER, Enum.Material.SmoothPlastic)
+		pool.Transparency = 0.3
+		deco(pool)
+	end
 end
 
--- galleries along the back and side walls on marble columns, with velvet lounges, the
--- marquee fascia and three walk-in hotel suites on the back gallery
-local function galleries(model: Model, hall: Model): Model
-	local gal = Builder.building(model, "Gallery")
-	Builder.restsOn(gal, hall)
-	local y = GALLERY_Y - 0.75
-	local function tile(c: Vector3, size: Vector3)
-		local t = Builder.block(gal, "Slab", c, size, MARBLE_DARK, Enum.Material.Marble)
-		Builder.structural(t, 2, false, 150)
-	end
-	local function column(x: number, z: number)
-		local col = Builder.cylinder(gal, "MarbleColumn", Vector3.new(x, (GALLERY_Y - 1.5) / 2, z), GALLERY_Y - 1.5, 2.6, MARBLE, Enum.Material.Marble)
-		Builder.structural(col, 1, true, 260)
-		local cap = Builder.block(gal, "Capital", Vector3.new(x, GALLERY_Y - 2, z), Vector3.new(3.4, 1, 3.4), GOLD, Enum.Material.Metal)
-		Builder.structural(cap, 1, false, 40)
-	end
-	-- back gallery (full width)
-	local bz = Z1 - GALLERY_W / 2
-	for x = -HX + 8, HX - 7.9, 16 do
-		tile(Vector3.new(x, y, bz), Vector3.new(16, 1.5, GALLERY_W))
-		if math.abs(x) > 12 then
-			column(x, Z1 - GALLERY_W + 1.5)
-		end
-	end
-	-- side galleries
-	for _, sx in { -1, 1 } do
-		local gx = sx * (HX - GALLERY_W / 2)
-		for z = Z0 + 24, Z1 - GALLERY_W - 7.9, 16 do
-			tile(Vector3.new(gx, y, z), Vector3.new(GALLERY_W, 1.5, 16))
-			column(sx * (HX - GALLERY_W + 1.5), z)
-		end
-	end
-	-- glowing balustrades on the inner edges
-	local railY = GALLERY_Y + 1.6
-	-- (gaps at x = +-22 where the grand staircase arrives)
-	local rails = {
-		{ Vector3.new(-57, railY, Z1 - GALLERY_W + 0.4), Vector3.new(62, 0.4, 0.4) },
-		{ Vector3.new(0, railY, Z1 - GALLERY_W + 0.4), Vector3.new(36, 0.4, 0.4) },
-		{ Vector3.new(57, railY, Z1 - GALLERY_W + 0.4), Vector3.new(62, 0.4, 0.4) },
-		{ Vector3.new(-HX + GALLERY_W - 0.4, railY, -4), Vector3.new(0.4, 0.4, 104) },
-		{ Vector3.new(HX - GALLERY_W + 0.4, railY, -4), Vector3.new(0.4, 0.4, 104) },
-	}
-	for _, r in rails do
-		local rail = Builder.block(gal, "Balustrade", r[1], r[2], PURPLE, Enum.Material.Neon)
-		Builder.structural(rail, 2, false, 20)
-		rail.CastShadow = false
-		local base = Builder.block(gal, "BalustradeBase", r[1] - Vector3.new(0, 1.2, 0), r[2] + Vector3.new(0, 1.8, 0), GOLD, Enum.Material.Metal)
-		Builder.structural(base, 2, false, 40)
-	end
-	-- the CASINO fascia on the back gallery's front edge
-	local fascia = Builder.block(gal, "Fascia", Vector3.new(0, GALLERY_Y - 2.4, Z1 - GALLERY_W - 0.4), Vector3.new(20, 3, 0.6), Color3.fromRGB(30, 10, 30), Enum.Material.SmoothPlastic)
-	Builder.structural(fascia, 2, false, 40)
-	Builder.sign(fascia, Enum.NormalId.Front, "♠ CASINO ♥", PURPLE, Color3.new(1, 1, 1))
-	-- velvet lounges on the side galleries
-	for _, sx in { -1, 1 } do
-		for _, z in { -24, 20 } do
-			local x = sx * (HX - GALLERY_W / 2)
-			local seat = Builder.block(gal, "LoungeSeat", Vector3.new(x + sx * 3, GALLERY_Y + 1, z), Vector3.new(3, 2, 10), VELVET, Enum.Material.Fabric)
-			Builder.structural(seat, 2, false, 30)
-			local back = Builder.block(gal, "LoungeBack", Vector3.new(x + sx * 4.8, GALLERY_Y + 2.6, z), Vector3.new(0.8, 3.2, 10), VELVET, Enum.Material.Fabric)
-			Builder.structural(back, 2, false, 30)
-			local table_ = Builder.cylinder(gal, "CocktailTable", Vector3.new(x - sx * 2, GALLERY_Y + 1.2, z), 2.4, 3, GOLD, Enum.Material.Metal)
-			Builder.structural(table_, 2, false, 25)
-		end
-	end
-	-- three hotel suites on the back gallery (doors face the hall)
-	for _, x in { -62, -34, 44 } do
-		local suite = Builder.highrise(model, "HotelSuite", Vector3.new(x, GALLERY_Y, Z1 - 7), 20, 13, 1, 10, {
-			SlabColor = MARBLE_DARK,
-			SlabMaterial = Enum.Material.Marble,
-			ColumnColor = GOLD,
-			ColumnMaterial = Enum.Material.Metal,
-			WallColor = Color3.fromRGB(110, 40, 60),
-			WallMaterial = Enum.Material.SmoothPlastic,
-			WallTransparency = 0,
+-- A hotel skyscraper: purple/magenta walls, gold slabs and trim, neon pilasters, red
+-- awnings over the ground-floor doors and a lit sign. Returns the tower and its roof Y.
+local function hotel(model: Model, name: string, at: Vector3, floors: number, wall: Color3, neon: Color3, title: string): (Model, number)
+	local tower, roofY = Builder.highrise(model, name, at, TOWER, TOWER, floors, FLOOR_H, {
+		SlabColor = Color3.fromRGB(60, 40, 70),
+		SlabMaterial = Enum.Material.Concrete,
+		ColumnColor = GOLD,
+		ColumnMaterial = Enum.Material.Metal,
+		WallColor = wall,
+		WallMaterial = Enum.Material.SmoothPlastic,
+		WallTransparency = 0,
+		Stairwell = true,
+		Windows = true,
+	})
+	Builder.facadeTrim(tower, GOLD, Enum.Material.Metal, neon, Enum.Material.Neon)
+	-- red awnings over the ground floor, one per side
+	for _, side in { { Vector3.new(0, 0, -1), true }, { Vector3.new(0, 0, 1), true }, { Vector3.new(1, 0, 0), false }, { Vector3.new(-1, 0, 0), false } } do
+		local n, alongX = side[1] :: Vector3, side[2] :: boolean
+		local a = Builder.part(tower, {
+			Name = "Awning",
+			Size = if alongX then Vector3.new(TOWER - 6, 0.6, 5) else Vector3.new(5, 0.6, TOWER - 6),
+			CFrame = CFrame.new(at + n * (TOWER / 2 + 2.4) + Vector3.new(0, 9, 0)),
+			Color = AWNING,
+			Material = Enum.Material.Fabric,
+			CastShadow = false,
 		})
-		Builder.restsOn(suite, gal)
+		Builder.structural(a, 1, false, 20)
 	end
-	return gal
+	-- a lit name sign standing on the roof edge
+	local sign = Builder.part(tower, {
+		Name = "RoofSign",
+		Size = Vector3.new(18, 4, 0.8),
+		CFrame = CFrame.new(at + Vector3.new(0, roofY - at.Y + 2.5, -TOWER / 2 + 1)),
+		Color = BLACK,
+		Material = Enum.Material.SmoothPlastic,
+	})
+	Builder.structural(sign, floors + 1, false, 30)
+	Builder.sign(sign, Enum.NormalId.Front, title, neon, Color3.new(0, 0, 0))
+	return tower, roofY
 end
 
--- the twin grand staircase: a central flight to a landing, then two flights curving out
--- to the back gallery
-local function grandStair(model: Model, gal: Model)
-	local stair = Builder.building(model, "GrandStair")
-	Builder.restsOn(stair, gal)
-	local landingY = 8
-	local landing = Builder.block(stair, "Landing", Vector3.new(0, landingY - 0.75, 36), Vector3.new(20, 1.5, 8), MARBLE, Enum.Material.Marble)
-	Builder.structural(landing, 1, false, 200)
-	for _, x in { -8, 8 } do
-		local pier = Builder.block(stair, "Pier", Vector3.new(x, (landingY - 1.5) / 2, 38), Vector3.new(2, landingY - 1.5, 2), MARBLE, Enum.Material.Marble)
-		Builder.structural(pier, 1, true, 260)
-	end
-	local central = Builder.stairs(stair, Vector3.new(0, 0, 14), Vector3.new(0, landingY, 32), 12, CARPET, Enum.Material.Fabric)
-	central.Name = "GrandFlight"
-	for _, sx in { -1, 1 } do
-		local mid = Vector3.new(sx * 18, landingY + 4, 42)
-		local f1 = Builder.stairs(stair, Vector3.new(sx * 10, landingY, 36), mid, 7, CARPET, Enum.Material.Fabric)
-		f1.Name = "CurvedFlight"
-		local midLanding = Builder.block(stair, "MidLanding", mid - Vector3.new(0, 0.75, 0) + Vector3.new(sx * 2, 0, 1), Vector3.new(12, 1.5, 12), MARBLE, Enum.Material.Marble)
-		Builder.structural(midLanding, 1, false, 160)
-		local f2 = Builder.stairs(stair, mid + Vector3.new(sx * 2, 0, 4), Vector3.new(sx * 22, GALLERY_Y, Z1 - GALLERY_W + 0.5), 7, CARPET, Enum.Material.Fabric)
-		f2.Name = "CurvedFlight"
-		-- gold banister along the outer edge
-		local a, b = Vector3.new(sx * 13.5, landingY + 3, 36), mid + Vector3.new(sx * 4, 3, 0)
-		local rail = Builder.part(stair, { Name = "Banister", Size = Vector3.new(0.4, 0.4, (b - a).Magnitude), CFrame = CFrame.lookAt((a + b) / 2, b), Color = GOLD, Material = Enum.Material.Metal })
-		deco(rail)
-		Builder.structural(rail, 1, false, 15)
-	end
-end
-
--- the golden coin fountain: tiered marble basins, water jets, a cascade of gold
-local function fountain(model: Model, at: Vector3)
-	local f = Builder.building(model, "Fountain")
-	local basin = Builder.cylinder(f, "Basin", at + Vector3.new(0, 1, 0), 2, 22, MARBLE, Enum.Material.Marble)
-	Builder.structural(basin, 1, true, 260)
-	local water = Builder.cylinder(f, "Water", at + Vector3.new(0, 2.05, 0), 0.2, 20, Color3.fromRGB(90, 170, 220), Enum.Material.Glass)
-	water.Transparency = 0.3
-	deco(water)
+local function pool(model: Model, base: Model, at: Vector3)
+	local m = Builder.building(model, "RooftopPool")
+	local rim = Builder.block(m, "PoolRim", at + Vector3.new(0, 0.6, 0), Vector3.new(18, 1.2, 12), CREAM, Enum.Material.Marble)
+	Builder.structural(rim, 1, false, 40)
+	local water = Builder.block(m, "PoolWater", at + Vector3.new(0, 1.25, 0), Vector3.new(16, 0.2, 10), WATER, Enum.Material.SmoothPlastic)
+	water.Transparency = 0.25
+	water.CanCollide = false
 	Builder.structural(water, 1, false, 10)
-	local tier = Builder.cylinder(f, "Tier", at + Vector3.new(0, 4, 0), 4, 9, MARBLE, Enum.Material.Marble)
-	Builder.structural(tier, 1, true, 200)
-	local top = Builder.cylinder(f, "TopBowl", at + Vector3.new(0, 7.4, 0), 1.2, 6, GOLD, Enum.Material.Metal)
-	Builder.structural(top, 2, false, 80)
-	local cascade = Builder.cylinder(f, "GoldCascade", at + Vector3.new(0, 10.5, 0), 6, 2.2, GOLD, Enum.Material.Neon)
-	cascade.Transparency = 0.25
-	deco(cascade)
-	Builder.structural(cascade, 2, false, 10)
-	local coins = Instance.new("ParticleEmitter")
-	coins.Name = "Coins"
-	coins.Color = ColorSequence.new(Color3.fromRGB(255, 215, 90))
-	coins.LightEmission = 0.6
-	coins.Size = NumberSequence.new(0.35)
-	coins.Lifetime = NumberRange.new(1, 1.4)
-	coins.Speed = NumberRange.new(4, 7)
-	coins.SpreadAngle = Vector2.new(30, 30)
-	coins.Acceleration = Vector3.new(0, -14, 0)
-	coins.Rate = 18
-	coins.Parent = cascade
-	for i = 0, 3 do
-		local a = i * math.pi / 2 + math.pi / 4
-		local jet = Builder.block(f, "Jet", at + Vector3.new(math.cos(a) * 7, 4.5, math.sin(a) * 7), Vector3.new(0.5, 5, 0.5), Color3.fromRGB(190, 230, 255), Enum.Material.Glass)
-		jet.Transparency = 0.4
-		deco(jet)
-		Builder.structural(jet, 1, false, 5)
+	for i = -1, 1 do
+		local lounger = Builder.block(m, "Lounger", at + Vector3.new(i * 5, 0.6, 9), Vector3.new(2.4, 1.2, 5), Color3.new(1, 1, 1), Enum.Material.Fabric)
+		Builder.structural(lounger, 1, false, 15)
 	end
-	local light = Instance.new("PointLight")
-	light.Color = GOLD
-	light.Range = 26
-	light.Brightness = 1.8
-	light.Parent = cascade
+	Builder.palm(m, at + Vector3.new(10, 0, 8), 8)
+	Builder.restsOn(m, base)
 end
 
-local function slotRow(model: Model, x: number, z0: number, count: number, facing: number)
-	local row = Builder.building(model, "SlotRow")
-	local colors = { PURPLE, Color3.fromRGB(255, 70, 120), Color3.fromRGB(60, 200, 255), GOLD }
-	for i = 0, count - 1 do
-		local z = z0 + i * 4.6
-		local cab = Builder.block(row, "SlotCabinet", Vector3.new(x, 3.2, z), Vector3.new(3, 6.4, 3.8), Color3.fromRGB(40, 30, 50), Enum.Material.Metal)
-		Builder.structural(cab, 1, true, 70)
-		local screen = Builder.block(row, "SlotScreen", Vector3.new(x + facing * 1.55, 4.2, z), Vector3.new(0.2, 2.6, 3), colors[i % #colors + 1], Enum.Material.Neon)
-		Builder.structural(screen, 1, false, 15)
-		local topper = Builder.block(row, "SlotTopper", Vector3.new(x, 7, z), Vector3.new(2.8, 1.2, 3.6), GOLD, Enum.Material.Neon)
-		Builder.structural(topper, 2, false, 15)
-	end
+local function helipad(model: Model, base: Model, at: Vector3)
+	local m = Builder.building(model, "Helipad")
+	local pad = Builder.cylinder(m, "Helipad", at + Vector3.new(0, 0.4, 0), 0.8, 22, Color3.fromRGB(60, 60, 68), Enum.Material.Concrete)
+	Builder.structural(pad, 1, false, 80)
+	local h = Builder.block(m, "HeliMark", at + Vector3.new(0, 0.85, 0), Vector3.new(8, 0.1, 8), Color3.fromRGB(250, 210, 60), Enum.Material.SmoothPlastic)
+	h.CanCollide = false
+	Builder.structural(h, 1, false, 10)
+	Builder.sign(h, Enum.NormalId.Top, "H", Color3.fromRGB(40, 40, 40), Color3.fromRGB(250, 210, 60))
+	Builder.restsOn(m, base)
 end
 
-local function roulette(model: Model, at: Vector3)
-	local t = Builder.building(model, "RouletteTable")
-	local leg = Builder.cylinder(t, "Pedestal", at + Vector3.new(0, 1.4, 0), 2.8, 2, GOLD, Enum.Material.Metal)
-	Builder.structural(leg, 1, true, 80)
-	local top = Builder.block(t, "Felt", at + Vector3.new(0, 3.1, 0), Vector3.new(12, 0.6, 6), FELT, Enum.Material.Fabric)
-	Builder.structural(top, 2, false, 40)
-	local rim = Builder.block(t, "Rim", at + Vector3.new(0, 3.0, 0), Vector3.new(12.8, 0.5, 6.8), Color3.fromRGB(80, 40, 30), Enum.Material.Wood)
-	Builder.structural(rim, 2, false, 40)
-	local wheel = Builder.cylinder(t, "Wheel", at + Vector3.new(-4, 3.6, 0), 0.6, 4, Color3.fromRGB(60, 30, 20), Enum.Material.Wood)
-	Builder.structural(wheel, 2, false, 25)
-	local spinner = Builder.cylinder(t, "WheelGold", at + Vector3.new(-4, 3.95, 0), 0.2, 2.6, GOLD, Enum.Material.Neon)
-	Builder.spin(spinner, Vector3.new(0, 0, 2))
-	Builder.structural(spinner, 2, false, 10)
-	for _, off in { Vector3.new(2, 0, 5), Vector3.new(-2, 0, 5), Vector3.new(4, 0, -5), Vector3.new(-1, 0, -5) } do
-		local stool = Builder.cylinder(t, "Stool", at + off + Vector3.new(0, 1.3, 0), 2.6, 1.8, VELVET, Enum.Material.Fabric)
-		Builder.structural(stool, 1, false, 20)
+local function cabana(model: Model, base: Model, at: Vector3)
+	local m = Builder.building(model, "Cabana")
+	for _, c in { Vector3.new(5, 0, 4), Vector3.new(-5, 0, 4), Vector3.new(5, 0, -4), Vector3.new(-5, 0, -4) } do
+		local post = Builder.block(m, "Post", at + c + Vector3.new(0, 3, 0), Vector3.new(0.8, 6, 0.8), GOLD, Enum.Material.Metal)
+		Builder.structural(post, 1, true, 30)
+	end
+	local roof = Builder.block(m, "CabanaRoof", at + Vector3.new(0, 6.5, 0), Vector3.new(12, 1, 10), MAROON, Enum.Material.Fabric)
+	Builder.structural(roof, 2, false, 25)
+	local sofa = Builder.block(m, "Sofa", at + Vector3.new(0, 0.8, 2), Vector3.new(8, 1.6, 3), Color3.fromRGB(240, 230, 220), Enum.Material.Fabric)
+	Builder.structural(sofa, 1, false, 15)
+	Builder.restsOn(m, base)
+end
+
+-- A long black limousine (destructible).
+local function limo(model: Model, at: Vector3, yaw: number, color: Color3)
+	local m = Builder.building(model, "Limo")
+	local cf = CFrame.new(at) * CFrame.Angles(0, yaw, 0)
+	local body = Builder.part(m, { Name = "Body", Size = Vector3.new(6, 2.4, 18), CFrame = cf * CFrame.new(0, 1.8, 0), Color = color, Material = Enum.Material.SmoothPlastic, Reflectance = 0.15 })
+	Builder.structural(body, 1, true, 90)
+	local cabin = Builder.part(m, { Name = "Cabin", Size = Vector3.new(5.6, 1.8, 11), CFrame = cf * CFrame.new(0, 3.9, -1), Color = BLACK, Material = Enum.Material.Glass, Transparency = 0.2 })
+	Builder.structural(cabin, 2, false, 30)
+	for _, w in { Vector3.new(3, 0.9, 6), Vector3.new(-3, 0.9, 6), Vector3.new(3, 0.9, -6), Vector3.new(-3, 0.9, -6) } do
+		local wheel = Builder.part(m, { Name = "Wheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 1.8, 1.8), CFrame = cf * CFrame.new(w), Color = BLACK, Material = Enum.Material.SmoothPlastic, CastShadow = false })
+		Builder.structural(wheel, 1, false, 20)
 	end
 end
 
-local function divider(model: Model, at: Vector3, alongX: boolean)
-	local d = Builder.building(model, "VelvetDivider")
-	local size = if alongX then Vector3.new(10, 6, 0.6) else Vector3.new(0.6, 6, 10)
-	local p = Builder.block(d, "Velvet", at + Vector3.new(0, 3.4, 0), size, VELVET, Enum.Material.Fabric)
-	Builder.structural(p, 1, true, 40)
-	local trim = Builder.block(d, "Trim", at + Vector3.new(0, 6.6, 0), size + Vector3.new(0.2, -5.6, 0.2), GOLD, Enum.Material.Metal)
-	Builder.structural(trim, 1, false, 20)
-end
-
--- outside: a porte-cochere over the middle entrance and a neon skyline in the rain
-local function exterior(model: Model, hall: Model, rng: Random)
-	local canopy = Builder.building(model, "EntranceCanopy")
-	Builder.restsOn(canopy, hall)
-	local roof = Builder.block(canopy, "CanopyRoof", Vector3.new(0, 14, Z0 - 10), Vector3.new(30, 1.2, 18), Color3.fromRGB(30, 14, 30), Enum.Material.Metal)
-	Builder.structural(roof, 2, false, 100)
-	local edge = Builder.neon(canopy, Vector3.new(0, 13.2, Z0 - 19), Vector3.new(30, 0.6, 0.4), PURPLE)
-	Builder.structural(edge, 2, false, 10)
-	for _, x in { -13, 13 } do
-		local col = Builder.cylinder(canopy, "CanopyColumn", Vector3.new(x, 6.7, Z0 - 17), 13.4, 1.8, GOLD, Enum.Material.Metal)
-		Builder.structural(col, 1, true, 120)
+-- The golden coin fountain in the middle of the plaza.
+local function fountain(model: Model)
+	local m = Builder.building(model, "CoinFountain")
+	local basin = Builder.cylinder(m, "Basin", Vector3.new(0, 1.5, 0), 2, 24, GOLD, Enum.Material.Metal)
+	Builder.structural(basin, 1, true, 200)
+	local water = Builder.cylinder(m, "FountainWater", Vector3.new(0, 2.55, 0), 0.1, 21, WATER, Enum.Material.SmoothPlastic)
+	water.Transparency = 0.25
+	water.CanCollide = false
+	Builder.structural(water, 1, false, 10)
+	local plinth = Builder.cylinder(m, "Plinth", Vector3.new(0, 4.5, 0), 5, 6, CREAM, Enum.Material.Marble)
+	Builder.structural(plinth, 1, true, 160)
+	for i, spec in { { Vector3.new(0, 10, 0), 0 }, { Vector3.new(-2.5, 9, 1.5), 35 }, { Vector3.new(2.6, 8.5, -1), -30 } } do
+		local coin = Builder.part(m, {
+			Name = "GiantCoin",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.2, 7, 7),
+			CFrame = CFrame.new(spec[1] :: Vector3) * CFrame.Angles(0, math.rad(spec[2] :: number + i * 20), 0),
+			Color = Color3.fromRGB(255, 205, 60),
+			Material = Enum.Material.Neon,
+		})
+		Builder.structural(coin, 2, false, 40)
 	end
-	-- skyline beyond the avenue (decor)
-	for _ = 1, 24 do
-		local a = rng:NextNumber(math.pi * 0.95, math.pi * 2.05)
-		local dist = rng:NextNumber(185, 240)
-		local h = rng:NextNumber(50, 140)
-		local w = rng:NextNumber(18, 34)
-		local p = Vector3.new(math.cos(a) * dist, h / 2 - 2, math.sin(a) * dist)
-		deco(Builder.block(model, "Skyline", p, Vector3.new(w, h, w), Color3.fromRGB(24, 20, 36), Enum.Material.SmoothPlastic))
-		deco(Builder.neon(model, p + Vector3.new(0, h / 2 - 4, -w / 2 - 0.1), Vector3.new(w * 0.7, 0.8, 0.2), if rng:NextNumber() > 0.5 then PURPLE else Color3.fromRGB(255, 70, 150)))
-	end
-	for _ = 1, 10 do
-		local a = rng:NextNumber(0, math.pi)
-		local dist = rng:NextNumber(150, 200)
-		local h = rng:NextNumber(40, 90)
-		deco(Builder.block(model, "Skyline", Vector3.new(math.cos(a) * dist, h / 2 - 2, math.sin(a) * dist + 30), Vector3.new(26, h, 26), Color3.fromRGB(28, 22, 40), Enum.Material.SmoothPlastic))
-	end
-	-- street lamps on the plaza
-	for _, x in { -80, -40, 40, 80 } do
-		local lamp = Builder.building(model, "StreetLamp")
-		local pole = Builder.block(lamp, "Pole", Vector3.new(x, 6, -104), Vector3.new(0.6, 12, 0.6), STEEL, Enum.Material.Metal)
-		Builder.structural(pole, 1, true, 40)
-		local bulb = Builder.block(lamp, "Bulb", Vector3.new(x, 12.4, -104), Vector3.new(1.6, 0.8, 1.6), Color3.fromRGB(255, 200, 150), Enum.Material.Neon)
-		Builder.structural(bulb, 2, false, 10)
-	end
+	Builder.fallDirection(m, Vector3.new(1, 0, 0.4))
 end
 
 function CasinoRoyale.build(parent: Instance): Types.MapInfo
 	local model = Instance.new("Model")
 	model.Name = "CasinoRoyale"
 	model.Parent = parent
-	local rng = Random.new(11)
 
 	grounds(model)
-	local hall = shell(model)
-	skylight(model, hall)
-	local gal = galleries(model, hall)
-	grandStair(model, gal)
-	fountain(model, Vector3.new(0, 0, -18))
+	perimeter(model)
+	fountain(model)
 
-	-- the gaming floors either side of the carpet
-	for _, spec in { { -68, 1 }, { -58, -1 }, { 58, 1 }, { 68, -1 } } do
-		slotRow(model, spec[1], -50, 9, spec[2])
-	end
-	for _, p in { Vector3.new(-30, 0, -44), Vector3.new(30, 0, -44), Vector3.new(-34, 0, 2), Vector3.new(34, 0, 2), Vector3.new(-20, 0, 26), Vector3.new(20, 0, 26) } do
-		roulette(model, p)
-	end
-	for _, d in { { Vector3.new(-44, 0, -30), false }, { Vector3.new(44, 0, -30), false }, { Vector3.new(-44, 0, 10), false }, { Vector3.new(44, 0, 10), false }, { Vector3.new(-18, 0, -56), true }, { Vector3.new(18, 0, -56), true } } do
-		divider(model, d[1] :: Vector3, d[2] :: boolean)
-	end
+	-- the four hotel towers (NW, NE, SE, SW)
+	local nw, nwRoof = hotel(model, "HotelAurum", Vector3.new(-TC, 0.5, TC), 5, PURPLE, NEON_PURPLE, "AURUM")
+	local ne, neRoof = hotel(model, "HotelRoyale", Vector3.new(TC, 0.5, TC), 5, MAGENTA, NEON_PINK, "ROYALE")
+	local se, seRoof = hotel(model, "HotelJackpot", Vector3.new(TC, 0.5, -TC), 5, PURPLE, NEON_PINK, "JACKPOT")
+	local sw, swRoof = hotel(model, "HotelVelvet", Vector3.new(-TC, 0.5, -TC), 4, MAGENTA, NEON_PURPLE, "VELVET")
+	pool(model, nw, Vector3.new(-TC + 3, nwRoof, TC + 3))
+	pool(model, ne, Vector3.new(TC - 3, neRoof, TC + 3))
+	helipad(model, se, Vector3.new(TC + 2, seRoof, -TC - 2))
+	cabana(model, sw, Vector3.new(-TC, swRoof, -TC - 4))
 
-	-- the lounge bar (climb its roof via the ladder) and the reinforced vault
-	local bar, barRoof = Builder.highrise(model, "LoungeBar", Vector3.new(-54, 0, 38), 26, 16, 1, 12, {
-		SlabColor = Color3.fromRGB(50, 30, 30),
-		SlabMaterial = Enum.Material.Wood,
-		ColumnColor = GOLD,
-		ColumnMaterial = Enum.Material.Metal,
-		WallColor = Color3.fromRGB(90, 30, 45),
-		WallMaterial = Enum.Material.Wood,
-		WallTransparency = 0,
-		Windows = true,
-		OpenSide = "East",
-	})
-	local counter = Builder.block(bar, "BarCounter", Vector3.new(-54, 1.8, 33), Vector3.new(18, 3.6, 2.4), Color3.fromRGB(60, 30, 25), Enum.Material.Wood)
-	Builder.structural(counter, 1, false, 60)
-	local shelf = Builder.block(bar, "Bottles", Vector3.new(-54, 6, 45), Vector3.new(16, 3, 1), Color3.fromRGB(120, 220, 200), Enum.Material.Neon)
-	shelf.Transparency = 0.3
-	Builder.structural(shelf, 1, false, 20)
-	local barSign = Builder.block(bar, "BarSign", Vector3.new(-54, barRoof + 2, 30), Vector3.new(12, 3, 0.6), Color3.fromRGB(30, 10, 30), Enum.Material.SmoothPlastic)
-	Builder.structural(barSign, 2, false, 30)
-	Builder.sign(barSign, Enum.NormalId.Front, "LOUNGE", PURPLE, Color3.new(1, 1, 1))
+	-- glass skybridges between the roofs (the SW link slopes down a storey)
+	local edge = TOWER / 2 - 1
+	local deckGlass = Color3.fromRGB(170, 220, 255)
+	local function skybridge(name: string, a: Vector3, b: Vector3, base: Model)
+		local bridge = Builder.bridge(model, name, a, b, 12, deckGlass, Enum.Material.Glass, GOLD, Color3.fromRGB(70, 60, 80), 70)
+		Builder.restsOn(bridge, base)
+	end
+	skybridge("SkybridgeNorth", Vector3.new(-TC + edge, nwRoof + 0.5, TC - 6), Vector3.new(TC - edge, neRoof + 0.5, TC - 6), nw)
+	skybridge("SkybridgeEast", Vector3.new(TC - 6, neRoof + 0.5, TC - edge), Vector3.new(TC - 6, seRoof + 0.5, -TC + edge), ne)
+	skybridge("SkybridgeWest", Vector3.new(-TC + 6, nwRoof + 0.5, TC - edge), Vector3.new(-TC + 6, swRoof + 0.5, -TC + edge), sw)
 
-	local vault = Builder.highrise(model, "Vault", Vector3.new(56, 0, 36), 22, 18, 1, 13, {
-		SlabColor = Color3.fromRGB(70, 70, 80),
-		SlabMaterial = Enum.Material.DiamondPlate,
-		ColumnColor = Color3.fromRGB(90, 90, 100),
-		ColumnMaterial = Enum.Material.Metal,
-		WallColor = Color3.fromRGB(80, 80, 92),
-		WallMaterial = Enum.Material.DiamondPlate,
-		WallTransparency = 0,
-		Health = 520,
-	})
-	local door = Builder.part(vault, { Name = "VaultDoor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 9, 9), CFrame = CFrame.new(64, 5, 26.4) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(190, 190, 200), Material = Enum.Material.DiamondPlate })
-	Builder.structural(door, 1, false, 300)
-	local wheel = Builder.part(vault, { Name = "VaultWheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 3.4, 3.4), CFrame = CFrame.new(64, 5, 25.6) * CFrame.Angles(0, math.rad(90), 0), Color = GOLD, Material = Enum.Material.Metal })
-	Builder.structural(wheel, 1, false, 40)
-	for _, p in { Vector3.new(52, 1, 40), Vector3.new(58, 1, 42) } do
-		local gold = Builder.block(vault, "GoldBars", p, Vector3.new(4, 2, 2.4), GOLD, Enum.Material.Neon)
-		Builder.structural(gold, 1, false, 30)
+	-- searchlight lasers from the Jackpot roof (decor)
+	for i, dir in { Vector3.new(-0.5, 1, 0.3), Vector3.new(0.4, 1, -0.6) } do
+		local from = Vector3.new(TC + (i - 1.5) * 10, seRoof + 1, -TC + 8)
+		local laser = Builder.part(model, { Name = "Laser", Size = Vector3.new(0.6, 0.6, 220), CFrame = CFrame.lookAt(from + dir.Unit * 110, from + dir.Unit * 220), Color = NEON_PINK, Material = Enum.Material.Neon, Transparency = 0.3 })
+		deco(laser)
 	end
 
-	-- the check-in desk by the entrance
-	local desk = Builder.building(model, "CheckIn")
-	local counter2 = Builder.block(desk, "Desk", Vector3.new(-56, 2, -56), Vector3.new(20, 4, 3), MARBLE, Enum.Material.Marble)
-	Builder.structural(counter2, 1, true, 120)
-	local top = Builder.block(desk, "DeskTop", Vector3.new(-56, 4.2, -56), Vector3.new(21, 0.4, 3.6), GOLD, Enum.Material.Metal)
-	Builder.structural(top, 2, false, 30)
-	local sign = Builder.block(desk, "DeskSign", Vector3.new(-56, 8, -57.6), Vector3.new(12, 2.4, 0.4), Color3.fromRGB(30, 10, 30), Enum.Material.SmoothPlastic)
-	Builder.structural(sign, 2, false, 20)
-	Builder.sign(sign, Enum.NormalId.Front, "CHECK-IN", GOLD, Color3.new(0, 0, 0))
-
-	exterior(model, hall, rng)
+	-- limousines round the plaza and palms on the corners
+	limo(model, Vector3.new(-17, 0, 30), math.rad(90), BLACK)
+	limo(model, Vector3.new(16, 0, -30), math.rad(90), BLACK)
+	limo(model, Vector3.new(30, 0, 14), 0, Color3.fromRGB(240, 240, 245))
+	limo(model, Vector3.new(-30, 0, -12), 0, BLACK)
+	for _, p in { Vector3.new(-20, 0.5, -20), Vector3.new(20, 0.5, -20), Vector3.new(-20, 0.5, 20), Vector3.new(20, 0.5, 20), Vector3.new(-TC - 18, 0, 0), Vector3.new(TC + 18, 0, 0), Vector3.new(0, 0, TC + 18), Vector3.new(0, 0, -TC - 18), Vector3.new(-96, 0, -60), Vector3.new(96, 0, 60) } do
+		Builder.palm(model, p, 13)
+	end
 
 	local spawns = {}
 	for _, p in {
-		Vector3.new(0, 3, -40), Vector3.new(-30, 3, -20), Vector3.new(30, 3, -20), Vector3.new(-62, 3, -10),
-		Vector3.new(62, 3, -10), Vector3.new(0, 3, 30), Vector3.new(-50, GALLERY_Y + 3, Z1 - 8), Vector3.new(50, GALLERY_Y + 3, Z1 - 8),
-		Vector3.new(-HX + 8, GALLERY_Y + 3, 0), Vector3.new(HX - 8, GALLERY_Y + 3, 0), Vector3.new(-40, 3, -90), Vector3.new(40, 3, -90),
+		Vector3.new(0, 3, -16), Vector3.new(0, 3, 16), Vector3.new(-16, 3, 0), Vector3.new(16, 3, 0),
+		Vector3.new(-96, 3, 0), Vector3.new(96, 3, 0), Vector3.new(0, 3, 96), Vector3.new(0, 3, -96),
+		Vector3.new(-96, 3, 96), Vector3.new(96, 3, -96),
+		Vector3.new(TC, 3.5, TC - 6), Vector3.new(-TC, 3.5, -TC - 6), -- inside the tower lobbies
 	} do
 		table.insert(spawns, CFrame.new(p))
 	end
@@ -508,15 +326,16 @@ function CasinoRoyale.build(parent: Instance): Types.MapInfo
 		Model = model,
 		SpawnPoints = spawns,
 		FluidStartY = -3,
-		FluidEndY = 12,
+		FluidEndY = 14,
 		FluidColor = Color3.fromRGB(240, 190, 70),
-		FluidMaterial = Enum.Material.Glass,
+		FluidMaterial = Enum.Material.Foil,
 		HazardFloorY = nil,
 		FluidName = "LIQUID GOLD",
 		Lighting = "Casino",
 		KnockbackMultiplier = 1.1,
-		Center = Vector3.new(0, 0, -10),
-		Radius = 125,
+		Center = Vector3.new(0, 0, 0),
+		Radius = 130,
+		Walled = true,
 	}
 end
 

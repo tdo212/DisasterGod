@@ -84,6 +84,10 @@ local function newSound(name: string, id: number | string, volume: number, speed
 end
 
 local function makeSound(key: string, volume: number, speed: number?, looped: boolean?): Sound?
+	local variants = A.Variants[key]
+	if variants and not looped then
+		key = variants[math.random(1, #variants)]
+	end
 	local id = A.Disaster[key]
 	if not id then
 		return nil

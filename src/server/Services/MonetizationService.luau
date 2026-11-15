@@ -9,6 +9,7 @@
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local PolicyService = game:GetService("PolicyService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -193,6 +194,31 @@ end
 
 ---------------------------------------------------------------------------
 
+-- Paid random items (Robux wheel spins) are illegal for some players' regions/ages. Ask
+-- PolicyService once on join; until it answers, or if it fails, treat the player as
+-- restricted (the safe side). Free spins from quests and the daily reward are unaffected.
+local function checkPolicy(player: Player)
+	player:SetAttribute(Config.Attributes.PaidRandomRestricted, true)
+	for attempt = 1, 3 do
+		local ok, info = pcall(function()
+			return PolicyService:GetPolicyInfoForPlayerAsync(player)
+		end)
+		if ok and typeof(info) == "table" then
+			if player.Parent then
+				player:SetAttribute(Config.Attributes.PaidRandomRestricted, info.ArePaidRandomItemsRestricted ~= false)
+			end
+			return
+		end
+		task.wait(2 * attempt)
+	end
+end
+
+-- True when this product is a paid random item (a wheel spin) and the player may not buy one.
+function MonetizationService.IsRestricted(player: Player, key: string): boolean
+	local def = M.Products[key]
+	return def ~= nil and (def.Spins or 0) > 0 and player:GetAttribute(Config.Attributes.PaidRandomRestricted) ~= false
+end
+
 function MonetizationService.Init()
 	MarketplaceService.ProcessReceipt = function(receipt)
 		return processReceipt(receipt)
@@ -209,6 +235,7 @@ function MonetizationService.Init()
 
 	local function onPlayer(player: Player)
 		checkPasses(player)
+		task.spawn(checkPolicy, player)
 		player.CharacterAdded:Connect(function()
 			if MonetizationService.HasPass(player, "VIP") then
 				task.defer(applyVipTag, player)

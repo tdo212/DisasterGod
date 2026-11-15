@@ -230,13 +230,16 @@ function OrbitCamera.ScreenToWorld(screen: Vector2, insetRelative: boolean?): Ve
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = { arena }
 		local origin, direction = ray.Origin, ray.Direction * 1500
-		for _ = 1, 6 do
+		for _ = 1, 24 do
 			local result = workspace:Raycast(origin, direction, params)
 			if not result then
 				break
 			end
-			-- aim through glass canopies (the Bio-Dome roof) at what is under them
-			if result.Instance:GetAttribute("Canopy") ~= true then
+			-- aim through glass canopies (the Bio-Dome roof), see-through glass and
+			-- non-solid trim at what is under them (MapService.GroundAt uses the same rule)
+			local hit = result.Instance
+			local seeThrough = hit:GetAttribute("Canopy") == true or (hit:IsA("BasePart") and (not hit.CanCollide or hit.Transparency >= 0.5))
+			if not seeThrough then
 				return result.Position
 			end
 			origin = result.Position + ray.Direction * 0.1

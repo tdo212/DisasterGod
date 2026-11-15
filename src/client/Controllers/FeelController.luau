@@ -151,7 +151,9 @@ local function countdownTick()
 	if untilCast >= 1 and untilCast <= FE.Countdown and untilCast ~= lastCount then
 		lastCount = untilCast
 		pop(tostring(untilCast), C.GoldLight)
-		Sound.play("Tick", 0.8)
+		if untilCast > 3 then
+			Sound.play("Tick", 0.8) -- AudioController plays the "3, 2, 1" clip for the rest
+		end
 	end
 end
 
