@@ -46,12 +46,13 @@ local function godOf(): Player?
 	return if god and god.Parent then god else nil
 end
 
--- An intact structural part (a roof or upper floor) directly overhead.
+-- An intact structural part (a roof or upper floor) directly overhead. See-through glass
+-- canopies (the Bio-Dome, the Aqua-Dome, the Casino skylight) don't hide anyone.
 local function underRoof(hrp: BasePart): boolean
 	rayParams.FilterDescendantsInstances = { MapService.GetArenaFolder() }
 	local hit = workspace:Raycast(hrp.Position + Vector3.new(0, 3, 0), Vector3.new(0, S.RoofCheckHeight, 0), rayParams)
 	local part = hit and hit.Instance
-	return part ~= nil and part:GetAttribute("Structural") == true and part:GetAttribute("Broken") ~= true
+	return part ~= nil and part:GetAttribute("Structural") == true and part:GetAttribute("Broken") ~= true and part:GetAttribute("Canopy") ~= true
 end
 
 function StealthService.IsJammed(position: Vector3): boolean

@@ -29,6 +29,8 @@ local lastCrush: { [Player]: { Name: string, At: number } } = {}
 local lastClutch: { [Player]: number } = {}
 local popup = Remotes.get("Popup")
 local feed = Remotes.get("Feed")
+-- one escape callout per player per building: a multi-floor collapse fires once per floor
+local escapedAt: { [string]: number } = {}
 local RED = Color3.fromRGB(255, 90, 90)
 
 local GOLD = Color3.fromRGB(255, 210, 60)
@@ -82,6 +84,7 @@ function ScoringService.Notify(player: Player, text: string, color: Color3?)
 end
 
 function ScoringService.ResetRound()
+	table.clear(escapedAt)
 	table.clear(records)
 	table.clear(lastHit)
 	table.clear(lastCause)
@@ -172,6 +175,9 @@ function ScoringService.OnEliminated(victim: Player, final: boolean?)
 		PlayerDataService.RecordGodKill(hit.By)
 		QuestService.Progress(hit.By, "GodKill", 1)
 		ScoringService.Award(hit.By, S.GodKillCoins, "ELIMINATED " .. string.upper(victim.DisplayName), PURPLE)
+		-- the God's kill confirm: hitmarker on the victim + sound (KillConfirmController)
+		local hrp = hrpOf(victim)
+		Remotes.get("ClientEffect"):FireClient(hit.By, "GodKill", victim.DisplayName, if hrp then hrp.Position else nil)
 	end
 	lastHit[victim] = nil
 end
@@ -338,8 +344,15 @@ function ScoringService.Init()
 			return
 		end
 		task.delay(S.StructuralEscapeWindow, function()
+			local id = building:GetAttribute("BuildingId")
 			for _, player in inside do
+				local key = player.UserId .. ":" .. tostring(id or building.Name)
+				local now = os.clock()
+				if now - (escapedAt[key] or -math.huge) < F.EscapeCooldown then
+					continue
+				end
 				if RoleService.IsAliveSurvivor(player) then
+					escapedAt[key] = now
 					record(player).Escapes += 1
 					QuestService.Progress(player, "Escape", 1)
 					ScoringService.Award(player, S.StructuralEscapeCoins, "STRUCTURAL ESCAPE", GOLD)

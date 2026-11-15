@@ -96,6 +96,21 @@ local PRESETS: { [string]: (ParticleEmitter, number) -> () } = {
 		p.LightEmission = 0.6
 		p.Rate = rate
 	end,
+	-- drifting glowing specks in the deep (Abyssal Aqua-Dome)
+	Plankton = function(p, rate)
+		p.Texture = ""
+		p.Color = ColorSequence.new(Color3.fromRGB(120, 240, 255), Color3.fromRGB(80, 200, 190))
+		p.Size = NumberSequence.new(0.18)
+		p.Squash = NumberSequence.new(0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.35), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(8, 12)
+		p.Speed = NumberRange.new(0.5, 2)
+		p.EmissionDirection = Enum.NormalId.Bottom
+		p.Acceleration = Vector3.new(0.4, 0.3, 0.2)
+		p.SpreadAngle = Vector2.new(80, 80)
+		p.LightEmission = 0.8
+		p.Rate = rate
+	end,
 	Dust = function(p, rate)
 		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
 		p.Color = ColorSequence.new(Color3.fromRGB(230, 200, 150))
@@ -286,6 +301,19 @@ local AMBIENT: { [string]: (ParticleEmitter) -> () } = {
 		p.SpreadAngle = Vector2.new(40, 40)
 		p.Acceleration = Vector3.new(4, -4, 0)
 		p.Rate = 4
+	end,
+	-- streams of bubbles rising from the sea floor (Abyssal Aqua-Dome)
+	Bubbles = function(p)
+		p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(200, 245, 255))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0.7) })
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+		p.Lifetime = NumberRange.new(5, 8)
+		p.Speed = NumberRange.new(5, 9)
+		p.SpreadAngle = Vector2.new(6, 6)
+		p.Acceleration = Vector3.new(0.6, 1, 0.3)
+		p.LightEmission = 0.5
+		p.Rate = 6
 	end,
 	DustDevil = function(p)
 		p.Texture = "rbxasset://textures/particles/smoke_main.dds"

@@ -21,6 +21,10 @@ local Builders: { [string]: any } = {
 	ChronoSpire = require(World.ChronoSpire),
 	VerdantDome = require(World.VerdantDome),
 	IroncladArmada = require(World.IroncladArmada),
+	AbyssalAquaDome = require(World.AbyssalAquaDome),
+	CasinoRoyale = require(World.CasinoRoyale),
+	OasisBazaar = require(World.OasisBazaar),
+	ClockworkSpire = require(World.ClockworkSpire),
 }
 
 local DestructionService = require(script.Parent.DestructionService)
@@ -36,6 +40,10 @@ local HIDEOUT_LOOK: { [string]: { Color3 | Enum.Material } } = {
 	Tempest = { Color3.fromRGB(110, 116, 124), Color3.fromRGB(70, 74, 80), Enum.Material.Metal },
 	Foundry = { Color3.fromRGB(150, 72, 52), Color3.fromRGB(58, 58, 68), Enum.Material.Brick },
 	Conservatory = { Color3.fromRGB(232, 238, 236), Color3.fromRGB(176, 186, 190), Enum.Material.SmoothPlastic },
+	Abyss = { Color3.fromRGB(130, 142, 150), Color3.fromRGB(70, 80, 92), Enum.Material.Metal },
+	Casino = { Color3.fromRGB(110, 40, 60), Color3.fromRGB(60, 40, 50), Enum.Material.SmoothPlastic },
+	Canyon = { Color3.fromRGB(214, 168, 118), Color3.fromRGB(120, 78, 46), Enum.Material.Sandstone },
+	Nebula = { Color3.fromRGB(196, 186, 170), Color3.fromRGB(110, 70, 44), Enum.Material.Cobblestone },
 }
 local DEFAULT_LOOK = { Color3.fromRGB(170, 120, 75), Color3.fromRGB(120, 80, 50), Enum.Material.WoodPlanks }
 
@@ -204,6 +212,7 @@ end
 -- Each gets crates inside to crouch behind.
 local function addHideouts(info: Types.MapInfo)
 	local H = Config.Hideouts
+	local perMap = H.PerMapOverride[info.Name] or H.PerMap
 	local look = HIDEOUT_LOOK[info.Lighting] or DEFAULT_LOOK
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
@@ -225,7 +234,7 @@ local function addHideouts(info: Types.MapInfo)
 	end
 	local placed = 0
 	for _ = 1, H.Tries do
-		if placed >= H.PerMap then
+		if placed >= perMap then
 			break
 		end
 		local v = pick()

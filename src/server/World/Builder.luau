@@ -586,6 +586,209 @@ function Builder.canopy(part: BasePart): BasePart
 	return part
 end
 
+-- A straight flight of stairs (a wedge) from `low` (its foot, on the ground) up to `high`
+-- (the top edge, level with the floor it reaches). Destructible, so it can be cut away.
+function Builder.stairs(parent: Instance, low: Vector3, high: Vector3, width: number, color: Color3, material: Enum.Material?, level: number?): BasePart
+	local rise = math.max(0.5, high.Y - low.Y)
+	local flat = Vector3.new(high.X - low.X, 0, high.Z - low.Z)
+	local length = math.max(1, flat.Magnitude)
+	local mid = Vector3.new((low.X + high.X) / 2, low.Y + rise / 2, (low.Z + high.Z) / 2)
+	local wedge = Builder.ramp(parent, "Stairs", CFrame.lookAt(mid, mid - flat), Vector3.new(width, rise, length), color, material)
+	Builder.structural(wedge, level or 1, false, 160)
+	return wedge
+end
+
+export type RoundStyle = {
+	WallColor: Color3,
+	WallMaterial: Enum.Material,
+	WallTransparency: number,
+	SlabColor: Color3,
+	SlabMaterial: Enum.Material,
+	ColumnColor: Color3,
+	Trim: Color3?, -- a neon ring at every floor line
+	Health: number?,
+	Segments: number?, -- wall panels around the ring
+}
+
+-- A round multi-storey hall (bio-domes, observatories, rotundas): a disc floor per level on
+-- a ring of columns, curved walls of flat panels (a doorway on the south of the ground
+-- floor, every other upper panel a window), optional neon floor rings. Furnished by
+-- World/Details like any highrise. Returns the building and the Y of its roof surface.
+function Builder.roundHall(parent: Instance, name: string, base: Vector3, diameter: number, floors: number, floorHeight: number, style: RoundStyle): (Model, number)
+	local model = Builder.building(parent, name)
+	local r = diameter / 2
+	local segs = style.Segments or 12
+	local y = base.Y
+	local level = 1
+	local floorTops: { string } = {}
+	local function disc(atY: number, lvl: number)
+		local d = Builder.part(model, {
+			Name = "Slab",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.5, diameter, diameter),
+			CFrame = CFrame.new(base.X, atY + 0.75, base.Z) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = style.SlabColor,
+			Material = style.SlabMaterial,
+		})
+		Builder.structural(d, lvl, false, style.Health)
+	end
+	for floor = 1, floors do
+		local top = y
+		if y > base.Y then
+			disc(y, level)
+			top = y + 1.5
+		end
+		table.insert(floorTops, string.format("%.2f:%d", top, level))
+		local h = floorHeight - 1.5
+		-- columns just inside the wall
+		for i = 0, 5 do
+			local a = i * math.pi / 3 + math.pi / 6
+			local col = Builder.block(model, "Column", Vector3.new(base.X + math.cos(a) * (r - 2), top + h / 2, base.Z + math.sin(a) * (r - 2)), Vector3.new(1.6, h, 1.6), style.ColumnColor, Enum.Material.Metal)
+			Builder.structural(col, level, true, style.Health)
+		end
+		-- curved wall
+		local chord = 2 * r * math.sin(math.pi / segs)
+		for i = 0, segs - 1 do
+			local a = (i + 0.5) * 2 * math.pi / segs
+			local south = math.abs(a - math.pi * 1.5) < math.pi / segs + 0.01
+			if south then
+				continue -- the doorway (upper floors: out onto a balcony)
+			end
+			local wh = h
+			local cy = top + h / 2
+			if floor > 1 and i % 2 == 0 then
+				wh = h * 0.45 -- a window: half-height wall to peek over
+				cy = top + wh / 2
+			end
+			local p = Vector3.new(base.X + math.cos(a) * (r - 0.3), cy, base.Z + math.sin(a) * (r - 0.3))
+			local wall = Builder.part(model, {
+				Name = "Wall",
+				Size = Vector3.new(chord + 0.3, wh, 0.6),
+				CFrame = CFrame.lookAt(p, Vector3.new(base.X, cy, base.Z)),
+				Color = style.WallColor,
+				Material = style.WallMaterial,
+				Transparency = style.WallTransparency,
+			})
+			Builder.structural(wall, level, false, style.Health)
+		end
+		local trim = style.Trim
+		if trim and floor > 1 then
+			for i = 0, segs - 1 do
+				local a = (i + 0.5) * 2 * math.pi / segs
+				local p = Vector3.new(base.X + math.cos(a) * (r + 0.1), top - 0.4, base.Z + math.sin(a) * (r + 0.1))
+				local band = Builder.part(model, {
+					Name = "Neon",
+					Size = Vector3.new(chord + 0.4, 0.6, 0.4),
+					CFrame = CFrame.lookAt(p, Vector3.new(base.X, p.Y, base.Z)),
+					Color = trim,
+					Material = Enum.Material.Neon,
+					CastShadow = false,
+				})
+				Builder.structural(band, level, false, 20)
+			end
+		end
+		y = top + h
+		level += 1
+	end
+	disc(y, level)
+	local roofY = y + 1.5
+	-- a ladder up the inside wall to every floor and the roof
+	local ladder = Builder.part(model, {
+		Name = "StairLadder",
+		Class = "TrussPart",
+		Size = Vector3.new(2, roofY - base.Y + 2, 2),
+		CFrame = CFrame.new(base.X - r + 2.4, (base.Y + roofY + 2) / 2, base.Z),
+		Color = Color3.fromRGB(90, 90, 100),
+		Material = Enum.Material.Metal,
+	})
+	Builder.structural(ladder, 1, false, 60)
+	model:SetAttribute("RoofY", roofY)
+	model:SetAttribute("FloorYs", table.concat(floorTops, ","))
+	-- furniture fits in the square inside the ring
+	model:SetAttribute("Footprint", Vector3.new(diameter * 0.68, 0, diameter * 0.68))
+	model:SetAttribute("BaseCenter", base)
+	local trim = style.Trim
+	if trim then
+		local band = Builder.part(model, {
+			Name = "Neon",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.6, diameter + 0.8, diameter + 0.8),
+			CFrame = CFrame.new(base.X, roofY - 0.5, base.Z) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = trim,
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+		})
+		Builder.structural(band, level, false, 20)
+	end
+	return model, roofY
+end
+
+-- A dome cap of flat panels (tiers x segments) sitting on a ring at `center`: glass
+-- research domes, observatory domes. Panels belong to `model` at `level`; glass ones are
+-- canopy (the God aims through them).
+function Builder.domeCap(model: Model, center: Vector3, radius: number, rise: number, color: Color3, material: Enum.Material, transparency: number, level: number, segments: number?, tiers: number?)
+	local segs = segments or 10
+	local rings = tiers or 3
+	local function point(e: number, lon: number): Vector3
+		return center + Vector3.new(radius * math.cos(e) * math.cos(lon), rise * math.sin(e), radius * math.cos(e) * math.sin(lon))
+	end
+	local top = math.rad(78)
+	for t = 0, rings - 1 do
+		local e0 = t * top / rings
+		local e1 = (t + 1) * top / rings
+		for i = 0, segs - 1 do
+			local l0 = i * 2 * math.pi / segs
+			local l1 = (i + 1) * 2 * math.pi / segs
+			local lm = (l0 + l1) / 2
+			local c = (point(e0, l0) + point(e0, l1) + point(e1, l0) + point(e1, l1)) / 4
+			local up = (point(e1, lm) - point(e0, lm)).Unit
+			local out = Vector3.new(c.X - center.X, (c.Y - center.Y) * (radius / rise) ^ 2, c.Z - center.Z).Unit
+			local width = (point((e0 + e1) / 2, l1) - point((e0 + e1) / 2, l0)).Magnitude
+			local height = (point(e1, lm) - point(e0, lm)).Magnitude
+			local panel = Builder.part(model, {
+				Name = "DomePanel",
+				Size = Vector3.new(width + 0.2, height + 0.2, 0.5),
+				CFrame = CFrame.lookAt(c, c + out, up),
+				Color = color,
+				Material = material,
+				Transparency = transparency,
+				CastShadow = false,
+			})
+			Builder.structural(panel, level, false, 40)
+			if material == Enum.Material.Glass then
+				Builder.canopy(panel)
+			end
+		end
+	end
+	local capD = radius * 2 * math.cos(top) + 1
+	local cap = Builder.part(model, {
+		Name = "DomeCap",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.6, capD, capD),
+		CFrame = CFrame.new(center + Vector3.new(0, rise * math.sin(top), 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = material,
+		Transparency = transparency,
+		CastShadow = false,
+	})
+	Builder.structural(cap, level, false, 40)
+end
+
+-- A pipe (horizontal or sloped cylinder) from a to b. Destructible at `level`.
+function Builder.pipe(parent: Instance, a: Vector3, b: Vector3, diameter: number, color: Color3, level: number?): BasePart
+	local p = Builder.part(parent, {
+		Name = "Pipe",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new((b - a).Magnitude, diameter, diameter),
+		CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(90), 0),
+		Color = color,
+		Material = Enum.Material.Metal,
+		CastShadow = false,
+	})
+	Builder.structural(p, level or 1, false, 60)
+	return p
+end
+
 -- Decorative neon strip (not destructible).
 function Builder.neon(parent: Instance, center: Vector3, size: Vector3, color: Color3): BasePart
 	local p = Builder.block(parent, "Neon", center, size, color, Enum.Material.Neon)

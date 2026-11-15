@@ -603,6 +603,10 @@ local Config = {
 		ClutchMargin = 3, -- near misses within this many studs are announced
 		ClutchCooldown = 4, -- per player
 		FinalKillHold = 2.4, -- seconds the final-kill camera plays before the round ends
+		EscapeCooldown = 5, -- one "escaped the collapsing X" per player per building in this window (multi-floor collapses)
+		-- the God's kill confirm (KillConfirmController): hitmarker on the victim, sound, kill chip
+		HitmarkerSeconds = 0.55,
+		KillStreakWindow = 4, -- kills this close together count up DOUBLE / TRIPLE / MULTI KILL
 		Phrases = {
 			Lightning = "was struck by Lightning",
 			["Chain Bolt"] = "was fried by a Chain Bolt",
@@ -773,6 +777,8 @@ local Config = {
 			IroncladArmada = { Count = 4, Surface = "Top" },
 			OutpostZero = { Count = 2, Surface = "Terrain" },
 			StarlightBoardwalk = { Count = 2, Surface = "Top" },
+			CasinoRoyale = { Count = 4, Surface = "Terrain" }, -- the plaza, and a prize car on the floor
+			OasisBazaar = { Count = 3, Surface = "Terrain" },
 		} :: { [string]: { Count: number, Surface: string } },
 		CarModel = "Car",
 		CarHealth = 140, -- per part
@@ -795,6 +801,8 @@ local Config = {
 	-- windows, so hiding inside buys time but is never a safe room.
 	Hideouts = {
 		PerMap = 8,
+		-- maps that are mostly interior already get fewer
+		PerMapOverride = { CasinoRoyale = 0, AbyssalAquaDome = 5, OasisBazaar = 6, ClockworkSpire = 6 } :: { [string]: number },
 		Tries = 90,
 		Variants = {
 			-- Floors / FloorHeight follow Builder.highrise; Weight picks how often
@@ -1048,6 +1056,10 @@ local Config = {
 			ChronoSpire = 9112839913, -- Oil Refinery: burners, pump clatter, machine hiss (PSE)
 			VerdantDome = 9112803829, -- Jungle Birds, exotic calls (PSE)
 			IroncladArmada = 82247046952844, -- Thunder & Rain (TooLost)
+			AbyssalAquaDome = 9120621792, -- Waves Rolling (PSE), muffled under the dome
+			CasinoRoyale = 82247046952844, -- Thunder & Rain (TooLost) on the skylight
+			OasisBazaar = 9125742262, -- airy desert wind (PSE)
+			ClockworkSpire = 81404060588532, -- Howling Wind, high above the clouds
 		} :: { [string]: number },
 		AmbienceLayer = {
 			StarlightBoardwalk = 9117143228, -- Ocean Surf (PSE)
@@ -1056,11 +1068,16 @@ local Config = {
 			VerdantDome = 9120552550, -- Waterfall steady stream (PSE)
 			IroncladArmada = 9126201551, -- heavy rolling surf (PSE)
 			ChronoSpire = 9112838943, -- refinery fan whir and metal groans (PSE)
+			AbyssalAquaDome = 9112838943, -- station machinery hum and metal groans (PSE)
+			CasinoRoyale = 9112757705, -- City Ambience night (PSE)
+			OasisBazaar = 9120552550, -- the river: steady stream (PSE)
+			ClockworkSpire = 9112839913, -- clockwork: burners, pump clatter, machine hiss (PSE)
 		} :: { [string]: number },
 		Ui = {
 			Click = 127005215501903, -- crisp UI click (every Components button)
 			SpinWhirl = 9126278342, -- wooden ratchet clicking (PSE): the wheel spinning
 			SpinWin = 9043151109, -- the wheel lands
+			Hitmarker = 75881627871349, -- "heavy hitmarker": the God's kill confirm
 			Tab = "rbxasset://sounds/button.wav",
 			Open = 9119467553, -- short whoosh (PSE)
 			Coin = 93529351909119,
@@ -1173,7 +1190,7 @@ local Config = {
 		BoundsMargin = 55, -- casts are allowed this far past a map's own Radius
 		LobbyOrigin = Vector3.new(0, 150, -232), -- close + low enough that the balcony overlooks the arena
 		GodPerch = Vector3.new(0, 150, 0),
-		MapRotation = { "ChronoSpire", "FractureBay", "NeoShibuya", "VerdantDome", "MagmaCore", "SunscorchedMirage", "IroncladArmada", "OutpostZero", "StarlightBoardwalk" },
+		MapRotation = { "AbyssalAquaDome", "ChronoSpire", "CasinoRoyale", "FractureBay", "NeoShibuya", "OasisBazaar", "VerdantDome", "MagmaCore", "ClockworkSpire", "SunscorchedMirage", "IroncladArmada", "OutpostZero", "StarlightBoardwalk" },
 		MapDisplayNames = {
 			FractureBay = "Fracture Bay",
 			NeoShibuya = "Neo-Shibuya Skyline",
@@ -1184,6 +1201,10 @@ local Config = {
 			ChronoSpire = "Chrono-Spire Citadel",
 			VerdantDome = "Verdant Bio-Dome",
 			IroncladArmada = "Ironclad Armada",
+			AbyssalAquaDome = "Abyssal Aqua-Dome",
+			CasinoRoyale = "Casino Royale",
+			OasisBazaar = "Oasis Bazaar",
+			ClockworkSpire = "Clockwork Spire",
 		} :: { [string]: string },
 		MapIcons = {
 			FractureBay = "🏖️",
@@ -1195,6 +1216,10 @@ local Config = {
 			ChronoSpire = "⚙️",
 			VerdantDome = "🌿",
 			IroncladArmada = "⚓",
+			AbyssalAquaDome = "🐠",
+			CasinoRoyale = "🎰",
+			OasisBazaar = "🐪",
+			ClockworkSpire = "🔭",
 		} :: { [string]: string },
 		-- cinematic shots of each arena for the map vote cards (captured in Studio, 384x512)
 		MapThumbnails = {
@@ -1208,7 +1233,7 @@ local Config = {
 			OutpostZero = "rbxassetid://89934695715065",
 			StarlightBoardwalk = "rbxassetid://110223167570976",
 		} :: { [string]: string },
-		NewMaps = { ChronoSpire = true, VerdantDome = true, IroncladArmada = true } :: { [string]: boolean },
+		NewMaps = { AbyssalAquaDome = true, CasinoRoyale = true, OasisBazaar = true, ClockworkSpire = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
 	},
 
@@ -1226,6 +1251,10 @@ local Config = {
 			Foundry = "Skybox_Sunset", -- Chrono-Spire: golden hour
 			Conservatory = "Sky", -- Verdant Bio-Dome: clear sky through the glass
 			Tempest = "NightSky2", -- Ironclad Armada: dark stormy night
+			Abyss = "NightSky2", -- Abyssal Aqua-Dome: the dark ocean overhead
+			Casino = "NightSky", -- Casino Royale: rainy twilight city
+			Canyon = "Skybox_Sunset", -- Oasis Bazaar: golden dusk
+			Nebula = "NorthernLightsNight", -- Clockwork Spire: starry nebula night
 			-- Volcanic (Magma Core) keeps the burning sky from Skies; NorthernLightsNight is spare
 		} :: { [string]: string },
 	},
@@ -1242,6 +1271,10 @@ local Config = {
 		Tempest = { 4498828382, 4498828812, 4498829917, 4498830911, 4498830417, 4498831746 }, -- dark storm clouds
 		Volcanic = { 157785163, 157785059, 157785081, 157785128, 157785104, 157785145 }, -- burning red apocalypse
 		Lodge = { 13523725319, 13523743919, 13523725319, 13523725319, 13523725319, 13523746141 }, -- cartoon blue sky
+		Abyss = { 4498828382, 4498828812, 4498829917, 4498830911, 4498830417, 4498831746 }, -- dark clouds (fallback)
+		Casino = { 119731751, 50282196, 119731771, 119731809, 119731823, 119731844 }, -- purple skyline (fallback)
+		Canyon = { 600830446, 600831635, 600832720, 600886090, 600833862, 600835177 }, -- sunset (fallback)
+		Nebula = { 119731751, 50282196, 119731771, 119731809, 119731823, 119731844 }, -- night (fallback)
 	} :: { [string]: { number } },
 
 	-- Client weather per map (MapFxController). Kinds: Rain | Snow | Pollen | Embers | Dust.
@@ -1254,6 +1287,10 @@ local Config = {
 			ChronoSpire = { Kind = "Embers", Rate = 30 },
 			MagmaCore = { Kind = "Embers", Rate = 60 },
 			SunscorchedMirage = { Kind = "Dust", Rate = 14 },
+			AbyssalAquaDome = { Kind = "Plankton", Rate = 60 },
+			CasinoRoyale = { Kind = "Rain", Rate = 160, Lightning = true },
+			OasisBazaar = { Kind = "Dust", Rate = 45 }, -- a dusty sandstorm wind
+			ClockworkSpire = { Kind = "Embers", Rate = 22 },
 		} :: { [string]: { Kind: string, Rate: number, Lightning: boolean? } },
 		-- Ambient set dressing per map (MapFxController, client-only, skipped in Low-FX):
 		-- "Roof" emitters sit on the tallest buildings (chimneys, smokestacks, vents),
@@ -1268,6 +1305,10 @@ local Config = {
 			ChronoSpire = { { Kind = "Smoke", Count = 5, On = "Roof" }, { Kind = "Steam", Count = 3, On = "Ground" } },
 			VerdantDome = { { Kind = "Mist", Count = 5, On = "Ground" }, { Kind = "Fireflies", Count = 3, On = "Ground" } },
 			IroncladArmada = { { Kind = "Ash", Count = 4, On = "Roof" }, { Kind = "Mist", Count = 3, On = "Ground" } },
+			AbyssalAquaDome = { { Kind = "Bubbles", Count = 7, On = "Ground" }, { Kind = "Mist", Count = 4, On = "Ground" } },
+			CasinoRoyale = { { Kind = "Steam", Count = 3, On = "Ground" }, { Kind = "Sparks", Count = 2, On = "Roof" } },
+			OasisBazaar = { { Kind = "DustDevil", Count = 4, On = "Ground" }, { Kind = "Smoke", Count = 2, On = "Roof" } },
+			ClockworkSpire = { { Kind = "Mist", Count = 6, On = "Ground" }, { Kind = "Steam", Count = 3, On = "Roof" }, { Kind = "Fireflies", Count = 3, On = "Ground" } },
 		} :: { [string]: { { Kind: string, Count: number, On: string } } },
 		AmbientDelay = 1.5, -- seconds after the map key changes before emitters are placed
 		Area = 140, -- emitter footprint over the camera

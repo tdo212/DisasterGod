@@ -618,6 +618,35 @@ F.stove = function(ctx, m, cf, lvl)
 	fp(m, "Flue", cf * CFrame.new(0, 4.5, -1.3), Vector3.new(0.8, 3, 0.8), rgb(40, 40, 45), Enum.Material.Metal, lvl)
 end
 
+-- a research console: a desk of glowing screens (Abyssal Aqua-Dome)
+F.console = function(ctx, m, cf, lvl)
+	fp(m, "ConsoleDesk", cf * CFrame.new(0, 1.4, -1.2), Vector3.new(6, 2.8, 2.2), rgb(70, 80, 92), Enum.Material.Metal, lvl)
+	for i, x in { -1.8, 0, 1.8 } do
+		local screen = fp(m, "Screen", cf * CFrame.new(x, 3.8, -2) * CFrame.Angles(math.rad(-12), 0, 0), Vector3.new(1.6, 1.4, 0.15), ({ rgb(60, 235, 255), rgb(40, 200, 190), rgb(120, 180, 255) })[i], Enum.Material.Neon, lvl, { CanCollide = false })
+		if i == 2 then
+			light(ctx, screen, rgb(60, 235, 255), 10)
+		end
+	end
+	fp(m, "Chair", cf * CFrame.new(0, 1, 0.6), Vector3.new(1.8, 2, 1.8), rgb(40, 46, 56), FABRIC, lvl)
+end
+
+-- a slot machine against the wall (Casino Royale suites and lounges)
+F.slot = function(ctx, m, cf, lvl)
+	fp(m, "SlotCabinet", cf * CFrame.new(0, 3, -1.4), Vector3.new(3, 6, 2.6), rgb(40, 30, 50), Enum.Material.Metal, lvl)
+	local screen = fp(m, "SlotScreen", cf * CFrame.new(0, 4, -0.05), Vector3.new(2.4, 2.4, 0.2), rgb(170, 70, 255), Enum.Material.Neon, lvl, { CanCollide = false })
+	light(ctx, screen, rgb(200, 120, 255), 9)
+	fp(m, "SlotTopper", cf * CFrame.new(0, 6.6, -1.4), Vector3.new(2.8, 1.2, 2.4), rgb(240, 190, 80), Enum.Material.Neon, lvl, { CanCollide = false })
+end
+
+-- a tall bookcase full of coloured spines (Clockwork Spire)
+F.bookcase = function(ctx, m, cf, lvl)
+	fp(m, "Bookcase", cf * CFrame.new(0, 4, -1), Vector3.new(6, 8, 1.8), rgb(100, 64, 40), WOOD, lvl)
+	local spines = { rgb(150, 40, 40), rgb(40, 80, 140), rgb(50, 110, 60), rgb(180, 140, 60) }
+	for i = 0, 2 do
+		fp(m, "Books", cf * CFrame.new(0, 1.6 + i * 2.4, -0.05), Vector3.new(5.4, 1.6, 0.3), spines[ctx.Rng:NextInteger(1, #spines)], FABRIC, lvl, { CanCollide = false })
+	end
+end
+
 -- what each map's rooms are made of (repeats make the common things common)
 local THEMES: { [string]: { string } } = {
 	FractureBay = { "bed", "sofa", "dining", "kitchen", "plant", "tv", "shelf", "lamp" },
@@ -629,6 +658,10 @@ local THEMES: { [string]: { string } } = {
 	ChronoSpire = { "workbench", "shelf", "crates", "barrels", "stove", "dining", "bed" },
 	VerdantDome = { "labBench", "desk", "plant", "plant", "shelf", "bunk" },
 	IroncladArmada = { "bunk", "lockers", "crates", "desk", "barrels", "kitchen" },
+	AbyssalAquaDome = { "labBench", "console", "lockers", "console", "bunk", "crates", "desk" },
+	CasinoRoyale = { "bed", "sofa", "slot", "tv", "dining", "plant", "lamp", "sofa" },
+	OasisBazaar = { "crates", "barrels", "dining", "shelf", "bed", "plant", "kitchen" },
+	ClockworkSpire = { "bookcase", "desk", "workbench", "bookcase", "lamp", "shelf", "stove" },
 }
 
 -- facade accents per map (awnings, planters)
@@ -642,6 +675,10 @@ local ACCENTS: { [string]: { Color3 } } = {
 	ChronoSpire = { rgb(120, 40, 35), rgb(40, 70, 60), rgb(190, 140, 60) },
 	VerdantDome = { rgb(90, 170, 90), rgb(240, 240, 240) },
 	IroncladArmada = { rgb(230, 170, 40), rgb(70, 76, 86) },
+	AbyssalAquaDome = { rgb(60, 235, 255), rgb(240, 190, 40), rgb(40, 200, 190) },
+	CasinoRoyale = { rgb(130, 20, 40), rgb(240, 190, 80), rgb(170, 70, 255) },
+	OasisBazaar = { rgb(200, 60, 50), rgb(40, 120, 180), rgb(240, 180, 50), rgb(60, 150, 90) },
+	ClockworkSpire = { rgb(120, 40, 35), rgb(40, 70, 60), rgb(196, 150, 70) },
 }
 
 type Floor = { Y: number, Level: number }
@@ -989,6 +1026,98 @@ local PASSES: { [string]: (Ctx) -> () } = {
 		end)
 		onGround(ctx, 6, Vector3.new(7, 7, 7), "Terrain", function(at)
 			Kit.umbrella(ctx, at, rgb(240, 70, 70), rgb(250, 250, 250))
+		end)
+	end,
+
+	AbyssalAquaDome = function(ctx)
+		-- dishes and AC units on the station roofs, barrels, crates and cyan work lamps
+		onRoofs(ctx, 4, Vector3.new(4, 6, 4), function(at)
+			return Kit.dish(ctx, at, randomYaw(ctx))
+		end)
+		onRoofs(ctx, 5, Vector3.new(6, 4, 5), function(at)
+			return Kit.acUnit(ctx, at, randomYaw(ctx))
+		end)
+		onGround(ctx, 8, Vector3.new(3, 4, 3), "Terrain", function(at)
+			Kit.barrel(ctx, at, if ctx.Rng:NextNumber() < 0.5 then rgb(240, 190, 40) else rgb(40, 140, 170))
+		end)
+		onGround(ctx, 5, Vector3.new(9, 9, 5), "Terrain", function(at)
+			Builder.crates(ctx.Info.Model, at, ctx.Rng:NextInteger(2, 3))
+		end)
+		onGround(ctx, 7, Vector3.new(3, 9, 3), "Terrain", function(at)
+			Kit.lamp(ctx, at, rgb(90, 230, 255), 8)
+		end)
+	end,
+
+	CasinoRoyale = function(ctx)
+		-- gold floor lamps, AC units on the suite and bar roofs, barriers on the plaza
+		onGround(ctx, 8, Vector3.new(3, 9, 3), "Terrain", function(at)
+			Kit.lamp(ctx, at, rgb(255, 205, 130), 8)
+		end)
+		onRoofs(ctx, 3, Vector3.new(6, 4, 5), function(at)
+			return Kit.acUnit(ctx, at, randomYaw(ctx))
+		end)
+		onGround(ctx, 5, Vector3.new(6, 3, 3), "Terrain", function(at)
+			Kit.barrier(ctx, at, randomYaw(ctx))
+		end)
+	end,
+
+	OasisBazaar = function(ctx)
+		-- the OASIS BAZAAR sign, market tents and fruit stands, barrels, crates, lanterns
+		-- strung between posts
+		edgeSign(ctx, "OASIS BAZAAR", rgb(120, 60, 30), rgb(255, 220, 120), 14, "Terrain")
+		local stripes = { { rgb(200, 60, 50), rgb(245, 230, 200) }, { rgb(40, 120, 180), rgb(245, 230, 200) }, { rgb(240, 180, 50), rgb(200, 90, 40) }, { rgb(60, 150, 90), rgb(245, 230, 200) } }
+		local names = { "DATES", "SPICES", "FIGS", "RUGS", "LAMPS", "SILK", "FRUIT" }
+		onGround(ctx, 10, Vector3.new(9, 10, 6), "Terrain", function(at)
+			local s = stripes[ctx.Rng:NextInteger(1, #stripes)]
+			Kit.stall(ctx, at, randomYaw(ctx), s[1], s[2], names[ctx.Rng:NextInteger(1, #names)])
+		end)
+		onGround(ctx, 10, Vector3.new(3, 4, 3), "Terrain", function(at)
+			Kit.barrel(ctx, at, rgb(130, 84, 50))
+		end)
+		onGround(ctx, 6, Vector3.new(9, 9, 5), "Terrain", function(at)
+			Builder.crates(ctx.Info.Model, at, ctx.Rng:NextInteger(1, 4))
+		end)
+		local lamps: { Vector3 } = {}
+		onGround(ctx, 8, Vector3.new(3, 10, 3), "Terrain", function(at)
+			Kit.lamp(ctx, at, rgb(255, 170, 80), 8)
+			table.insert(lamps, at + Vector3.new(0, 8.5, 0))
+		end)
+		local bulbs = { rgb(255, 170, 60), rgb(255, 90, 60), rgb(255, 220, 120) }
+		for i = 1, #lamps - 1 do
+			if (lamps[i] - lamps[i + 1]).Magnitude < 50 and math.abs(lamps[i].Y - lamps[i + 1].Y) < 4 then
+				Kit.stringLights(ctx, lamps[i], lamps[i + 1], bulbs)
+			end
+		end
+		onGround(ctx, 6, Vector3.new(6, 4, 6), "Terrain", function(at)
+			Kit.rock(ctx, at, ctx.Rng:NextNumber(2, 4), rgb(205, 140, 90), Enum.Material.Sandstone)
+		end)
+	end,
+
+	ClockworkSpire = function(ctx)
+		-- gaslamps along the paths, chimneys and wall gears on the roofs, ruined columns,
+		-- crates and copper pipe runs
+		onGround(ctx, 12, Vector3.new(3, 9, 3), "Terrain", function(at)
+			Kit.lamp(ctx, at, rgb(255, 180, 80), 8)
+		end)
+		onRoofs(ctx, 5, Vector3.new(4, 14, 4), function(at)
+			return Kit.chimney(ctx, at, ctx.Rng:NextNumber(6, 10))
+		end)
+		for i, roof in roofs(ctx) do
+			if i > 4 then
+				break
+			end
+			local face = roof.Center + Vector3.new(0, ctx.Rng:NextNumber(-0.2, 0.2) * roof.Size.Y, -roof.Size.Z / 2 - 0.6)
+			Builder.restsOn(Kit.gear(ctx, CFrame.new(face), ctx.Rng:NextNumber(5, 8), if i % 2 == 0 then 0.5 else -0.7), roof.Model)
+		end
+		onGround(ctx, 5, Vector3.new(5, 12, 5), "Terrain", function(at)
+			Kit.columnRuin(ctx, at, ctx.Rng:NextNumber(4, 10))
+		end)
+		onGround(ctx, 4, Vector3.new(9, 9, 5), "Terrain", function(at)
+			Builder.crates(ctx.Info.Model, at, ctx.Rng:NextInteger(2, 3))
+		end)
+		onGround(ctx, 3, Vector3.new(14, 4, 4), "Terrain", function(at)
+			local yaw = randomYaw(ctx)
+			Kit.pipe(ctx, at + yaw:VectorToWorldSpace(Vector3.new(-6, 1.2, 0)), at + yaw:VectorToWorldSpace(Vector3.new(6, 1.2, 0)), 1.4, rgb(184, 108, 60))
 		end)
 	end,
 

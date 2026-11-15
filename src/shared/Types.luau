@@ -142,7 +142,7 @@ export type MapInfo = {
 	FluidMaterial: Enum.Material,
 	HazardFloorY: number?, -- standing below this Y hurts (lava floors)
 	FluidName: string, -- shown in the sudden-death banner ("WATER", "LAVA", ...)
-	Lighting: string, -- EnvironmentService preset: Day | Night | Desert | Arctic | Sunset | Volcanic | Foundry | Conservatory | Tempest
+	Lighting: string, -- EnvironmentService preset: Day | Night | Desert | Arctic | Sunset | Volcanic | Foundry | Conservatory | Tempest | Abyss | Casino | Canyon | Nebula
 	KnockbackMultiplier: number?, -- slippery maps make knockback stronger
 	Center: Vector3,
 	Radius: number,
