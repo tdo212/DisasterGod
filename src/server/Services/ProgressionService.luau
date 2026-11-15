@@ -18,6 +18,8 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RoleService = require(script.Parent.RoleService)
+local CosmeticService = require(script.Parent.CosmeticService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 
 local Attributes = Config.Attributes
 local MA = Config.Mastery
@@ -187,19 +189,40 @@ local function claimStreak(player: Player)
 	profile.StreakClaimedDay = day
 	local index = (math.max(1, profile.LoginStreak) - 1) % #D.Rewards + 1
 	local reward = D.Rewards[index]
-	PlayerDataService.AddCoins(player, reward.Coins)
-	local text = string.format("🎁 DAY %d CHEST: +%d COINS", index, reward.Coins)
-	if reward.Spins then
-		PlayerDataService.AddSpins(player, reward.Spins)
-		text ..= string.format(" + %d FREE SPIN", reward.Spins)
+	local coins, spins = reward.Coins, reward.Spins or 0
+	local extra = ""
+	-- the unique unlocks fall back to coins (and a spin) when already owned
+	if reward.SolarFlare then
+		if profile.SolarFlare then
+			coins += reward.Fallback and reward.Fallback.Coins or 0
+			spins += reward.Fallback and reward.Fallback.Spins or 0
+		else
+			profile.SolarFlare = true
+			extra = " + SOLAR FLARE DASH TRAIL!"
+		end
 	end
-	if reward.GoldenTrail then
-		profile.GoldenTrail = true
-		text ..= " + GOLDEN TRAIL!"
+	if reward.Cosmetic then
+		if PlayerDataService.OwnsCosmetic(player, reward.Cosmetic) then
+			coins += reward.Fallback and reward.Fallback.Coins or 0
+			spins += reward.Fallback and reward.Fallback.Spins or 0
+		else
+			CosmeticService.Grant(player, reward.Cosmetic)
+			extra = " + EXCLUSIVE GOD SKIN!"
+		end
+	end
+	local parts = {}
+	if coins > 0 then
+		PlayerDataService.AddCoins(player, coins)
+		table.insert(parts, string.format("+%d COINS", coins))
+	end
+	if spins > 0 then
+		PlayerDataService.AddSpins(player, spins)
+		table.insert(parts, string.format("+%d FREE SPIN%s", spins, if spins > 1 then "S" else ""))
 	end
 	PlayerDataService.Publish(player)
 	player:SetAttribute(Attributes.StreakReady, false)
-	popup:FireClient(player, text, GOLD)
+	popup:FireClient(player, string.format("🎁 DAY %d: %s%s", index, table.concat(parts, " "), extra), GOLD)
+	AnalyticsService.DailyRewardClaimed(player, index, profile.LoginStreak)
 end
 
 -- The streak chest in the Sky Lodge: a gold chest with a prompt and a day counter.
@@ -316,6 +339,42 @@ end
 
 local SETTINGS = { LowFx = "boolean", Shake = "number", Music = "boolean", Sfx = "boolean" }
 
+---------------------------------------------------------------------------
+-- friend squad: +20% round coins while a Roblox friend is in the server
+
+local friendCache: { [string]: boolean } = {}
+local refreshFriends: () -> ()
+
+local function areFriends(a: Player, b: Player): boolean
+	local key = if a.UserId < b.UserId then a.UserId .. ":" .. b.UserId else b.UserId .. ":" .. a.UserId
+	local cached = friendCache[key]
+	if cached ~= nil then
+		return cached
+	end
+	local ok, result = pcall(function()
+		return a:IsFriendsWith(b.UserId)
+	end)
+	local friends = ok and result == true
+	friendCache[key] = friends
+	return friends
+end
+
+refreshFriends = function()
+	local players = Players:GetPlayers()
+	for _, p in players do
+		local boosted = false
+		for _, other in players do
+			if other ~= p and other.UserId > 0 and p.UserId > 0 and areFriends(p, other) then
+				boosted = true
+				break
+			end
+		end
+		if p.Parent then
+			p:SetAttribute(Attributes.FriendBoost, boosted)
+		end
+	end
+end
+
 function ProgressionService.Init()
 	PlayerDataService.ProfileLoaded:Connect(function(player: Player)
 		local profile = PlayerDataService.Get(player) :: any
@@ -334,7 +393,12 @@ function ProgressionService.Init()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastCheer[player] = nil
+		task.defer(refreshFriends)
 	end)
+	Players.PlayerAdded:Connect(function()
+		task.defer(refreshFriends)
+	end)
+	task.defer(refreshFriends)
 	Remotes.get("ClaimStreak").OnServerEvent:Connect(claimStreak)
 	Remotes.get("Cheer").OnServerEvent:Connect(onCheer)
 	Remotes.get("SaveSetting").OnServerEvent:Connect(function(player, key, value)

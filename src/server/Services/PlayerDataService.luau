@@ -57,6 +57,8 @@ local function defaultProfile(): Profile
 		FirstSurviveDay = 0,
 		FirstGodWinDay = 0,
 		GoldenTrail = false,
+		SolarFlare = false,
+		GodRounds = 0,
 		Set_LowFx = false,
 		Set_Shake = 1,
 		Set_Music = true,
@@ -64,9 +66,9 @@ local function defaultProfile(): Profile
 	}
 end
 
--- Free starters are always owned.
+-- Free starters are always owned (streak exclusives are not starters).
 local function isFree(def: any): boolean
-	return def.Coins == nil and def.Product == nil
+	return def.Coins == nil and def.Product == nil and def.Exclusive ~= true
 end
 
 local function publish(player: Player, profile: Profile)
@@ -96,6 +98,8 @@ local function publish(player: Player, profile: Profile)
 		player:SetAttribute(Attributes.SavePrefix .. kind, count)
 	end
 	player:SetAttribute(Attributes.GoldenTrail, profile.GoldenTrail)
+	player:SetAttribute(Attributes.SolarFlare, profile.SolarFlare)
+	player:SetAttribute(Attributes.GodRounds, profile.GodRounds)
 	player:SetAttribute(Attributes.LoginStreak, profile.LoginStreak)
 	for _, key in { "LowFx", "Shake", "Music", "Sfx" } do
 		player:SetAttribute(Attributes.SettingPrefix .. key, (profile :: any)["Set_" .. key])
@@ -498,6 +502,15 @@ function PlayerDataService.RecordPlayed(player: Player)
 	local profile = profiles[player]
 	if profile then
 		profile.RoundsPlayed += 1
+		publish(player, profile)
+	end
+end
+
+-- Another round played as the God (new-player God priority stops after the first).
+function PlayerDataService.RecordGodRound(player: Player)
+	local profile = profiles[player]
+	if profile then
+		profile.GodRounds += 1
 		publish(player, profile)
 	end
 end

@@ -57,18 +57,12 @@ local function seaFloor(model: Model)
 	Builder.block(g, "SeaFloorSouth", Vector3.new(0, -4, -92), Vector3.new(320, 8, 160), SAND, Enum.Material.Sand)
 	Builder.block(g, "SeaFloorEast", Vector3.new(120, -4, 0), Vector3.new(80, 8, 24), SAND, Enum.Material.Sand)
 	Builder.block(g, "SeaFloorWest", Vector3.new(-120, -4, 0), Vector3.new(80, 8, 24), SAND, Enum.Material.Sand)
-	-- the channel: a sunken floor with water over it and dock edges
-	Builder.block(g, "ChannelBed", Vector3.new(0, -7, 0), Vector3.new(160, 2, 24), Color3.fromRGB(24, 36, 48), Enum.Material.Slate)
-	local water = Builder.part(g, { Name = "MoonPool", Size = Vector3.new(160, 4.4, 24), CFrame = CFrame.new(0, -3.8, 0), Color = WATER, Material = Enum.Material.Glass, Transparency = 0.35, CanCollide = false, CastShadow = false })
+	-- the channel: a shallow moon pool (2 studs of water over a solid bed) with dock edges
+	Builder.block(g, "ChannelBed", Vector3.new(0, -4, 0), Vector3.new(160, 4, 24), Color3.fromRGB(24, 36, 48), Enum.Material.Slate)
+	local water = Builder.part(g, { Name = "MoonPool", Size = Vector3.new(160, 1.8, 24), CFrame = CFrame.new(0, -1.1, 0), Color = WATER, Material = Enum.Material.Glass, Transparency = 0.35, CanCollide = false, CastShadow = false })
 	water.CanQuery = false
 	for _, z in { -12.5, 12.5 } do
 		Builder.block(g, "DockEdge", Vector3.new(0, 0.2, z), Vector3.new(160, 0.6, 1), Color3.fromRGB(230, 190, 40), Enum.Material.Metal)
-	end
-	-- ladders out of the channel
-	for _, x in { -60, -20, 30, 70 } do
-		for _, z in { -11.6, 11.6 } do
-			Builder.part(g, { Name = "PoolLadder", Class = "TrussPart", Size = Vector3.new(2, 7, 2), CFrame = CFrame.new(x, -3, z), Color = STEEL, Material = Enum.Material.Metal })
-		end
 	end
 	-- glowing floor strips leading between the buildings
 	for _, s in { { Vector3.new(-50, 0.05, -40), Vector3.new(1, 0.1, 40) }, { Vector3.new(50, 0.05, 40), Vector3.new(1, 0.1, 40) }, { Vector3.new(0, 0.05, -60), Vector3.new(60, 0.1, 1) } } do

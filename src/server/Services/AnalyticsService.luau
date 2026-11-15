@@ -158,6 +158,11 @@ end
 ---------------------------------------------------------------------------
 -- game hooks (called by the owning services)
 
+-- ProgressionService: the daily login reward was claimed (value = the reward day 1-7).
+function AnalyticsService.DailyRewardClaimed(player: Player, day: number, streak: number)
+	custom(player, "DailyRewardClaimed", day, "day " .. day, "streak " .. streak)
+end
+
 -- VoteService: a new ballot opens -> the next round's MatchFlow sessions start fresh.
 function AnalyticsService.BallotOpened()
 	roundSession = HttpService:GenerateGUID(false)

@@ -442,6 +442,7 @@ function Builder.bridge(
 	supportColor: Color3,
 	deckHealth: number?
 ): Model
+	width = math.max(width, Config.World.MinWalkWidth)
 	local model = Builder.building(parent, name)
 	local span = b - a
 	local length = span.Magnitude
@@ -589,6 +590,7 @@ end
 -- A straight flight of stairs (a wedge) from `low` (its foot, on the ground) up to `high`
 -- (the top edge, level with the floor it reaches). Destructible, so it can be cut away.
 function Builder.stairs(parent: Instance, low: Vector3, high: Vector3, width: number, color: Color3, material: Enum.Material?, level: number?): BasePart
+	width = math.max(width, Config.World.MinWalkWidth)
 	local rise = math.max(0.5, high.Y - low.Y)
 	local flat = Vector3.new(high.X - low.X, 0, high.Z - low.Z)
 	local length = math.max(1, flat.Magnitude)

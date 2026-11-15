@@ -103,6 +103,15 @@ local BUILDERS: { [string]: (Model, number) -> () } = {
 			add(model, s, { Name = "Orbit", Shape = Enum.PartType.Ball, Size = Vector3.one * 2.2, CFrame = CFrame.new(math.cos(a) * 14, math.sin(a) * 3, math.sin(a) * 14), Color = Color3.fromRGB(255, 240, 160), Material = Enum.Material.Neon })
 		end
 	end,
+	-- day-7 login streak exclusive: a molten-gold hand with a blazing sun halo behind it
+	Sunforged = function(model, s)
+		hand(model, s, Color3.fromRGB(255, 190, 70), Color3.fromRGB(255, 120, 30), Enum.Material.Foil, 25, true, Color3.fromRGB(255, 230, 120))
+		add(model, s, { Name = "SunHalo", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 30, 30), CFrame = CFrame.new(0, 6, 4) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(255, 200, 80), Material = Enum.Material.Neon, Transparency = 0.35 })
+		for i = 0, 7 do
+			local a = math.rad(i * 45)
+			add(model, s, { Name = "Ray", Size = Vector3.new(1.4, 7, 0.6), CFrame = CFrame.new(math.cos(a) * 18, 6 + math.sin(a) * 18, 4.5) * CFrame.Angles(0, 0, a - math.pi / 2), Color = Color3.fromRGB(255, 160, 40), Material = Enum.Material.Neon })
+		end
+	end,
 	-- a thundercloud fist crackling with lightning arcs
 	StormSovereign = function(model, s)
 		hand(model, s, Color3.fromRGB(70, 80, 105), Color3.fromRGB(150, 210, 255), Enum.Material.Slate, 80, false, Color3.fromRGB(120, 190, 255))

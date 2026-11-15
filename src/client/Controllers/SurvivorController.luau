@@ -106,8 +106,15 @@ local function dash()
 	trail.Attachment0 = trailA
 	trail.Attachment1 = trailB
 	trail.Lifetime = 0.25
-	trail.Color = if player:GetAttribute(Attributes.GoldenTrail) == true and player:GetAttribute(Attributes.PassPrefix .. "VIP") ~= true
-		then ColorSequence.new(Color3.fromRGB(255, 240, 150), Color3.fromRGB(255, 170, 30)) -- day-7 streak reward
+	local vip = player:GetAttribute(Attributes.PassPrefix .. "VIP") == true
+	trail.Color = if player:GetAttribute(Attributes.GoldenTrail) == true and not vip
+		then ColorSequence.new(Color3.fromRGB(255, 240, 150), Color3.fromRGB(255, 170, 30)) -- the old day-7 streak reward
+		elseif player:GetAttribute(Attributes.SolarFlare) == true and not vip
+		then ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 250, 200)),
+			ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 170, 40)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 30)),
+		}) -- day-2 streak reward: Solar Flare
 		elseif player:GetAttribute(Attributes.PassPrefix .. "VIP") == true
 		then ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),

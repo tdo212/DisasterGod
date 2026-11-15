@@ -391,6 +391,9 @@ local function assignRoles(): Player?
 		end
 	end
 	ReplicatedStorage:SetAttribute(Attributes.GodName, if god then god.DisplayName else "The Storm")
+	if god then
+		PlayerDataService.RecordGodRound(god)
+	end
 	AnalyticsService.RoundStarted(players, god)
 	return god
 end

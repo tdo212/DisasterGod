@@ -326,12 +326,14 @@ local function buildStylePage(content: Frame)
 			Icon = def.Icon,
 			Title = def.Name,
 			Subtitle = def.Description,
-			Badge = if product and product.Badge ~= "" then product.Badge elseif def.Coins == nil and def.Product == nil then "Starter" else nil,
+			Badge = if def.Exclusive then "Day 7 Streak" elseif product and product.Badge ~= "" then product.Badge elseif def.Coins == nil and def.Product == nil then "Starter" else nil,
 			Button = "",
 			OnClick = function()
 				local owned = player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) == true
 				if owned then
 					Remotes.get("CosmeticAction"):FireServer("Equip", def.Id)
+				elseif def.Exclusive then
+					HUDController.Popup("REACH DAY 7 OF YOUR LOGIN STREAK", C.GoldLight)
 				elseif def.Coins then
 					Remotes.get("CosmeticAction"):FireServer("Buy", def.Id)
 				elseif def.Product and not Store.promptProduct(def.Product) then
@@ -349,6 +351,9 @@ local function buildStylePage(content: Frame)
 			elseif owned then
 				Components.setText(button, "EQUIP")
 				Components.setColors(button, C.BlueLight, C.Blue, true)
+			elseif def.Exclusive then
+				Components.setText(button, "🔒 DAY 7")
+				Components.setColors(button, C.GreyLight, C.Grey, true)
 			elseif def.Coins then
 				Components.setText(button, "💰 " .. HUDController.FormatNumber(def.Coins))
 				Components.setColors(button, C.GreenLight, C.Green, true)

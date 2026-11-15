@@ -302,6 +302,9 @@ local QuestPool: { Types.QuestDefinition } = {
 	{ Id = "Destroy200", Text = "Destroy 200 parts as God", Stat = "Destroy", Goal = 200, Reward = 150 },
 	{ Id = "Vote3", Text = "Vote for a map 3 times", Stat = "Vote", Goal = 3, Reward = 60 },
 	{ Id = "Spin1", Text = "Spin the wheel", Stat = "Spin", Goal = 1, Reward = 50 },
+	{ Id = "Survive2", Text = "Survive 2 rounds", Stat = "Survive", Goal = 2, Reward = 120 },
+	{ Id = "Dash12", Text = "Use Dash 12 times", Stat = "Dash", Goal = 12, Reward = 80 },
+	{ Id = "Smash25", Text = "Smash 25 parts as God", Stat = "Destroy", Goal = 25, Reward = 90 },
 }
 
 local Gear: { Types.GearDefinition } = {
@@ -371,6 +374,7 @@ local Cosmetics: { Types.CosmeticDefinition } = {
 	{ Id = "CyberGauntlet", Category = "GodSkin", Name = "Cyber Gauntlet", Icon = "🤖", Description = "Signature: System Override", Color = Color3.fromRGB(60, 230, 255), Product = "SkinCyberGauntlet" },
 	{ Id = "CelestialMask", Category = "GodSkin", Name = "Celestial Mask", Icon = "🌟", Description = "Signature: Astral Collapse", Color = Color3.fromRGB(255, 205, 60), Product = "SkinCelestialMask" },
 	{ Id = "StormSovereign", Category = "GodSkin", Name = "Storm Sovereign", Icon = "🌩️", Description = "Signature: Maelstrom Vortex", Color = Color3.fromRGB(90, 150, 255), Coins = 7500 },
+	{ Id = "Sunforged", Category = "GodSkin", Name = "Sunforged Hand", Icon = "☀️", Description = "Day-7 login streak exclusive", Color = Color3.fromRGB(255, 170, 40), Exclusive = true },
 	-- Disaster FX: recolours / reshapes your disasters as God
 	{ Id = "ClassicFx", Category = "Vfx", Name = "Classic", Icon = "⚡", Description = "Storm blue and fire", Color = Color3.fromRGB(120, 200, 255) },
 	{ Id = "GoldenWrath", Category = "Vfx", Name = "Golden Wrath", Icon = "✨", Description = "Everything in gold", Color = Color3.fromRGB(255, 200, 40), Coins = 2500 },
@@ -418,6 +422,8 @@ local Config = {
 	},
 
 	Pity = {
+		NewPlayerRounds = 3, -- players with fewer rounds than this who have never been the God ...
+		NewPlayerMultiplier = 6, -- ... get their God weight multiplied (+500%) so they get a God round early
 		BaseWeight = 1,
 		PerRoundParticipated = 1,
 		SurvivedBonus = 0.5,
@@ -743,15 +749,18 @@ local Config = {
 
 	-- 7-day play streak chest in the lodge, and the first-win-of-the-day bonus.
 	Daily = {
+		-- 7-day login streak (the Daily Reward window on arrival, or the lodge chest). Day 2 is
+		-- the Solar Flare dash trail (300 coins + a spin if already owned); day 7 the
+		-- exclusive Sunforged God skin (1,500 coins if already owned).
 		Rewards = {
-			{ Coins = 100 },
-			{ Coins = 150 },
-			{ Coins = 100, Spins = 1 }, -- day 3: a free spin token
+			{ Coins = 150, Spins = 1 },
+			{ Coins = 0, SolarFlare = true, Fallback = { Coins = 300, Spins = 1 } },
 			{ Coins = 250 },
-			{ Coins = 300 },
+			{ Coins = 300, Spins = 1 },
 			{ Coins = 400 },
-			{ Coins = 750, GoldenTrail = true }, -- day 7: the exclusive Golden Trail dash
-		} :: { { Coins: number, Spins: number?, GoldenTrail: boolean? } },
+			{ Coins = 500, Spins = 2 },
+			{ Coins = 750, Cosmetic = "Sunforged", Fallback = { Coins = 1500 } },
+		} :: { { Coins: number, Spins: number?, SolarFlare: boolean?, Cosmetic: string?, Fallback: { Coins: number, Spins: number? }? } },
 		FirstWinMultiplier = 2, -- first survived round and first God win each day
 		ChestOffset = Vector3.new(-20, 0, -30), -- in the lodge, from LobbyOrigin
 	},
@@ -799,6 +808,22 @@ local Config = {
 	-- Enterable interiors dropped onto empty ground on every arena (MapService). Each is a
 	-- normal destructible building: walls break, the God can see in through doorways and
 	-- windows, so hiding inside buys time but is never a safe room.
+	-- Interior seal (MapService): after a map builds, any hole or deep pit inside the island
+	-- (a channel, the sea between ships, the water under a pier) gets a shallow floor just
+	-- under the waterline, with ladders up any high edge. Only the outer rim stays a drop
+	-- into the sea / lava / void.
+	Seal = {
+		Cell = 8, -- sample grid (studs)
+		Bearings = 72, -- directions used to find how far the island reaches
+		ChannelCells = 6, -- a hole with ground on both sides within this many cells is a channel
+		Margin = 16, -- studs inside the island's reach before a hole is filled (the rim stays a drop)
+		WaterDepth = 1.5, -- shallow floor top below the resting waterline
+		LavaDepth = 4, -- lava maps: shallow floor top below the hazard line (it still burns)
+		LadderMinClimb = 5, -- edges higher than this above the shallows get a ladder
+		LadderSpacing = 28,
+		MaxLadders = 28,
+	},
+
 	Hideouts = {
 		PerMap = 8,
 		-- maps that are mostly interior already get fewer
@@ -1010,7 +1035,9 @@ local Config = {
 		GodKillCoins = 30,
 		GodDestructionCoinsPerPart = 0.25,
 		ObbyCoins = 15,
-		ObbyCooldown = 20,
+		ObbyCooldown = 15,
+		FirstRoundBonus = 100, -- one-time "First Round Completed!" coins
+		FriendBoost = 0.2, -- +20% round coins while a Roblox friend is in the server
 		GhostPingCooldown = 5,
 		KillCreditWindow = 4,
 	},
@@ -1235,6 +1262,7 @@ local Config = {
 		} :: { [string]: string },
 		NewMaps = { AbyssalAquaDome = true, CasinoRoyale = true, OasisBazaar = true, ClockworkSpire = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame
+		MinWalkWidth = 12, -- bridges, catwalks and stairs are at least this wide (dashable on a phone)
 	},
 
 	-- Hand-picked Sky objects kept in the place file (Workspace.Skyboxes, moved to
@@ -1383,7 +1411,10 @@ local Config = {
 		TitleColor = "TitleColor", -- Player: Color3 of that title
 		LoginStreak = "LoginStreak", -- Player: current daily play streak (days)
 		StreakReady = "StreakReady", -- Player: today's streak chest can be claimed
-		GoldenTrail = "GoldenTrail", -- Player: owns the day-7 Golden Trail dash
+		GoldenTrail = "GoldenTrail", -- Player: owns the old day-7 Golden Trail dash
+		SolarFlare = "SolarFlare", -- Player: owns the day-2 Solar Flare dash trail
+		GodRounds = "GodRounds", -- Player: rounds played as the God
+		FriendBoost = "FriendBoost", -- Player: a Roblox friend is in the server (+20% round coins)
 		SpeedUntil = "SpeedUntil", -- Player: server time a speed pickup ends
 		ShieldCharges = "ShieldCharges", -- Player: one-hit shields from air drops
 		SettingPrefix = "Set_", -- Player: saved quick settings (LowFx, Shake, Music, Sfx)

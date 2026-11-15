@@ -51,6 +51,9 @@ type Preset = {
 	Bloom: number,
 }
 
+-- Visibility first: every preset keeps its mood but the haze stays light (Density / Haze)
+-- so survivors and the God can see across the arena, and the night maps carry strong
+-- moonlit ambient light (Ambient / OutdoorAmbient) instead of going black.
 local PRESETS: { [string]: Preset } = {
 	-- the Sky Lodge between rounds: indoor warmth, gentle exposure so avatars keep their colour
 	Lodge = {
@@ -77,22 +80,22 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.05,
 		AtmosphereColor = Color3.fromRGB(200, 225, 255),
 		AtmosphereDecay = Color3.fromRGB(120, 150, 200),
-		Density = 0.28,
-		Haze = 0.6,
+		Density = 0.25,
+		Haze = 0.5,
 		Bloom = 0.35,
 	},
 	Night = {
 		ClockTime = 20.6,
-		Brightness = 2.2,
-		Ambient = Color3.fromRGB(118, 100, 155),
-		OutdoorAmbient = Color3.fromRGB(155, 132, 198),
+		Brightness = 3.0,
+		Ambient = Color3.fromRGB(140, 125, 178),
+		OutdoorAmbient = Color3.fromRGB(178, 162, 218),
 		Tint = Color3.fromRGB(235, 225, 255),
 		Saturation = 0.3,
 		Contrast = 0.12,
 		AtmosphereColor = Color3.fromRGB(120, 80, 170),
 		AtmosphereDecay = Color3.fromRGB(70, 40, 120),
-		Density = 0.3,
-		Haze = 1.3,
+		Density = 0.22,
+		Haze = 0.6,
 		Bloom = 0.22,
 	},
 	Desert = {
@@ -105,8 +108,8 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.08,
 		AtmosphereColor = Color3.fromRGB(255, 225, 170),
 		AtmosphereDecay = Color3.fromRGB(230, 180, 120),
-		Density = 0.33,
-		Haze = 1.6,
+		Density = 0.28,
+		Haze = 1.1,
 		Bloom = 0.3,
 	},
 	Arctic = {
@@ -119,8 +122,8 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.08,
 		AtmosphereColor = Color3.fromRGB(215, 235, 255),
 		AtmosphereDecay = Color3.fromRGB(150, 190, 240),
-		Density = 0.35,
-		Haze = 1.2,
+		Density = 0.28,
+		Haze = 0.9,
 		Bloom = 0.35,
 	},
 	Sunset = {
@@ -133,8 +136,8 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.1,
 		AtmosphereColor = Color3.fromRGB(255, 190, 160),
 		AtmosphereDecay = Color3.fromRGB(240, 140, 120),
-		Density = 0.3,
-		Haze = 1.4,
+		Density = 0.26,
+		Haze = 1.0,
 		Bloom = 0.3,
 	},
 	-- Chrono-Spire: warm golden sunset haze over the foundries
@@ -148,8 +151,8 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.1,
 		AtmosphereColor = Color3.fromRGB(255, 200, 130),
 		AtmosphereDecay = Color3.fromRGB(220, 140, 80),
-		Density = 0.36,
-		Haze = 2,
+		Density = 0.28,
+		Haze = 1.2,
 		Bloom = 0.25,
 	},
 	-- Verdant Bio-Dome: bright midday through glass, green bounce light
@@ -170,46 +173,46 @@ local PRESETS: { [string]: Preset } = {
 	-- Ironclad Armada: dark overcast storm, driving rain (client weather adds the flashes)
 	Tempest = {
 		ClockTime = 15,
-		Brightness = 2,
-		Ambient = Color3.fromRGB(100, 108, 120),
-		OutdoorAmbient = Color3.fromRGB(140, 150, 165),
+		Brightness = 2.8,
+		Ambient = Color3.fromRGB(132, 140, 152),
+		OutdoorAmbient = Color3.fromRGB(172, 180, 194),
 		Tint = Color3.fromRGB(215, 225, 240),
 		Saturation = -0.15,
 		Contrast = 0.14,
 		AtmosphereColor = Color3.fromRGB(120, 130, 145),
 		AtmosphereDecay = Color3.fromRGB(70, 80, 95),
-		Density = 0.42,
-		Haze = 2.4,
+		Density = 0.28,
+		Haze = 1.0,
 		Bloom = 0.15,
 	},
 	-- Abyssal Aqua-Dome: deep-ocean night, indigo murk, cyan glow
 	Abyss = {
 		ClockTime = 0.5,
-		Brightness = 2.4,
-		Ambient = Color3.fromRGB(90, 130, 170),
-		OutdoorAmbient = Color3.fromRGB(110, 160, 200),
+		Brightness = 3.0,
+		Ambient = Color3.fromRGB(118, 152, 188),
+		OutdoorAmbient = Color3.fromRGB(142, 182, 216),
 		Tint = Color3.fromRGB(200, 236, 255),
 		Saturation = 0.18,
 		Contrast = 0.12,
 		AtmosphereColor = Color3.fromRGB(40, 100, 140),
 		AtmosphereDecay = Color3.fromRGB(20, 56, 96),
-		Density = 0.34,
-		Haze = 1.8,
+		Density = 0.26,
+		Haze = 0.9,
 		Bloom = 0.4,
 	},
 	-- Casino Royale: rainy twilight, velvet red and gold inside, neon purple outside
 	Casino = {
 		ClockTime = 19.3,
-		Brightness = 1.8,
-		Ambient = Color3.fromRGB(120, 86, 96),
-		OutdoorAmbient = Color3.fromRGB(130, 110, 160),
+		Brightness = 2.8,
+		Ambient = Color3.fromRGB(152, 122, 130),
+		OutdoorAmbient = Color3.fromRGB(168, 148, 192),
 		Tint = Color3.fromRGB(255, 236, 244),
 		Saturation = 0.28,
 		Contrast = 0.18,
 		AtmosphereColor = Color3.fromRGB(100, 70, 130),
 		AtmosphereDecay = Color3.fromRGB(50, 30, 80),
-		Density = 0.36,
-		Haze = 1.6,
+		Density = 0.24,
+		Haze = 0.8,
 		Bloom = 0.4,
 	},
 	-- Oasis Bazaar: golden-orange dusk in a dusty canyon
@@ -223,23 +226,23 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.1,
 		AtmosphereColor = Color3.fromRGB(236, 196, 160),
 		AtmosphereDecay = Color3.fromRGB(196, 140, 104),
-		Density = 0.3,
-		Haze = 1.4,
+		Density = 0.26,
+		Haze = 1.0,
 		Bloom = 0.22,
 	},
 	-- Clockwork Spire: starry nebula night above the clouds, amber gaslight
 	Nebula = {
 		ClockTime = 0.2,
-		Brightness = 1.7,
-		Ambient = Color3.fromRGB(100, 90, 130),
-		OutdoorAmbient = Color3.fromRGB(130, 120, 180),
+		Brightness = 2.8,
+		Ambient = Color3.fromRGB(136, 126, 168),
+		OutdoorAmbient = Color3.fromRGB(168, 158, 208),
 		Tint = Color3.fromRGB(240, 232, 255),
 		Saturation = 0.25,
 		Contrast = 0.14,
 		AtmosphereColor = Color3.fromRGB(110, 90, 160),
 		AtmosphereDecay = Color3.fromRGB(50, 36, 96),
-		Density = 0.3,
-		Haze = 1.5,
+		Density = 0.22,
+		Haze = 0.7,
 		Bloom = 0.4,
 	},
 	Volcanic = {
@@ -252,8 +255,8 @@ local PRESETS: { [string]: Preset } = {
 		Contrast = 0.1,
 		AtmosphereColor = Color3.fromRGB(190, 150, 140),
 		AtmosphereDecay = Color3.fromRGB(150, 90, 70),
-		Density = 0.32,
-		Haze = 1.4,
+		Density = 0.26,
+		Haze = 1.0,
 		Bloom = 0.35,
 	},
 }
@@ -269,28 +272,28 @@ local function moodValues(mood: string): Mood?
 		return { Brightness = p.Brightness, Tint = p.Tint, Contrast = p.Contrast, AtmosphereColor = p.AtmosphereColor, Haze = p.Haze }
 	elseif mood == "Storm" then
 		return {
-			Brightness = p.Brightness * 0.72,
+			Brightness = p.Brightness * 0.85,
 			Tint = p.Tint:Lerp(Color3.fromRGB(200, 205, 235), 0.6),
 			Contrast = p.Contrast + 0.07,
 			AtmosphereColor = p.AtmosphereColor:Lerp(Color3.fromRGB(120, 125, 150), 0.6),
-			Haze = p.Haze + 1.2,
+			Haze = p.Haze + 0.5,
 		}
 	elseif mood == "Twilight" then
 		-- Chaos Twist: a darker, moodier sky; telegraphs and outlines are neon so they stay readable
 		return {
-			Brightness = p.Brightness * 0.62,
+			Brightness = p.Brightness * 0.78,
 			Tint = p.Tint:Lerp(Color3.fromRGB(190, 195, 255), 0.45),
 			Contrast = p.Contrast + 0.1,
 			AtmosphereColor = p.AtmosphereColor:Lerp(Color3.fromRGB(90, 95, 140), 0.55),
-			Haze = p.Haze + 0.8,
+			Haze = p.Haze + 0.4,
 		}
 	elseif mood == "SuddenDeath" then
 		return {
-			Brightness = p.Brightness * 0.7,
+			Brightness = p.Brightness * 0.85,
 			Tint = p.Tint:Lerp(Color3.fromRGB(255, 170, 150), 0.6),
 			Contrast = p.Contrast + 0.13,
 			AtmosphereColor = p.AtmosphereColor:Lerp(Color3.fromRGB(220, 110, 90), 0.6),
-			Haze = p.Haze + 1.6,
+			Haze = p.Haze + 0.6,
 		}
 	end
 	return nil

@@ -111,13 +111,18 @@ local function gorge(model: Model)
 		local w = GORGE - RIVER
 		Builder.block(g, "GorgeFloor", Vector3.new(0, -3, side * (RIVER + w / 2)), Vector3.new(320, 6, w), SAND, Enum.Material.Sand)
 	end
-	Builder.block(g, "RiverBed", Vector3.new(0, -5.5, 0), Vector3.new(320, 1, RIVER * 2), Color3.fromRGB(120, 100, 80), Enum.Material.Pebble)
-	local water = Builder.part(g, { Name = "River", Size = Vector3.new(320, 2.6, RIVER * 2), CFrame = CFrame.new(0, -3.6, 0), Color = Color3.fromRGB(50, 140, 200), Material = Enum.Material.Glass, Transparency = 0.3, CanCollide = false, CastShadow = false })
+	-- a shallow river: wade across (1.5 studs deep over a pebble bed)
+	Builder.block(g, "RiverBed", Vector3.new(0, -3.5, 0), Vector3.new(320, 4, RIVER * 2), Color3.fromRGB(120, 100, 80), Enum.Material.Pebble)
+	local water = Builder.part(g, { Name = "River", Size = Vector3.new(320, 1.3, RIVER * 2), CFrame = CFrame.new(0, -0.85, 0), Color = Color3.fromRGB(50, 150, 210), Material = Enum.Material.Glass, Transparency = 0.3, CanCollide = false, CastShadow = false })
 	water.CanQuery = false
+	-- stone banks along the river (the low walls in the reference)
+	for _, side in { -1, 1 } do
+		Builder.block(g, "RiverBank", Vector3.new(0, -0.6, side * (RIVER + 0.6)), Vector3.new(320, 1.2, 1.2), Color3.fromRGB(150, 130, 110), Enum.Material.Cobblestone)
+	end
 	-- stepping stones across the river
 	for _, x in { -100, -30, 90 } do
 		for k = -1, 1 do
-			Builder.block(g, "SteppingStone", Vector3.new(x + k * 0.8, -2.2, k * 5), Vector3.new(4, 1.6, 3.4), Color3.fromRGB(150, 130, 110), Enum.Material.Slate)
+			Builder.block(g, "SteppingStone", Vector3.new(x + k * 0.8, -1.2, k * 5), Vector3.new(4, 1.6, 3.4), Color3.fromRGB(150, 130, 110), Enum.Material.Slate)
 		end
 	end
 	cliff(g, 1, NORTH_CAVES)
@@ -165,6 +170,19 @@ local function marketHall(model: Model, name: string, base: Vector3, w: number, 
 		local p = Builder.block(hall, "Parapet", Vector3.new(base.X, roofY + 0.7, base.Z) + e[1], e[2], ADOBE, Enum.Material.Sandstone)
 		Builder.structural(p, 3, false, 60)
 	end
+	-- patterned rugs hanging over the upper-floor sill, and a striped cloth awning
+	local rugColors = { Color3.fromRGB(170, 40, 40), Color3.fromRGB(60, 70, 150), Color3.fromRGB(190, 120, 40) }
+	for i, x in { -w / 4, w / 4 } do
+		local rug = Builder.block(hall, "HangingRug", Vector3.new(base.X + x, base.Y + 14, base.Z - d / 2 - 0.5), Vector3.new(4, 5, 0.2), rugColors[(i + math.floor(w)) % #rugColors + 1], Enum.Material.Fabric)
+		Builder.structural(rug, 2, false, 10)
+		rug.CanCollide = false
+		local trim = Builder.block(hall, "RugTrim", Vector3.new(base.X + x, base.Y + 14, base.Z - d / 2 - 0.62), Vector3.new(3, 3.6, 0.1), Color3.fromRGB(240, 210, 140), Enum.Material.Fabric)
+		Builder.structural(trim, 2, false, 5)
+		trim.CanCollide = false
+	end
+	local awning = Builder.part(hall, { Name = "Awning", Size = Vector3.new(w * 0.7, 0.3, 4), CFrame = CFrame.new(base.X, base.Y + 8.5, base.Z - d / 2 - 2) * CFrame.Angles(math.rad(-15), 0, 0), Color = rugColors[(math.floor(w) % #rugColors) + 1], Material = Enum.Material.Fabric, CanCollide = false })
+	Builder.structural(awning, 1, false, 10)
+
 	-- shop counters inside on the ground floor
 	for _, x in { -w / 4, w / 4 } do
 		local counter = Builder.block(hall, "ShopCounter", Vector3.new(base.X + x, base.Y + 1.6, base.Z + d / 2 - 4), Vector3.new(7, 3.2, 2), TIMBER, Enum.Material.Wood)
@@ -293,6 +311,46 @@ function OasisBazaar.build(parent: Instance): Types.MapInfo
 					bank(model, Vector3.new(x, 0, side * (RIVER + 4 + rng:NextNumber(0, 6))), rng)
 				end
 			end
+		end
+	end
+
+	-- the natural rock arch spanning the gorge (walk across it; the reference's sunlit arch)
+	local arch = Instance.new("Folder")
+	arch.Name = "RockArch"
+	arch.Parent = model
+	local segs = 9
+	for i = 0, segs - 1 do
+		local a0 = math.pi * i / segs
+		local a1 = math.pi * (i + 1) / segs
+		local function at(a: number): Vector3
+			return Vector3.new(-112, TOP + 4 + math.sin(a) * 18, math.cos(a) * (GORGE + 6))
+		end
+		local p0, p1 = at(a0), at(a1)
+		Builder.part(arch, { Name = "Arch", Size = Vector3.new(16, 6, (p1 - p0).Magnitude + 2), CFrame = CFrame.lookAt((p0 + p1) / 2, p1), Color = SANDSTONE, Material = Enum.Material.Sandstone })
+	end
+	-- bunting: lines of colourful pennants strung across the gorge between the rims
+	local flagColors = { Color3.fromRGB(230, 60, 60), Color3.fromRGB(250, 200, 50), Color3.fromRGB(60, 170, 90), Color3.fromRGB(60, 120, 220), Color3.fromRGB(230, 120, 40) }
+	for line, x in { -10, 34, 96 } do
+		local a = Vector3.new(x, TOP + 6, GORGE + 1)
+		local b = Vector3.new(x + 8, TOP + 6, -GORGE - 1)
+		local rope = Builder.part(model, { Name = "BuntingRope", Size = Vector3.new(0.2, 0.2, (b - a).Magnitude), CFrame = CFrame.lookAt((a + b) / 2 - Vector3.new(0, 3, 0), b - Vector3.new(0, 3, 0)), Color = ROPE, Material = Enum.Material.Fabric })
+		deco(rope)
+		local count = 14
+		for i = 1, count do
+			local t = i / (count + 1)
+			local sag = math.sin(t * math.pi) * 3
+			local p = a:Lerp(b, t) - Vector3.new(0, 3 + sag + 0.9, 0)
+			local flag = Builder.part(model, { Name = "Pennant", Class = "WedgePart", Size = Vector3.new(0.2, 1.8, 1.6), CFrame = CFrame.lookAt(p, p + (b - a).Unit) * CFrame.Angles(math.pi, math.rad(90), 0), Color = flagColors[(i + line) % #flagColors + 1], Material = Enum.Material.Fabric })
+			deco(flag)
+		end
+	end
+	-- lanterns hanging from the rope bridges
+	for _, x in { -36, 70 } do
+		for _, z in { -14, 14 } do
+			local chain = Builder.part(model, { Name = "LanternChain", Size = Vector3.new(0.2, 3, 0.2), CFrame = CFrame.new(x + 6.2, TOP - 1.6, z), Color = Color3.fromRGB(60, 50, 40), Material = Enum.Material.Metal })
+			deco(chain)
+			local lantern = Builder.part(model, { Name = "Lantern", Size = Vector3.new(1.2, 1.6, 1.2), CFrame = CFrame.new(x + 6.2, TOP - 3.8, z), Color = Color3.fromRGB(255, 190, 90), Material = Enum.Material.Neon })
+			deco(lantern)
 		end
 	end
 

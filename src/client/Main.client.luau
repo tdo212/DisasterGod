@@ -32,6 +32,7 @@ local order = {
 	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)
 	"RoleRevealController", -- round-start GOD vs SURVIVORS card
 	"KillConfirmController", -- the God's hitmarker + sound on a kill
+	"DailyRewardController", -- the once-a-day login reward window in the lodge
 	"TutorialController", -- last: points at buttons the other controllers built
 }
 

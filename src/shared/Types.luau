@@ -75,6 +75,7 @@ export type CosmeticDefinition = {
 	Color: Color3,
 	Coins: number?, -- coin price (nil + no Product = free starter)
 	Product: string?, -- Config.Monetization.Products key (Robux)
+	Exclusive: boolean?, -- only granted (login streak), never sold and not a free starter
 }
 
 -- Disaster VFX pack palette (nil fields keep the classic look).
@@ -175,6 +176,8 @@ export type PlayerProfile = {
 	FirstSurviveDay: number,
 	FirstGodWinDay: number,
 	GoldenTrail: boolean,
+	SolarFlare: boolean,
+	GodRounds: number,
 	Set_LowFx: boolean,
 	Set_Shake: number,
 	Set_Music: boolean,
@@ -191,6 +194,7 @@ export type RoundRecord = {
 	Destroyed: number,
 	Taunts: number,
 	HiddenBest: number, -- longest hidden streak (seconds)
+	Streak: number?, -- survival streak after this round (survivors only)
 }
 
 export type SummaryLine = { Text: string, Amount: number }
@@ -206,6 +210,7 @@ export type RoundSummary = {
 	Total: number,
 	Awards: { { Name: string, Icon: string, Player: string, Text: string } }?,
 	Mutator: string?,
+	Highlight: string?, -- your personal moment of the round ("Closest Call: 3 near misses")
 }
 
 export type PlayerState = {

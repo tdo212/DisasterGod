@@ -28,6 +28,18 @@ function RoleService.IsSolo(): boolean
 	return #Players:GetPlayers() == 1
 end
 
+-- A brand-new player (few rounds, never the God) weighs much more, so they get to be the
+-- God in their first rounds.
+local function weightOf(p: Player): number
+	local w = weights[p] or Config.Pity.BaseWeight
+	local played = p:GetAttribute(Attributes.RoundsPlayed)
+	local godRounds = p:GetAttribute(Attributes.GodRounds)
+	if typeof(played) == "number" and played < Config.Pity.NewPlayerRounds and (godRounds == nil or godRounds == 0) then
+		w *= Config.Pity.NewPlayerMultiplier
+	end
+	return w
+end
+
 function RoleService.UpdateChances()
 	local players = Players:GetPlayers()
 	-- a purchased "God next round" is a guarantee: show it as 100%
@@ -51,10 +63,10 @@ function RoleService.UpdateChances()
 	end
 	local total = 0
 	for _, p in players do
-		total += weights[p] or Config.Pity.BaseWeight
+		total += weightOf(p)
 	end
 	for _, p in players do
-		local w = weights[p] or Config.Pity.BaseWeight
+		local w = weightOf(p)
 		p:SetAttribute(Attributes.GodChance, if total > 0 then math.floor(w / total * 1000 + 0.5) / 10 else 0)
 	end
 end
@@ -171,11 +183,11 @@ function RoleService.PickGod(players: { Player }): Player?
 	end
 	local total = 0
 	for _, p in players do
-		total += weights[p] or Config.Pity.BaseWeight
+		total += weightOf(p)
 	end
 	local roll = math.random() * total
 	for _, p in players do
-		roll -= weights[p] or Config.Pity.BaseWeight
+		roll -= weightOf(p)
 		if roll <= 0 then
 			return p
 		end

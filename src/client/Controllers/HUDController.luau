@@ -322,6 +322,44 @@ local function buildCoins()
 	player:GetAttributeChangedSignal(Attributes.Coins):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.Streak):Connect(refresh)
 	refresh()
+
+	-- friend squad: a subtle pill while a Roblox friend is in the server (+20% round coins)
+	local friend = Components.panel({
+		Name = "FriendBoost",
+		Size = UDim2.fromOffset(196, 26),
+		Position = if touch then UDim2.new(1, -196, 0, 78) else UDim2.fromOffset(2, -54),
+		Color = Color3.fromRGB(30, 90, 60),
+		Transparency = 0.15,
+		Parent = frame,
+	})
+	Components.label({ Name = "Text", Text = "👥 +" .. math.floor(Config.Scoring.FriendBoost * 100) .. "% Friend Boost", TextSize = 15, Color = C.GreenLight, Size = UDim2.fromScale(1, 1), Parent = friend })
+	local function refreshFriend()
+		friend.Visible = player:GetAttribute(Attributes.FriendBoost) == true
+	end
+	player:GetAttributeChangedSignal(Attributes.FriendBoost):Connect(refreshFriend)
+	refreshFriend()
+end
+
+-- The next thing you can buy with coins: the cheapest coin item (God kit or cosmetic) you
+-- don't own yet. Returns its name and price, or nil when you own them all.
+local function nextUnlock(): (string?, number?)
+	local bestName: string?, bestPrice: number? = nil, nil
+	local function consider(name: string, price: number)
+		if bestPrice == nil or price < bestPrice then
+			bestName, bestPrice = name, price
+		end
+	end
+	for _, kit in Config.Kits do
+		if kit.Price > 0 and player:GetAttribute(Attributes.KitPrefix .. kit.Id) ~= true then
+			consider(kit.Name, kit.Price)
+		end
+	end
+	for _, def in Config.Cosmetics.Items do
+		if def.Coins and player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) ~= true then
+			consider(def.Name, def.Coins)
+		end
+	end
+	return bestName, bestPrice
 end
 
 ---------------------------------------------------------------------------
@@ -874,7 +912,10 @@ end
 
 local function showSummary(summary: any)
 	local awards = if typeof(summary.Awards) == "table" then summary.Awards else {}
-	local window = Components.window(layer, "Round Over", UDim2.fromOffset(560, 440 + (if #awards > 0 then 74 else 0)))
+	local highlight = if typeof(summary.Highlight) == "string" and summary.Highlight ~= "" then summary.Highlight else nil
+	local unlockName, unlockPrice = nextUnlock()
+	local extra = (if highlight then 32 else 0) + (if unlockName then 52 else 0)
+	local window = Components.window(layer, "Round Over", UDim2.fromOffset(560, 440 + extra + (if #awards > 0 then 74 else 0)))
 	local content = window.Content
 	local headline = if summary.Role == "DisasterGod" then "GOD ROUND COMPLETE" elseif summary.Survived then "YOU SURVIVED!" else "ELIMINATED"
 	local headColor = if summary.Role == "DisasterGod" then C.PurpleLight elseif summary.Survived then C.GreenLight else C.RedLight
@@ -889,12 +930,44 @@ local function showSummary(summary: any)
 		Parent = content,
 	})
 	local y = 72
+	-- your personal highlight of the round
+	if highlight then
+		local pill = Components.panel({ Name = "Highlight", Size = UDim2.fromOffset(380, 28), Position = UDim2.new(0.5, 0, 0, y - 4), AnchorPoint = Vector2.new(0.5, 0), Color = Color3.fromRGB(110, 70, 160), Transparency = 0.1, Parent = content })
+		Components.label({ Name = "Text", Text = highlight, TextSize = 17, Color = Color3.new(1, 1, 1), Size = UDim2.fromScale(1, 1), Parent = pill })
+		local pop = Instance.new("UIScale")
+		pop.Scale = 0.3
+		pop.Parent = pill
+		task.delay(0.25, function()
+			Components.tween(pop, Theme.Tweens.Spring, { Scale = 1 })
+		end)
+		y += 32
+	end
 	for _, line in summary.Lines do
 		Components.label({ Name = "Line", Text = line.Text, TextSize = 21, XAlign = Enum.TextXAlignment.Left, Size = UDim2.new(0.7, 0, 0, 26), Position = UDim2.fromOffset(16, y), Parent = content })
 		Components.label({ Name = "Amount", Text = "+" .. tostring(line.Amount), TextSize = 21, Color = C.Gold, XAlign = Enum.TextXAlignment.Right, Size = UDim2.new(0.3, -16, 0, 26), Position = UDim2.new(0.7, 0, 0, y), Parent = content })
 		y += 28
 	end
 	Components.label({ Name = "Total", Text = "TOTAL  💰 " .. tostring(summary.Total), TextSize = 28, Color = C.Gold, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, y + 6), Parent = content })
+	-- next unlock: how close your coins are to the next thing you can buy
+	if unlockName and unlockPrice then
+		local coins = player:GetAttribute(Attributes.Coins) :: number? or 0
+		local fraction = math.clamp(coins / unlockPrice, 0, 1)
+		local text = if coins >= unlockPrice
+			then string.format("✅ You can buy %s now! Open the Shop", unlockName)
+			else string.format("%d%% to %s (%s / %s coins)", math.floor(fraction * 100), unlockName, HUDController.FormatNumber(coins), HUDController.FormatNumber(unlockPrice))
+		Components.label({ Name = "NextUnlock", Text = text, TextSize = 17, Color = C.GreenLight, Size = UDim2.new(1, -40, 0, 22), Position = UDim2.new(0.5, 0, 0, y + 44), AnchorPoint = Vector2.new(0.5, 0), Parent = content })
+		local track = Components.panel({ Name = "UnlockTrack", Size = UDim2.new(1, -60, 0, 16), Position = UDim2.new(0.5, 0, 0, y + 68), AnchorPoint = Vector2.new(0.5, 0), Color = Color3.fromRGB(30, 34, 44), Parent = content })
+		local fill = Instance.new("Frame")
+		fill.Name = "Fill"
+		fill.BorderSizePixel = 0
+		fill.BackgroundColor3 = C.GreenLight
+		fill.Size = UDim2.fromScale(0, 1)
+		fill.Parent = track
+		Components.corner(fill)
+		task.delay(0.4, function()
+			Components.tween(fill, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.fromScale(fraction, 1) })
+		end)
+	end
 	local podiumText = {}
 	for i, entry in summary.Podium do
 		table.insert(podiumText, string.format("%s %s", ({ "🥇", "🥈", "🥉" })[i], entry.Name))

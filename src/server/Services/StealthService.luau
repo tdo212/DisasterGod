@@ -17,6 +17,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DestructionService = require(script.Parent.DestructionService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
+local QuestService = require(script.Parent.QuestService)
 
 local S = Config.Stealth
 local HIDDEN = Config.Attributes.Hidden
@@ -32,6 +33,7 @@ local ripples: { [Player]: number } = {} -- noise ripples made this round (Ghost
 local hiddenFor: { [Player]: number } = {} -- current hidden streak (seconds)
 local hiddenBest: { [Player]: number } = {} -- longest hidden streak this round (Phantom)
 local indoors: { [Player]: boolean } = {}
+local lastDash: { [Player]: number } = {} -- last counted dash (daily quest)
 local jams: { Jam } = {}
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
@@ -136,6 +138,11 @@ local function tick()
 		if v.Y > S.JumpNoiseSpeed or flat > S.RunNoiseSpeed then
 			StealthService.Noise(player, if flat > S.RunNoiseSpeed then 1.3 else 1)
 		end
+		-- a dash (daily quest "Use Dash"): far faster than any run, counted once per burst
+		if flat > Config.Mobility.DashSpeed * 0.7 and now - (lastDash[player] or 0) > 1 then
+			lastDash[player] = now
+			QuestService.Progress(player, "Dash", 1)
+		end
 		indoors[player] = underRoof(hrp)
 		if flat < S.StillSpeed and math.abs(v.Y) < S.StillSpeed then
 			stillFor[player] = (stillFor[player] or 0) + S.CheckInterval
@@ -190,6 +197,7 @@ function StealthService.Init()
 		stillFor[player] = nil
 		lastNoise[player] = nil
 		indoors[player] = nil
+		lastDash[player] = nil
 		ripples[player] = nil
 		hiddenFor[player] = nil
 		hiddenBest[player] = nil

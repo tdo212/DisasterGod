@@ -83,7 +83,7 @@ local function directorDrift()
 end
 
 local function isFree(def: Types.CosmeticDefinition): boolean
-	return def.Coins == nil and def.Product == nil
+	return def.Coins == nil and def.Product == nil and def.Exclusive ~= true
 end
 
 -- Palette for the caster's disasters (the AI Director and default kits use Classic).

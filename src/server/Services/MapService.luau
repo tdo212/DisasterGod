@@ -270,6 +270,181 @@ local function addHideouts(info: Types.MapInfo)
 	end
 end
 
+-- Interior seal (Config.Seal): fill holes and deep pits inside the island with a shallow
+-- floor just under the waterline, and put ladders up high edges, so a survivor looking up at
+-- the God and dashing backward never drops into an unseen pit. The island's outer rim stays
+-- a lethal drop: a hole only counts if solid ground lies further out in that direction.
+local function sealInterior(info: Types.MapInfo)
+	local SE = Config.Seal
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { info.Model }
+	params.RespectCanCollide = true
+	local function cast(x: number, z: number, terrainOnly: boolean): number?
+		local y = 300
+		for _ = 1, 24 do
+			local r = workspace:Raycast(Vector3.new(x, y, z), Vector3.new(0, -420, 0), params)
+			if not r then
+				return nil
+			end
+			if terrainOnly and r.Instance:GetAttribute("Structural") == true then
+				y = r.Position.Y - 0.05
+			else
+				return r.Position.Y
+			end
+		end
+		return y -- a tall stack of structure (a tower): solid ground underneath
+	end
+	local step = SE.Cell
+	local deep = info.FluidStartY - 2
+	local c = info.Center
+	local n = math.floor((info.Radius + 30) / step)
+	local anyY: { [number]: number } = {}
+	local terY: { [number]: number } = {}
+	local function key(ix: number, iz: number): number
+		return (ix + 1000) * 4096 + (iz + 1000)
+	end
+	local reach = table.create(SE.Bearings, 0)
+	local function bearing(ix: number, iz: number): number
+		local a = math.atan2(iz, ix) % (2 * math.pi)
+		return math.floor(a / (2 * math.pi) * SE.Bearings) % SE.Bearings + 1
+	end
+	for ix = -n, n do
+		for iz = -n, n do
+			local x, z = c.X + ix * step, c.Z + iz * step
+			local a = cast(x, z, false)
+			local t = cast(x, z, true)
+			local k = key(ix, iz)
+			if a then
+				anyY[k] = a
+			end
+			if t then
+				terY[k] = t
+			end
+			if a and a > deep then
+				local b = bearing(ix, iz)
+				reach[b] = math.max(reach[b], math.sqrt(ix * ix + iz * iz) * step)
+			end
+		end
+		task.wait()
+	end
+	local function solid(ix: number, iz: number): boolean
+		local a = anyY[key(ix, iz)]
+		return a ~= nil and a > deep
+	end
+	-- a channel: ground on both sides across it (also fills channel mouths that run out to
+	-- the rim, where there is no ground further out along the channel itself)
+	local function enclosed(ix: number, iz: number): boolean
+		local len = math.sqrt(ix * ix + iz * iz)
+		if len < 0.5 then
+			return true
+		end
+		local px, pz = -iz / len, ix / len
+		local found = 0
+		for _, side in { 1, -1 } do
+			for s = 1, SE.ChannelCells do
+				if solid(math.floor(ix + px * s * side + 0.5), math.floor(iz + pz * s * side + 0.5)) then
+					found += 1
+					break
+				end
+			end
+		end
+		return found == 2
+	end
+	local top = if info.HazardFloorY then info.HazardFloorY - SE.LavaDepth else info.FluidStartY - SE.WaterDepth
+	local fill: { [number]: boolean } = {}
+	for ix = -n, n do
+		for iz = -n, n do
+			local k = key(ix, iz)
+			local t = terY[k]
+			if t ~= nil and t > deep then
+				continue
+			end
+			-- inside the island: ground further out in this direction, or a channel
+			local d = math.sqrt(ix * ix + iz * iz) * step
+			if d < reach[bearing(ix, iz)] - SE.Margin or enclosed(ix, iz) then
+				fill[k] = true
+			end
+		end
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "Shallows"
+	local lava = info.HazardFloorY ~= nil
+	local color = if lava then Color3.fromRGB(230, 90, 30) else info.FluidColor:Lerp(Color3.fromRGB(150, 130, 100), 0.6)
+	local material = if lava then Enum.Material.CrackedLava else Enum.Material.Sand
+	-- merge each row's run of cells into one tile
+	for iz = -n, n do
+		local ix = -n
+		while ix <= n do
+			if fill[key(ix, iz)] then
+				local start = ix
+				while ix + 1 <= n and fill[key(ix + 1, iz)] do
+					ix += 1
+				end
+				local count = ix - start + 1
+				local tile = Instance.new("Part")
+				tile.Name = "Shallows"
+				tile.Anchored = true
+				tile.Size = Vector3.new(count * step, 2, step)
+				tile.CFrame = CFrame.new(c.X + (start + ix) / 2 * step, top - 1, c.Z + iz * step)
+				tile.Color = color
+				tile.Material = material
+				tile.TopSurface = Enum.SurfaceType.Smooth
+				tile.BottomSurface = Enum.SurfaceType.Smooth
+				tile.CastShadow = false
+				tile.CanTouch = false
+				tile.Parent = folder
+			end
+			ix += 1
+		end
+	end
+	-- ladders out of the shallows wherever the edge is too high to jump
+	local ladders: { Vector3 } = {}
+	for ix = -n, n do
+		for iz = -n, n do
+			local k = key(ix, iz)
+			local open = anyY[k] == nil or (anyY[k] :: number) <= deep
+			if not (fill[k] and open) or #ladders >= SE.MaxLadders then
+				continue
+			end
+			for _, dir in { Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) } do
+				local nk = key(ix + dir.X, iz + dir.Z)
+				if fill[nk] then
+					continue
+				end
+				local h = terY[nk] or anyY[nk]
+				if not h or h - top < SE.LadderMinClimb then
+					continue
+				end
+				local at = Vector3.new(c.X + ix * step, 0, c.Z + iz * step) + dir * (step / 2 - 1)
+				local near = false
+				for _, p in ladders do
+					if (Vector3.new(p.X, 0, p.Z) - at).Magnitude < SE.LadderSpacing then
+						near = true
+						break
+					end
+				end
+				if near then
+					continue
+				end
+				table.insert(ladders, at)
+				local height = h - top + 1
+				local ladder = Instance.new("TrussPart")
+				ladder.Name = "ShoreLadder"
+				ladder.Anchored = true
+				ladder.Size = Vector3.new(2, height, 2)
+				ladder.CFrame = CFrame.new(at.X, top + height / 2, at.Z)
+				ladder.Color = Color3.fromRGB(110, 100, 90)
+				ladder.Material = Enum.Material.Metal
+				ladder.CastShadow = false
+				ladder.Parent = folder
+				break
+			end
+		end
+	end
+	folder.Parent = info.Model
+end
+
 function MapService.Build(name: string): Types.MapInfo
 	MapService.Clear()
 	local builder = Builders[name]
@@ -278,6 +453,7 @@ function MapService.Build(name: string): Types.MapInfo
 	addHideouts(info)
 	addProps(info, name)
 	Details.apply(name, info) -- reference-art dressing: rooftop clutter, signs, set dressing
+	sealInterior(info) -- no hidden pits inside the island: shallow floors + ladders
 
 	-- infinite sea (water or lava) under the island
 	local s = Instance.new("Part")

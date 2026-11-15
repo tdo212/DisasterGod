@@ -188,6 +188,28 @@ function ScoringService.RecordDestruction(by: Player?, count: number)
 	end
 end
 
+-- Your personal moment of the round, for the pill on the Round Over card.
+local function highlightOf(p: Player, r: any, isGod: boolean): string
+	if isGod then
+		if (r.Kills or 0) >= 2 then
+			return string.format("☠ Wiped out %d survivors", r.Kills)
+		elseif (r.Destroyed or 0) > 0 then
+			return string.format("💥 Most Buildings Wrecked: %d parts", r.Destroyed)
+		end
+		return "😈 Your first strikes as the God"
+	end
+	if r.Survived and (r.Streak or 0) >= 2 then
+		return string.format("🔥 Survivor Streak x%d", r.Streak)
+	elseif (r.NearMisses or 0) > 0 then
+		return string.format("😱 Closest Call: %d near miss%s", r.NearMisses, if r.NearMisses > 1 then "es" else "")
+	elseif (r.Escapes or 0) > 0 then
+		return string.format("🏃 Escaped %d collapsing building%s", r.Escapes, if r.Escapes > 1 then "s" else "")
+	elseif r.Survived then
+		return "🛡 Outlasted the God"
+	end
+	return "💪 So close: try hiding indoors next round"
+end
+
 -- Round-end payouts. Returns a summary per player and the podium.
 function ScoringService.FinishRound(mapName: string, god: Player?, participants: { Player }): { [Player]: Types.RoundSummary }
 	local summaries: { [Player]: Types.RoundSummary } = {}
@@ -202,6 +224,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 		end
 		local r = record(p)
 		lines[p] = {}
+		local firstRound = (p:GetAttribute(Config.Attributes.RoundsPlayed) or 0) == 0
 		PlayerDataService.RecordPlayed(p)
 		QuestService.Progress(p, "Play", 1)
 		if r.NearMisses > 0 then
@@ -234,6 +257,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 		elseif RoleService.IsAliveSurvivor(p) then
 			r.Survived = true
 			local streak = PlayerDataService.RecordRound(p, true)
+			r.Streak = streak
 			local bonus = PlayerDataService.EarnCoins(p, S.SurvivalCoins + S.StreakBonusPerRound * math.max(0, streak - 1))
 			PlayerDataService.RecordWin(p)
 			QuestService.Progress(p, "Survive", 1)
@@ -266,6 +290,16 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			local rush = PlayerDataService.EarnCoins(p, math.floor(r.Earned * (Config.Mutators.GoldRushPayout - 1)))
 			r.Earned += rush
 			table.insert(lines[p], { Text = "Gold Rush x" .. Config.Mutators.GoldRushPayout, Amount = rush })
+		end
+		if p:GetAttribute(Config.Attributes.FriendBoost) == true then
+			local boost = PlayerDataService.EarnCoins(p, math.floor(r.Earned * S.FriendBoost))
+			r.Earned += boost
+			table.insert(lines[p], { Text = "👥 Friend boost +" .. math.floor(S.FriendBoost * 100) .. "%", Amount = boost })
+		end
+		if firstRound then
+			local bonus = PlayerDataService.EarnCoins(p, S.FirstRoundBonus)
+			r.Earned += bonus
+			table.insert(lines[p], { Text = "🎉 First Round Completed!", Amount = bonus })
 		end
 		r.HiddenBest = StealthService.HiddenBest(p)
 	end
@@ -319,6 +353,7 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			Total = r.Earned,
 			Awards = awards,
 			Mutator = if typeof(mutator) == "string" then mutator else "",
+			Highlight = highlightOf(p, r, p == god),
 		}
 	end
 	return summaries

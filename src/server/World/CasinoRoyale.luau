@@ -283,7 +283,7 @@ local function grandStair(model: Model, gal: Model)
 		local mid = Vector3.new(sx * 18, landingY + 4, 42)
 		local f1 = Builder.stairs(stair, Vector3.new(sx * 10, landingY, 36), mid, 7, CARPET, Enum.Material.Fabric)
 		f1.Name = "CurvedFlight"
-		local midLanding = Builder.block(stair, "MidLanding", mid - Vector3.new(0, 0.75, 0) + Vector3.new(sx * 2, 0, 1), Vector3.new(8, 1.5, 8), MARBLE, Enum.Material.Marble)
+		local midLanding = Builder.block(stair, "MidLanding", mid - Vector3.new(0, 0.75, 0) + Vector3.new(sx * 2, 0, 1), Vector3.new(12, 1.5, 12), MARBLE, Enum.Material.Marble)
 		Builder.structural(midLanding, 1, false, 160)
 		local f2 = Builder.stairs(stair, mid + Vector3.new(sx * 2, 0, 4), Vector3.new(sx * 22, GALLERY_Y, Z1 - GALLERY_W + 0.5), 7, CARPET, Enum.Material.Fabric)
 		f2.Name = "CurvedFlight"
