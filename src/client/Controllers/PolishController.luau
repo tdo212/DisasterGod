@@ -777,12 +777,23 @@ local function mirrorArena()
 	end
 	local world = Instance.new("Model")
 	world.Name = "Mirror"
+	camWorld = world -- claimed now so the sync loop doesn't start a second copy
 	local minSize = if Components.isTouch() then PR.ArenaCamMinSize * 1.6 else PR.ArenaCamMinSize
+	-- copied in chunks across frames (a whole arena in one frame was a visible hitch)
+	local copied = 0
 	for _, d in arena:GetDescendants() do
-		if d:IsA("BasePart") and d.Transparency < 0.9 and math.max(d.Size.X, d.Size.Y, d.Size.Z) >= minSize and d.Name ~= "Sea" then
+		if d:IsA("BasePart") and d.Parent and d.Transparency < 0.9 and math.max(d.Size.X, d.Size.Y, d.Size.Z) >= minSize and d.Name ~= "Sea" then
 			local copy = copyOf(d)
 			copy.Parent = world
 			mirrors[d] = copy
+			copied += 1
+			if copied % PR.ArenaCamCopyChunk == 0 then
+				task.wait()
+				if camWorld ~= world then
+					world:Destroy() -- the round ended while copying
+					return
+				end
+			end
 		end
 	end
 	-- the sea / lava plane as a flat colour sheet
@@ -1044,7 +1055,7 @@ function PolishController.Start()
 		local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
 		if phase == "Active" and previous ~= "Active" then
 			task.delay(0.6, playIntro) -- after the teleport into the arena
-			task.delay(1.2, mirrorArena)
+			-- the Arena Cam copies the arena lazily, only once someone in the lodge can see it
 		elseif phase == "RoundEnd" and previous == "Active" then
 			task.delay(Config.Feed.FinalKillHold + 0.4, playOutro)
 		elseif phase == "Intermission" then
@@ -1078,7 +1089,7 @@ function PolishController.Start()
 	end)
 	-- live layer + director camera, only while someone in the lodge can see the screen
 	RunService.RenderStepped:Connect(function(dt)
-		if not camWorld or not camVisible() then
+		if not camWorld or not camFx or not camVisible() then
 			return
 		end
 		fxAccum += dt

@@ -102,21 +102,29 @@ function QuestService.Progress(player: Player, stat: string, amount: number?)
 		return
 	end
 	local day = roll(profile)
+	-- two of the day's quests can share a stat ("Survive 2" and "Survive 3"): progress is per
+	-- stat, counted up to the biggest goal, and each quest turns ready at its own goal
+	local cap = 0
 	for _, quest in dailyQuests(day) do
 		if quest.Stat == stat then
-			local before = profile.Quests.Progress[stat] or 0
-			if before >= quest.Goal then
-				return
-			end
-			local after = math.min(quest.Goal, before + (amount or 1))
-			profile.Quests.Progress[stat] = after
-			if after >= quest.Goal then
-				popup:FireClient(player, "QUEST READY: " .. string.upper(quest.Text), GREEN)
-			end
-			publish(player)
-			return
+			cap = math.max(cap, quest.Goal)
 		end
 	end
+	if cap == 0 then
+		return
+	end
+	local before = profile.Quests.Progress[stat] or 0
+	if before >= cap then
+		return
+	end
+	local after = math.min(cap, before + (amount or 1))
+	profile.Quests.Progress[stat] = after
+	for _, quest in dailyQuests(day) do
+		if quest.Stat == stat and before < quest.Goal and after >= quest.Goal then
+			popup:FireClient(player, "QUEST READY: " .. string.upper(quest.Text), GREEN)
+		end
+	end
+	publish(player)
 end
 
 local function claim(player: Player, questId: string)

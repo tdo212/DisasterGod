@@ -121,7 +121,7 @@ local function otherWindowOpen(): boolean
 	for _, sg in player:WaitForChild("PlayerGui"):GetChildren() do
 		if sg:IsA("ScreenGui") and sg.Enabled and sg.Name ~= "DailyRewardHUD" then
 			for _, d in sg:GetDescendants() do
-				if d:IsA("GuiObject") and d.Visible and string.sub(d.Name, -6) == "Window" and d.AbsoluteSize.X > 4 then
+				if d:IsA("GuiObject") and d.Visible and (string.sub(d.Name, -6) == "Window" or d.Name == "MapVote") and d.AbsoluteSize.X > 4 then
 					return true
 				end
 			end
@@ -168,6 +168,24 @@ function DailyRewardController.Start()
 			end
 		else
 			shownToday = false
+		end
+	end)
+	-- the map vote or a round starting takes the screen: put the window away for now and
+	-- offer it again on the next quiet moment in the lodge
+	local function yield()
+		if window and window.IsOpen() then
+			window.Close()
+			shownToday = false
+		end
+	end
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.VoteOpen):Connect(function()
+		if ReplicatedStorage:GetAttribute(Attributes.VoteOpen) == true then
+			yield()
+		end
+	end)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(function()
+		if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" then
+			yield()
 		end
 	end)
 	task.spawn(function()

@@ -626,7 +626,7 @@ function MenuController.Start()
 	gui.Name = "Menu"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.DisplayOrder = 2
+	gui.DisplayOrder = 7 -- the shop opens above the map vote
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 

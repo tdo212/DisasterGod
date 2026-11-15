@@ -853,6 +853,7 @@ local Config = {
 		DangerDot = 0.35, -- telegraphs outside this view cone pulse the screen edge
 		DangerRange = 90,
 		ArenaCamInterval = 0.4, -- seconds between Arena Cam structure syncs (collapses, debris)
+		ArenaCamCopyChunk = 150, -- arena parts copied into the Arena Cam per frame
 		ArenaCamLiveRate = 15, -- disasters / survivors / God rig mirror updates per second
 		ArenaCamMinSize = 4, -- arena parts smaller than this (largest axis) are skipped
 		ArenaCamMaxFx = 150, -- disaster parts mirrored at once
@@ -1259,6 +1260,10 @@ local Config = {
 			SunscorchedMirage = "rbxassetid://109383400239121",
 			OutpostZero = "rbxassetid://89934695715065",
 			StarlightBoardwalk = "rbxassetid://110223167570976",
+			AbyssalAquaDome = "rbxassetid://77388193228611",
+			CasinoRoyale = "rbxassetid://111737162787584",
+			OasisBazaar = "rbxassetid://99320055045674",
+			ClockworkSpire = "rbxassetid://109579151256350",
 		} :: { [string]: string },
 		NewMaps = { AbyssalAquaDome = true, CasinoRoyale = true, OasisBazaar = true, ClockworkSpire = true } :: { [string]: boolean },
 		BuildYieldEvery = 150, -- parts created before yielding a frame

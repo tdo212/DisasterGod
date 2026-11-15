@@ -543,7 +543,7 @@ function SpinController.Start()
 	gui.Name = "SpinWheel"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.DisplayOrder = 5
+	gui.DisplayOrder = 10 -- opened on purpose: above the map vote and the HUD
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 	build()

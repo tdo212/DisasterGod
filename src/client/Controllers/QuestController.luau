@@ -2,8 +2,8 @@
 -- QuestController: the Daily Quests window. Three rows with a progress bar and a claim
 -- button each; the footer shows the all-done bonus, the daily streak and the reset timer.
 -- State arrives as JSON in the player's QuestState attribute (see QuestService).
--- In the lodge a compact tracker pill shows today's three quests (tap to expand); it pulses
--- CLAIM when one is done, and tapping it then opens the window.
+-- In the lodge a small tracker button under the menu tiles shows "QUESTS 1/3" and opens the
+-- window; it pulses CLAIM when a quest is done.
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -143,11 +143,10 @@ local function onState()
 	changed:Fire()
 end
 
--- the lodge tracker pill
-local tracker: Frame? = nil
-local trackerHeader: TextLabel? = nil
-local trackerRows: Frame? = nil
-local trackerOpen = false
+-- the lodge tracker pill: a small button under the menu tiles (never over the play area).
+-- Tapping it opens the Daily Quests window; it pulses gold when a quest can be claimed.
+local tracker: TextButton? = nil
+local trackerText: TextLabel? = nil
 local trackerPulse: UIScale? = nil
 
 local function inRound(): boolean
@@ -156,8 +155,8 @@ local function inRound(): boolean
 end
 
 local function refreshTracker()
-	local t, header, rows = tracker, trackerHeader, trackerRows
-	if not (t and header and rows) then
+	local t, text = tracker, trackerText
+	if not (t and text) then
 		return
 	end
 	t.Visible = #state.Quests > 0 and not inRound()
@@ -169,67 +168,32 @@ local function refreshTracker()
 			claimable += 1
 		end
 	end
-	header.Text = if claimable > 0 then "🎁 QUEST DONE · CLAIM!" else string.format("📜 QUESTS %d/%d %s", done, #state.Quests, if trackerOpen then "–" else "+")
-	header.TextColor3 = if claimable > 0 then C.GoldLight else C.Text
-	for _, child in rows:GetChildren() do
-		if child:IsA("TextLabel") then
-			child:Destroy()
-		end
-	end
-	rows.Visible = trackerOpen
-	for i, quest in state.Quests do
-		local mark = if quest.Claimed then "✔" elseif quest.Progress >= quest.Goal then "🎁" else "•"
-		local row = Components.label({
-			Name = "Row",
-			Text = string.format("%s %s  %d/%d", mark, quest.Text, math.min(quest.Progress, quest.Goal), quest.Goal),
-			TextSize = 14,
-			Color = if quest.Claimed then C.TextDim else C.Text,
-			XAlign = Enum.TextXAlignment.Left,
-			Size = UDim2.new(1, -12, 0, 22),
-			Position = UDim2.fromOffset(8, (i - 1) * 24),
-			Parent = rows,
-		})
-		row.TextTruncate = Enum.TextTruncate.AtEnd
-	end
-	t.Size = UDim2.fromOffset(260, 34 + (if trackerOpen then #state.Quests * 24 + 6 else 0))
+	text.Text = if claimable > 0 then "🎁 CLAIM QUEST!" else string.format("📜 QUESTS %d/%d", done, #state.Quests)
+	text.TextColor3 = if claimable > 0 then C.GoldLight else C.Text
 end
 
 local function buildTracker()
 	local touch = Components.isTouch()
-	local t = Components.panel({
-		Name = "QuestTracker",
-		Size = UDim2.fromOffset(260, 34),
-		Position = if touch then UDim2.fromOffset(12, 350) else UDim2.new(0, 188, 1, -130),
-		AnchorPoint = if touch then Vector2.zero else Vector2.new(0, 1),
-		Color = C.Window,
-		Transparency = 0.12,
-		Parent = layer,
-	})
-	local button = Instance.new("TextButton")
-	button.Name = "Toggle"
-	button.Text = ""
-	button.BackgroundTransparency = 1
-	button.Size = UDim2.new(1, 0, 0, 34)
-	button.Parent = t
-	trackerHeader = Components.label({ Name = "Header", Text = "", TextSize = 17, Size = UDim2.new(1, -12, 0, 30), Position = UDim2.fromOffset(6, 2), Parent = t })
-	local rows = Instance.new("Frame")
-	rows.Name = "Rows"
-	rows.BackgroundTransparency = 1
-	rows.Size = UDim2.new(1, 0, 1, -36)
-	rows.Position = UDim2.fromOffset(0, 34)
-	rows.Parent = t
-	trackerRows = rows
+	local t = Instance.new("TextButton")
+	t.Name = "QuestTracker"
+	t.Text = ""
+	t.AutoButtonColor = false
+	t.Size = UDim2.fromOffset(160, 34)
+	-- PC: directly under the sidebar tiles (left column); phones: under the top-left tiles
+	t.Position = if touch then UDim2.fromOffset(12, 350) else UDim2.new(0, 16, 0.5, 156)
+	t.BackgroundColor3 = C.Window
+	t.BackgroundTransparency = 0.12
+	t.BorderSizePixel = 0
+	Components.corner(t, Theme.Radius.Small)
+	Components.stroke(t, Theme.Stroke.Thick)
+	t.Parent = layer
+	trackerText = Components.label({ Name = "Text", Text = "", TextSize = 16, Size = UDim2.new(1, -8, 1, 0), Position = UDim2.fromOffset(4, 0), Parent = t })
 	local pulse = Instance.new("UIScale")
 	pulse.Parent = t
 	trackerPulse = pulse
 	tracker = t
-	button.Activated:Connect(function()
-		if QuestController.ClaimableCount() > 0 then
-			QuestController.Toggle()
-		else
-			trackerOpen = not trackerOpen
-			refreshTracker()
-		end
+	t.Activated:Connect(function()
+		QuestController.Toggle()
 	end)
 	-- pulse while something is ready to claim
 	task.spawn(function()
@@ -270,7 +234,7 @@ function QuestController.Start()
 	gui.Name = "Quests"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.DisplayOrder = 4
+	gui.DisplayOrder = 10 -- opened on purpose: above the map vote and the HUD
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
