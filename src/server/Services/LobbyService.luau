@@ -1,6 +1,6 @@
 --!strict
 -- LobbyService: builds the Sky Lodge and runs its activities — obby rewards, fall
--- resets and ghost "haunt" pings. Hands the vote pads to VoteService and the
+-- resets and ghost bolts (DisasterService.GhostBolt) from spectating ghosts. Hands the vote pads to VoteService and the
 -- leaderboard slots and Hall of Legends podium to LeaderboardService.
 
 local Debris = game:GetService("Debris")
@@ -15,6 +15,7 @@ local Lobby = require(ServerScriptService.Server.World.Lobby)
 
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
+local DisasterService = require(script.Parent.DisasterService)
 local QuestService = require(script.Parent.QuestService)
 local RoleService = require(script.Parent.RoleService)
 local ScoringService = require(script.Parent.ScoringService)
@@ -135,8 +136,14 @@ function LobbyService.Init()
 		if (pingCooldown[player] or 0) > now then
 			return
 		end
-		pingCooldown[player] = now + Config.Scoring.GhostPingCooldown
-		ghostPing(position)
+		-- a ghost bolt when the arena takes one (global gap); otherwise the harmless ping
+		if DisasterService.GhostBolt(player, position) then
+			pingCooldown[player] = now + Config.Ghost.Cooldown
+			player:SetAttribute(Config.Attributes.GhostReadyAt, workspace:GetServerTimeNow() + Config.Ghost.Cooldown)
+		else
+			pingCooldown[player] = now + Config.Scoring.GhostPingCooldown
+			ghostPing(position)
+		end
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)

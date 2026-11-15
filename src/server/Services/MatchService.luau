@@ -175,7 +175,7 @@ local function onDied(player: Player, character: Model)
 			end
 		end
 		updateAlive()
-		banner:FireClient(player, "ELIMINATED", "Spectate & haunt, or shop and explore the lodge until the next round", RED)
+		banner:FireClient(player, "ELIMINATED", "Spectate and drop 👻 ghost bolts for coins, or shop until the next round", RED)
 	end
 end
 
@@ -412,10 +412,14 @@ local function active(god: Player?)
 
 	local castingOpen = false
 	local suddenDeath = false
+	local finalRush = false
+	local startSurvivors = 0
+	ReplicatedStorage:SetAttribute(Attributes.FinalRush, false)
 	while state.TimeRemaining > 0 do
 		tick()
 		local elapsed = M.RoundDuration - state.TimeRemaining
 		if not castingOpen and elapsed >= M.PrepDuration then
+			startSurvivors = #RoleService.GetAliveSurvivors()
 			castingOpen = true
 			DisasterService.SetCastingOpen(true)
 			LobbyService.SetGhostPingsOpen(true)
@@ -442,6 +446,16 @@ local function active(god: Player?)
 		local aliveCount = #RoleService.GetAliveSurvivors()
 		if survivorsAssigned and aliveCount == 0 then
 			break -- everyone is out: skip straight to the podium
+		end
+		-- Final Rush: most of the survivors are out; skip ahead so the eliminated aren't left
+		-- waiting (sudden death starts FinalRushLead seconds from now)
+		local rushAt = math.max(1, math.floor(startSurvivors * M.FinalRushShare))
+		if castingOpen and not finalRush and not suddenDeath and startSurvivors >= 2 and aliveCount <= rushAt and state.TimeRemaining > M.SuddenDeathDuration + M.FinalRushLead then
+			finalRush = true
+			state.TimeRemaining = M.SuddenDeathDuration + M.FinalRushLead
+			ReplicatedStorage:SetAttribute(Attributes.TimeRemaining, state.TimeRemaining)
+			ReplicatedStorage:SetAttribute(Attributes.FinalRush, true)
+			banner:FireAllClients("FINAL RUSH!", string.format("%d left standing: sudden death in %d seconds", aliveCount, M.FinalRushLead), Color3.fromRGB(255, 170, 40))
 		end
 		DisasterService.SetHunterPulse(aliveCount == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
 		MutatorService.Update(state.TimeRemaining, M.RoundDuration, 1)

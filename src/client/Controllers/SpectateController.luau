@@ -1,6 +1,7 @@
 --!strict
 -- SpectateController: eliminated / waiting players fly a free orbit camera over
--- the arena and can "haunt" it with harmless ghost pings (Poltergeist mode), and spend a
+-- the arena and can drop ghost bolts on it (Config.Ghost: a small telegraphed zap that pays
+-- coins per survivor hit; a harmless ping when the arena is busy), and spend a
 -- few coins on a survivor: a firework cheer, a speed berry or a bandage (Config.Cheers).
 -- Anyone not in the live round (joined mid-round, or eliminated) also gets the Waiting
 -- card: when the next round starts, plus SPECTATE / LODGE and SHOP buttons. A mid-round
@@ -103,7 +104,7 @@ function SpectateController.Enter()
 				then OrbitCamera.ScreenToWorld(Vector2.new(input.Position.X, input.Position.Y), true)
 				else OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 			if point then
-				nextPing = now + Config.Scoring.GhostPingCooldown
+				nextPing = now + Config.Ghost.Cooldown
 				Remotes.get("GhostPing"):FireServer(point)
 			end
 		end
@@ -131,11 +132,12 @@ function SpectateController.Start()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
+	local baseHint = if Components.isTouch()
+		then "👻 Tap the arena to drop a ghost bolt (+coins per zap) · Drag to fly, pinch to zoom"
+		else "👻 Click the arena to drop a ghost bolt (+coins per zap) · WASD/QE/Scroll to fly"
 	hint = Components.label({
 		Name = "Hint",
-		Text = if Components.isTouch()
-			then "👻 SPECTATING · Tap the arena to haunt · Drag to fly, pinch to zoom"
-			else "👻 SPECTATING · Click the arena to haunt · WASD/QE/Scroll to fly",
+		Text = baseHint,
 		TextSize = 22,
 		Color = C.PurpleLight,
 		Size = UDim2.fromOffset(760, 30),
@@ -236,9 +238,16 @@ function SpectateController.Start()
 	end
 	task.spawn(function()
 		while true do
-			task.wait(1)
+			task.wait(0.5)
 			if gui.Enabled then
 				refreshTarget()
+				-- the ghost bolt's own cooldown, so a click never feels ignored
+				local readyAt = player:GetAttribute(Attributes.GhostReadyAt)
+				local wait = if typeof(readyAt) == "number" then math.ceil(readyAt - workspace:GetServerTimeNow()) else 0
+				hint.Text = if ReplicatedStorage:GetAttribute(Attributes.CastingOpen) ~= true
+					then "👻 Ghost bolts open when the disasters start"
+					elseif wait > 0 then string.format("👻 Ghost bolt recharging · %ds", wait)
+					else baseHint
 			end
 		end
 	end)
@@ -316,7 +325,7 @@ function SpectateController.Start()
 		local t = ReplicatedStorage:GetAttribute(Attributes.TimeRemaining) :: number? or 0
 		local nextRound = t + M.RoundEndDuration + M.IntermissionDuration
 		waitingTitle.Text = if player:GetAttribute(Attributes.Role) == "Survivor" then "💀 ELIMINATED" else "⏳ ROUND IN PROGRESS"
-		waitingTimer.Text = string.format("You're in the next round · about %d:%02d", nextRound // 60, nextRound % 60)
+		waitingTimer.Text = string.format("Next round ~%d:%02d · 👻 spectate to zap", nextRound // 60, nextRound % 60)
 		if joinedMid and autoAt > 0 and os.clock() >= autoAt then
 			autoAt = 0
 			SpectateController.Enter()

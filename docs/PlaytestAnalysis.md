@@ -113,7 +113,7 @@ Very engaged in round 1-3 (the God hand, the VS card, destruction, colourful map
 
 ## Suggested next steps (not done; for discussion)
 
-1. Shorten dead time: shorter rounds when most survivors are gone, a "next round" fast-forward when everyone left alive is eliminated, or a mini-game for the eliminated (a ghost team that can drop small hazards for coins).
+1. ~~Shorten dead time~~ **Done:** Final Rush (the clock jumps to sudden death once only a quarter of the survivors are left) and ghost bolts (the eliminated zap survivors from spectate for coins).
 2. A calmer first join: hold the Daily Reward until after the first round; hide the Welcome Pack and the God BUY button until round 2 or 3.
 3. Simplify the economy view for new players (one "Coins" shop tab first, the rest unlocked later) and use simpler words on banners.
 4. Give survivors one active counter-play (a short-cooldown "brace" or "shield bash" against debris).

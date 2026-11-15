@@ -406,6 +406,10 @@ local Config = {
 		MinPlayers = 1, -- 1 keeps Play Solo fully playable
 		IntermissionDuration = 30, -- lobby break, map vote, then the build + countdown
 		LobbyBreak = 10, -- first seconds of intermission: free time to shop, spin and explore before the vote
+		-- Final Rush: once only this share of the round's survivors is left (at least 1), the
+		-- clock jumps to sudden death + FinalRushLead seconds, so the eliminated don't wait long
+		FinalRushShare = 0.25,
+		FinalRushLead = 10,
 		RoundDuration = 85,
 		PrepDuration = 10, -- survivors scatter, God charges energy
 		SuddenDeathDuration = 20, -- final seconds: rising fluid + double regen
@@ -455,6 +459,18 @@ local Config = {
 		StartEnergy = 25,
 		RegenPerSecond = 8, -- raised with the bigger, more numerous buildings
 		SuddenDeathRegenMultiplier = 2,
+	},
+
+	-- Ghost bolts: eliminated players (and mid-round joiners) in spectate click the arena to
+	-- drop a small purple bolt after a short telegraph. It zaps survivors for a little damage
+	-- and pays the ghost coins per survivor hit; it never credits kills or breaks buildings.
+	Ghost = {
+		Radius = 6,
+		WarningTime = 1.2,
+		Damage = 8,
+		Cooldown = 8, -- per ghost
+		GlobalGap = 1.2, -- seconds between any two ghost bolts (a crowd of ghosts can't swarm)
+		HitCoins = 6,
 	},
 
 	-- God vs survivors balance (DisasterService / MatchService). The God should get some or
@@ -1039,7 +1055,7 @@ local Config = {
 		ObbyCooldown = 15,
 		FirstRoundBonus = 100, -- one-time "First Round Completed!" coins
 		FriendBoost = 0.2, -- +20% round coins while a Roblox friend is in the server
-		GhostPingCooldown = 5,
+		GhostPingCooldown = 5, -- (old harmless pings; ghost bolts use Config.Ghost)
 		KillCreditWindow = 4,
 	},
 
@@ -1420,6 +1436,8 @@ local Config = {
 		SolarFlare = "SolarFlare", -- Player: owns the day-2 Solar Flare dash trail
 		GodRounds = "GodRounds", -- Player: rounds played as the God
 		FriendBoost = "FriendBoost", -- Player: a Roblox friend is in the server (+20% round coins)
+		GhostReadyAt = "GhostReadyAt", -- Player: server time their next ghost bolt is ready
+		FinalRush = "FinalRush", -- ReplicatedStorage: the Final Rush has started this round
 		SpeedUntil = "SpeedUntil", -- Player: server time a speed pickup ends
 		ShieldCharges = "ShieldCharges", -- Player: one-hit shields from air drops
 		SettingPrefix = "Set_", -- Player: saved quick settings (LowFx, Shake, Music, Sfx)

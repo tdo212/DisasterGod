@@ -16,6 +16,8 @@ With no human God (solo play, or nobody picked), the **Storm Director** AI plays
 
 The round ends early as soon as no survivors are left.
 
+**Final Rush** (`Config.Match.FinalRushShare` / `FinalRushLead`): once only a quarter of the round's survivors are left (at least 1, in rounds that started with 2 or more), the clock jumps so sudden death starts in 10 seconds, with a "FINAL RUSH!" banner. The last survivors get a tense finale and the eliminated wait seconds, not a minute, for the next round. The Waiting card counts down to the next round.
+
 **Round start: GOD vs SURVIVORS** (RoleRevealController, every round, for everyone): a card slams in over the fly-by. Portraits flick through every player like a roulette and land on the God (purple side, horns), a big VS hits, then the survivors' faces pop in on the green side. Your own face gets a gold ring and a YOU chip. Banners and the tutorial wait until it lifts away. It replaces the old "SURVIVE!" banner.
 
 **Balance** (`Config.Balance`): the God should catch some or most survivors, not always all of them, and abilities improve a survivor's odds.
@@ -68,7 +70,7 @@ Every arena has, on scanned free ground away from spawns and hazards:
 ### Eliminated / waiting players
 - Respawn straight into the **Sky Lodge** lobby (watch from the observation deck).
 - **Waiting card** (SpectateController): while a round runs without you, a card at the bottom says ELIMINATED or ROUND IN PROGRESS, when you're back in ("in the next round, about 1:20"), with SPECTATE / LODGE and SHOP buttons. A player who joins mid-round drops into spectate on their own after 4 s.
-- **Spectate** opens a free orbit camera over the arena. **Haunt**: click to drop harmless 👻 ghost pings (5 s cooldown).
+- **Spectate** opens a free orbit camera over the arena. **Ghost bolts** (`Config.Ghost`): click the arena to drop a small purple bolt after a 1.2 s telegraph. It zaps survivors in a 6-stud radius for 8 damage and pays the ghost 6 coins per survivor hit; it never credits a kill or breaks buildings. 8 s cooldown per ghost (shown on the spectate hint), and at most one ghost bolt every 1.2 s across the server so a crowd of ghosts can't swarm; when the arena is busy the click drops the old harmless 👻 ping instead. Being eliminated is no longer just waiting.
 - Run the Neon Climb obby for coins and check the leaderboards and Hall of Legends.
 
 ## God pity (the "one more round" hook)

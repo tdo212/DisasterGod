@@ -301,6 +301,47 @@ local function lightning(def: Ability, ground: Vector3, caster: Player?)
 	strike(def, ground, caster)
 end
 
+-- Ghost bolt (Config.Ghost): an eliminated player's small purple zap. Telegraphed, light
+-- damage, no kill credit and no structure damage; the ghost earns coins per survivor hit.
+local GH = Config.Ghost
+local GHOST_PURPLE = Color3.fromRGB(180, 120, 255)
+local lastGhostBolt = 0
+
+function DisasterService.GhostBolt(ghost: Player, target: Vector3): boolean
+	local now = os.clock()
+	if not state.Active or not state.CastingOpen or now - lastGhostBolt < GH.GlobalGap then
+		return false
+	end
+	lastGhostBolt = now
+	local ground = MapService.GroundAt(target)
+	task.spawn(function()
+		ringTelegraph(ground, GH.Radius, GH.WarningTime, GHOST_PURPLE)
+		task.wait(GH.WarningTime)
+		if not state.Active then
+			return
+		end
+		local top = ground + Vector3.new(0, 60, 0)
+		local seg = fxPart({ Name = "GhostBolt", Size = Vector3.new(0.8, 0.8, 60), CFrame = CFrame.lookAt((top + ground) / 2, ground), Color = GHOST_PURPLE })
+		Debris:AddItem(seg, 0.25)
+		local puff = fxPart({ Name = "GhostFlash", Shape = Enum.PartType.Ball, Size = Vector3.one * GH.Radius * 2, CFrame = CFrame.new(ground), Color = GHOST_PURPLE, Transparency = 0.4 })
+		TweenService:Create(puff, TweenInfo.new(0.35), { Transparency = 1 }):Play()
+		Debris:AddItem(puff, 0.4)
+		sound("Lightning", ground, 1.1, 1.6)
+		local hits = 0
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp and (hrp.Position - ground).Magnitude <= GH.Radius + 1.5 then
+				hurt(player, GH.Damage, nil, "Ghost Bolt")
+				hits += 1
+			end
+		end
+		if hits > 0 and ghost.Parent then
+			ScoringService.Award(ghost, GH.HitCoins * hits, string.format("👻 GHOST ZAP x%d", hits), GHOST_PURPLE)
+		end
+	end)
+	return true
+end
+
 -- Storm Deity: the bolt hops between the nearest survivors.
 local function chainLightning(def: Ability, ground: Vector3, caster: Player?)
 	local tele = CosmeticService.VfxOf(caster).Telegraph or BOLT_BLUE
