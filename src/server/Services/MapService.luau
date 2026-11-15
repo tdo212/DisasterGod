@@ -1,5 +1,6 @@
 --!strict
--- MapService: builds / clears the active arena and runs the sudden-death rising fluid.
+-- MapService: builds / clears the active arena and runs the rising fluid (sudden death on
+-- a Flash Flood Chaos Twist round).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")

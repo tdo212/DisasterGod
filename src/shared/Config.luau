@@ -412,7 +412,7 @@ local Config = {
 		FinalRushLead = 10,
 		RoundDuration = 85,
 		PrepDuration = 10, -- survivors scatter, God charges energy
-		SuddenDeathDuration = 20, -- final seconds: rising fluid + double regen
+		SuddenDeathDuration = 20, -- final seconds: God Overdrive (double regen, siren); fluid only on a Flash Flood twist
 		RoundEndDuration = 9,
 		RespawnDelay = 2,
 		AllowSoloRoleToggle = true, -- 1 player: toggle Survivor <-> God on the fly
@@ -693,6 +693,7 @@ local Config = {
 			{ Id = "TwilightStorm", Name = "Twilight Storm", Icon = "⛈️", Description = "Darker skies, same bright warnings", Color = Color3.fromRGB(130, 140, 255) },
 			{ Id = "Hyperdrive", Name = "Hyperdrive", Icon = "💨", Description = "Dash and Chaos Energy recharge 25% faster", Color = Color3.fromRGB(90, 230, 255) },
 			{ Id = "AirDrops", Name = "Air Drops", Icon = "📦", Description = "Supply crates land mid-round", Color = Color3.fromRGB(120, 240, 120) },
+			{ Id = "FlashFlood", Name = "Flash Flood", Icon = "🌊", Description = "The arena floods in sudden death: keep some high ground standing", Color = Color3.fromRGB(70, 170, 255) },
 		} :: { { Id: string, Name: string, Icon: string, Description: string, Color: Color3 } },
 		BouncyRestitution = 0.85,
 		BrittleScale = 2, -- wood and glass structure damage

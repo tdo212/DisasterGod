@@ -429,7 +429,12 @@ local function active(god: Player?)
 			suddenDeath = true
 			setSubPhase("SuddenDeath")
 			DisasterService.SetSuddenDeath(true)
-			MapService.StartFluid(M.SuddenDeathDuration)
+			-- God Overdrive: the fluid only rises on a Flash Flood round (a Chaos Twist,
+			-- announced at the start), so the finale is the God against the last few
+			local flood = MutatorService.Get() == "FlashFlood"
+			if flood then
+				MapService.StartFluid(M.SuddenDeathDuration)
+			end
 			local reached = RoleService.GetAliveSurvivors()
 			local godNow = RoleService.GetGod()
 			if godNow then
@@ -438,9 +443,13 @@ local function active(god: Player?)
 			AnalyticsService.SuddenDeath(reached)
 			EnvironmentService.SetMood("SuddenDeath", 3)
 			siren = AudioService.playGlobal("Siren", Config.Audio.SirenVolume, true)
-			local info = MapService.GetCurrent()
-			local fluidName = if info then info.FluidName else "WATER"
-			banner:FireAllClients("SUDDEN DEATH", fluidName .. " IS RISING — GET TO HIGH GROUND!", RED)
+			if flood then
+				local info = MapService.GetCurrent()
+				local fluidName = if info then info.FluidName else "WATER"
+				banner:FireAllClients("SUDDEN DEATH", fluidName .. " IS RISING — GET TO HIGH GROUND!", RED)
+			else
+				banner:FireAllClients("SUDDEN DEATH", "GOD OVERDRIVE — DOUBLE CHAOS ENERGY. KEEP MOVING!", RED)
+			end
 		end
 		updateAlive()
 		local aliveCount = #RoleService.GetAliveSurvivors()
