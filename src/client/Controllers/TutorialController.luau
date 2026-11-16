@@ -333,7 +333,7 @@ local function buildGui()
 	local layer = Components.scaledRoot(gui)
 	hint = Components.panel({ Name = "Hint", Size = UDim2.fromOffset(if touch then 520 else 600, 54), Color = C.Window, Transparency = 0.08, Parent = layer })
 	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Position = UDim2.new(0.5, 0, 1, if touch then -150 else -118)
+	hint.Position = UDim2.new(0.5, 0, 1, -(if touch then TU.HintLiftTouch else TU.HintLift))
 	hint.Visible = false
 	hintLabel = Components.label({ Name = "Text", Text = "", TextSize = if touch then 19 else 21, Size = UDim2.new(1, -110, 1, 0), Position = UDim2.fromOffset(14, 0), XAlign = Enum.TextXAlignment.Left, Parent = hint })
 	Components.button({
@@ -378,6 +378,10 @@ local function start(step: Step)
 	active = step
 	activeSince = os.clock()
 	hintLabel.Text = "👉 " .. (if touch and step.TextTouch then step.TextTouch else step.Text)
+	-- the God's hotbar is taller: lift the card clear of it
+	local god = step.Id == "GodCast"
+	local lift = if god then (if touch then TU.GodHintLiftTouch else TU.GodHintLift) else (if touch then TU.HintLiftTouch else TU.HintLift)
+	hint.Position = UDim2.new(0.5, 0, 1, -lift)
 	hint.Visible = true
 	Analytics.track("TutorialStep", step.Id .. ":shown")
 end

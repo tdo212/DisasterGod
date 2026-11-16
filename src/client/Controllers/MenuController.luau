@@ -1013,6 +1013,21 @@ function MenuController.Start()
 	end
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refreshSidebar)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refreshSidebar)
+	-- a round starting drops you into the arena: lobby windows close so nothing covers the
+	-- screen when the disasters begin (a spin in progress is left to finish)
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(function()
+		local role = player:GetAttribute(Attributes.Role)
+		if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" or (role ~= "Survivor" and role ~= "DisasterGod") then
+			return
+		end
+		if shop.IsOpen() then
+			shop.Close()
+		end
+		QuestController.Close()
+		if not SpinController.IsSpinning() then
+			SpinController.Close()
+		end
+	end)
 	refreshSidebar()
 
 	ProximityPromptService.PromptTriggered:Connect(function(prompt)

@@ -189,7 +189,7 @@ function FeedController.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "FeedHUD"
 	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 2
+	gui.DisplayOrder = 0 -- under the HUD, so the Round Over window covers the feed on phones
 	gui.Parent = player:WaitForChild("PlayerGui")
 	local layer = Components.scaledRoot(gui)
 	-- top-right corner (under the wallet on phones)

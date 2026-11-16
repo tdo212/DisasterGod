@@ -268,8 +268,8 @@ local Kits: { Types.KitDefinition } = {
 	{ Id = "Architect", Name = "The Architect", Icon = "🏛️", Description = "The balanced classic", Price = 0, Color = Color3.fromRGB(140, 60, 255), Abilities = { "Lightning", "Gust", "Meteor", "Tornado", "FaultCleave" } },
 	{ Id = "Storm", Name = "Storm Deity", Icon = "⛈️", Description = "Chain bolts and hurricanes", Price = 1500, Color = Color3.fromRGB(40, 140, 255), Abilities = { "Lightning", "ChainLightning", "Gust", "Tornado", "Meteor" } },
 	{ Id = "Magma", Name = "Magma Titan", Icon = "🔥", Description = "Eruptions, meteors, fissures", Price = 2500, Color = Color3.fromRGB(255, 110, 30), Abilities = { "Eruption", "Meteor", "FaultCleave", "Lightning", "Gust" } },
-	{ Id = "Glitch", Name = "Cyber Glitch", Icon = "👾", Description = "Glitch pulses and chain bolts", Price = 4000, Color = Color3.fromRGB(255, 60, 200), Abilities = { "Glitch", "ChainLightning", "Lightning", "Tornado", "FaultCleave" } },
 	{ Id = "Cataclysm", Name = "Cataclysm", Icon = "🕳️", Description = "Singularities, spires, barrages", Price = 3500, Color = Color3.fromRGB(120, 80, 255), Abilities = { "MeteorBarrage", "TectonicSpire", "ChainArc", "GravitySingularity", "Gust" } },
+	{ Id = "Glitch", Name = "Cyber Glitch", Icon = "👾", Description = "Glitch pulses and chain bolts", Price = 4000, Color = Color3.fromRGB(255, 60, 200), Abilities = { "Glitch", "ChainLightning", "Lightning", "Tornado", "FaultCleave" } },
 }
 
 -- God Packs: a GodSkin cosmetic that also swaps one ability for its signature version
@@ -1003,7 +1003,7 @@ local Config = {
 		Steps = {
 			{ Id = "Dash", Text = "Press Q (or click DASH) to dash out of danger", TextTouch = "Tap DASH to dash out of danger" },
 			{ Id = "Hide", Text = "Follow the arrows: hide indoors and stand still", TextTouch = "Follow the arrows: hide indoors and stand still" },
-			{ Id = "GodCast", Text = "Pick a disaster (keys 1-5), then click the arena to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
+			{ Id = "GodCast", Text = "Pick a disaster (1-5), then click to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
 		} :: { { Id: string, Text: string, TextTouch: string? } },
 		Cinematics = { "IntroSurvivor", "IntroGod" }, -- first-round cinematic (saved like steps); a player sees only one of them, once
 		ArrowImage = "rbxassetid://136636775487081", -- yellow pointer arrow (tools/icons/gen_tutorial.py)
@@ -1015,6 +1015,12 @@ local Config = {
 		ArriveDistance = 9, -- the Hide step completes this close to the doorway (or when Hidden)
 		StepTimeout = 40, -- a step left unfinished this long counts as shown
 		TickSeconds = 0.3,
+		-- hint card bottom, in canvas units above the screen bottom (survivor: over the gear
+		-- hotbar; God: over the taller ability hotbar and its controls line)
+		HintLift = 118,
+		HintLiftTouch = 150,
+		GodHintLift = 214,
+		GodHintLiftTouch = 236,
 	},
 
 	Onboarding = {
@@ -1439,6 +1445,7 @@ local Config = {
 
 	-- Attribute names used to replicate state to clients.
 	Attributes = {
+		Spectating = "Spectating", -- local player, client-only: the spectate view (cheer bar) is open
 		RoundPhase = "RoundPhase", -- ReplicatedStorage
 		SubPhase = "SubPhase", -- ReplicatedStorage
 		TimeRemaining = "RoundTimeRemaining", -- ReplicatedStorage

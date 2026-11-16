@@ -34,7 +34,8 @@ local touch = false
 local function offersVisible(): boolean
 	local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
 	local role = player:GetAttribute(Attributes.Role)
-	return phase ~= "Active" or role == "Spectator"
+	-- the spectate view's cheer bar sits on the right too: the offers make room for it
+	return (phase ~= "Active" or role == "Spectator") and player:GetAttribute(Attributes.Spectating) ~= true
 end
 
 local function formatTime(seconds: number): string
@@ -470,6 +471,7 @@ local function buildGodChance()
 	end
 	player:GetAttributeChangedSignal(Attributes.GodChance):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
+	player:GetAttributeChangedSignal(Attributes.Spectating):Connect(refresh)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)
 	refresh()
 
@@ -578,6 +580,7 @@ local function buildWelcomeOffer()
 		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and played >= 1 and offersVisible() and not inRound
 	end
 	player:GetAttributeChangedSignal(Attributes.WelcomeClaimed):Connect(refresh)
+	player:GetAttributeChangedSignal(Attributes.Spectating):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.RoundsPlayed):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refresh)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refresh)

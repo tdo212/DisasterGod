@@ -243,6 +243,12 @@ function QuestController.Toggle()
 	end
 end
 
+function QuestController.Close()
+	if window.IsOpen() then
+		window.Close()
+	end
+end
+
 function QuestController.Start()
 	if started then
 		return

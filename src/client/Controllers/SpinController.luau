@@ -525,6 +525,10 @@ function SpinController.IsOpen(): boolean
 	return open
 end
 
+function SpinController.IsSpinning(): boolean
+	return spinning
+end
+
 function SpinController.Open()
 	if open then
 		return

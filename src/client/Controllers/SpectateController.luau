@@ -72,6 +72,7 @@ function SpectateController.Exit()
 	end
 	active = false
 	gui.Enabled = false
+	player:SetAttribute(Attributes.Spectating, false)
 	refreshToggle()
 	if inputConn then
 		inputConn:Disconnect()
@@ -86,6 +87,7 @@ function SpectateController.Enter()
 	end
 	active = true
 	gui.Enabled = true
+	player:SetAttribute(Attributes.Spectating, true)
 	refreshToggle()
 	OrbitCamera.Enable(Config.World.ArenaCenter)
 	inputConn = UserInputService.InputBegan:Connect(function(input, processed)

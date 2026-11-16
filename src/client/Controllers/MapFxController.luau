@@ -215,6 +215,8 @@ local function spin()
 	end
 end
 
+local filteredArena: Instance? = nil
+
 local function launchCheck()
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -230,7 +232,11 @@ local function launchCheck()
 	if not arena then
 		return
 	end
-	rayParams.FilterDescendantsInstances = { arena }
+	-- rebuild the filter only when the arena changes (this runs every frame on the ground)
+	if filteredArena ~= arena then
+		filteredArena = arena
+		rayParams.FilterDescendantsInstances = { arena }
+	end
 	local hit = workspace:Raycast(root.Position, Vector3.new(0, -4.5, 0), rayParams)
 	local power = hit and hit.Instance:GetAttribute("LaunchPower")
 	if typeof(power) == "number" then
