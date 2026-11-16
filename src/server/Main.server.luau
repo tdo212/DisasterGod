@@ -15,6 +15,7 @@ local order = {
 	"QuestService",
 	"RoleService",
 	"ProgressionService",
+	"CommunityService",
 	"EnvironmentService",
 	"DestructionService",
 	"MapService",

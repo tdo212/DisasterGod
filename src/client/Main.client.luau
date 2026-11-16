@@ -27,6 +27,7 @@ local order = {
 	"SpinController",
 	"QuestController",
 	"MenuController",
+	"CommunityController", -- lodge community reward + the one-time favourite prompt
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
 	"SaveController",
 	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)

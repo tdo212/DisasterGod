@@ -14,7 +14,9 @@ Every code change is applied in **both** places:
 Disk is the source of truth for git; Studio must never drift from it. If they disagree, the disk version wins and is re-synced to Studio.
 
 Sync notes:
-- Studio's Assistant HTTP allowlist blocks localhost, so sources can't be pulled over HTTP. Push whole files inline with `execute_luau` (long-bracket `[==[ ... ]==]` strings) or apply the same exact replacements with `multi_edit`.
+- Studio's Assistant HTTP allowlist blocks localhost, so sources can't be pulled over HTTP. Sync with `multi_edit` (exact replacements, or a new script created with its whole content).
+- The place is in Team Create: setting `.Source` from `execute_luau` changes what Edit-mode `.Source` reads, but playtests and saves can keep running an older script draft. Never sync with `.Source =`. To replace a whole script, destroy it and recreate it with `multi_edit` (`className` + one edit with an empty `old_string`).
+- Verify against what actually runs: in Play Solo, compute the checksums from the **Server** datamodel, not only in Edit.
 - Verify after every sync: `python tools/checksum.py` prints byte length + checksum per file; compute the same checksum on each script's `.Source` in Studio (`sum = (sum + byte_i * ((i-1) % 251 + 1)) % 2147483647`) and compare. `.gitattributes` keeps files LF so the numbers match.
 
 ## DataModel mapping

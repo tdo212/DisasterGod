@@ -28,6 +28,8 @@ local NAMES = {
 	"ClaimStreak", -- C->S () open today's lodge streak chest
 	"SaveSetting", -- C->S (key, value) quick settings (LowFx, Shake, Music, Sfx)
 	"Analytics", -- C->S (event, detail?) UI-only funnel steps (Config.Analytics.ClientEvents)
+	"CommunityClaim", -- C->S () check group membership and pay the one-time community reward
+	"CommunityPrompt", -- S->C (kind) "Favorite": show Roblox's favourite prompt (once per player)
 }
 
 -- High-rate, loss-tolerant streams (UnreliableRemoteEvent): a dropped update is simply

@@ -179,6 +179,8 @@ export type PlayerProfile = {
 	GoldenTrail: boolean,
 	SolarFlare: boolean,
 	GodRounds: number,
+	CommunityClaimed: boolean, -- the one-time community (group) reward was paid
+	FavoriteAsked: boolean, -- the one-time favourite prompt was shown
 	Set_LowFx: boolean,
 	Set_Shake: number,
 	Set_Music: boolean,

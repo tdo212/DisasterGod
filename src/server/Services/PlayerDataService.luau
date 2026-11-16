@@ -59,6 +59,8 @@ local function defaultProfile(): Profile
 		GoldenTrail = false,
 		SolarFlare = false,
 		GodRounds = 0,
+		CommunityClaimed = false,
+		FavoriteAsked = false,
 		Set_LowFx = false,
 		Set_Shake = 1,
 		Set_Music = true,
@@ -100,6 +102,7 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute(Attributes.GoldenTrail, profile.GoldenTrail)
 	player:SetAttribute(Attributes.SolarFlare, profile.SolarFlare)
 	player:SetAttribute(Attributes.GodRounds, profile.GodRounds)
+	player:SetAttribute(Attributes.CommunityClaimed, profile.CommunityClaimed)
 	player:SetAttribute(Attributes.LoginStreak, profile.LoginStreak)
 	for _, key in { "LowFx", "Shake", "Music", "Sfx" } do
 		player:SetAttribute(Attributes.SettingPrefix .. key, (profile :: any)["Set_" .. key])

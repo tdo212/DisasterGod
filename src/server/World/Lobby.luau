@@ -718,6 +718,48 @@ local function skinDisplays(model: Model, L: Vector3)
 	end
 end
 
+-- Community board by the deck doorway: a glowing plinth (the prompt, the name tag) in front
+-- of a JOIN THE COMMUNITY sign on timber posts. CommunityService pays the one-time reward
+-- (Config.Community) once the server has checked the player is in the group.
+local function communityBoard(model: Model, L: Vector3)
+	local f = folder(model, "Community")
+	local CM = Config.Community
+	local kitName = CM.Kit
+	for _, kit in Config.Kits do
+		if kit.Id == CM.Kit then
+			kitName = kit.Name
+		end
+	end
+	local accent = Color3.fromRGB(80, 200, 255)
+	local base = L + Vector3.new(-24, 0, 42)
+	local plinth = LodgeProps.plinth(f, base, 6, accent, 2.6)
+	LodgeProps.light(plinth.Pedestal, 13, 0.8, accent)
+	Signage.billboard(plinth.Pedestal, {
+		Title = "FREE REWARD",
+		Subtitle = string.format("+%d COINS + %s KIT", CM.Coins, string.upper(kitName)),
+		Accent = accent,
+		Offset = Vector3.new(0, 4.6, 0),
+		Width = 7.2,
+		Height = 2.1,
+	})
+	local p = prompt(plinth.Pedestal, "CommunityPrompt", "Join & claim", "Community reward")
+	p.MaxActivationDistance = 12
+	-- the sign behind it, on two posts, readable from the spawn
+	local signAt = base + Vector3.new(0, 10, 4)
+	for _, x in { -7.6, 7.6 } do
+		Builder.block(f, "Post", base + Vector3.new(x, 6.3, 4), Vector3.new(0.9, 12.6, 0.9), LOG, Enum.Material.Wood)
+		Builder.block(f, "PostFoot", base + Vector3.new(x, 0.25, 4), Vector3.new(1.4, 0.5, 1.4), GOLD, Enum.Material.Metal)
+	end
+	Signage.board(f, CFrame.new(signAt), 15, 3.6, {
+		Name = "CommunitySign",
+		Title = "JOIN THE COMMUNITY",
+		Subtitle = string.format("free %s kit + %d coins", kitName, CM.Coins),
+		Icon = "👥",
+		Accent = accent,
+		DoubleSided = true,
+	})
+end
+
 local function godPerch(model: Model): BasePart
 	local p = Config.World.GodPerch
 	local f = folder(model, "GodPerch")
@@ -755,6 +797,7 @@ function Lobby.build(parent: Instance): LobbyInfo
 	spinStand(model, L)
 	passPedestals(model, L)
 	skinDisplays(model, L)
+	communityBoard(model, L)
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"

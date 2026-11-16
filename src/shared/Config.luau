@@ -944,6 +944,20 @@ local Config = {
 	GodPacks = GodPacks,
 	DefaultKit = "Architect",
 
+	-- Community (the Roblox group that owns the game) and favourites. Joining the group pays
+	-- a one-time reward, verified on the server (IsInGroupAsync). Favouriting is only asked
+	-- for, once per player, and never rewarded: Roblox's rules forbid paying for favourites
+	-- or likes.
+	Community = {
+		GroupId = 0, -- 0 = the group that owns the place (game.CreatorId)
+		Coins = 500,
+		Kit = "Storm", -- Storm Deity God kit
+		KitOwnedCoins = 1000, -- paid instead of the kit when it is already owned
+		FavoriteAfterRounds = { 2, 5 }, -- the favourite prompt comes once, after this many rounds (fixed per player)
+		FavoriteDelay = 4, -- seconds into the lobby break
+		CheckCooldown = 5, -- seconds between claim checks per player
+	},
+
 	Spin = {
 		Rewards = SpinRewards,
 		FreeIntervalSeconds = 600,
@@ -1444,6 +1458,8 @@ local Config = {
 	-- Attribute names used to replicate state to clients.
 	Attributes = {
 		Spectating = "Spectating", -- local player, client-only: the spectate view (cheer bar) is open
+		CommunityClaimed = "CommunityClaimed", -- Player: the community reward has been paid
+		CommunityGroupId = "CommunityGroupId", -- ReplicatedStorage: the group the lodge board invites to (0 = none)
 		RoundPhase = "RoundPhase", -- ReplicatedStorage
 		SubPhase = "SubPhase", -- ReplicatedStorage
 		TimeRemaining = "RoundTimeRemaining", -- ReplicatedStorage

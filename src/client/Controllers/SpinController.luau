@@ -71,7 +71,7 @@ local function prizeText(reward: any): string
 	elseif reward.Kind == "God" then
 		return "BE THE GOD"
 	elseif reward.Kind == "Kit" then
-		return "FREE GOD KIT"
+		return "SURVIVAL KIT"
 	end
 	return string.upper(tostring(reward.Label))
 end
