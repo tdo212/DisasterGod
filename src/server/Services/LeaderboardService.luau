@@ -32,7 +32,7 @@ local TEMPLATE_MAIN_ATTRIBUTE = "TopTimePlayedLeaderboard_IsMainBoard"
 local TEST_THUMBNAIL = "rbxassetid://1146888101"
 local STATUE_SETTLE = 0.5 -- seconds for accessory welds to seat before freezing a statue
 
-type Row = { UserId: number, Value: number, Placeholder: boolean? }
+type Row = { UserId: number, Value: number }
 type Board = { Model: Model, Stat: string, Unit: string, Store: OrderedDataStore?, Rig: any }
 type HallSlot = { Spot: CFrame, Label: TextLabel, UserId: number?, Statue: Model? }
 
@@ -102,28 +102,40 @@ local function thumbOf(userId: number): string
 	return TEST_THUMBNAIL
 end
 
+-- The saved all-time top (live servers), merged with everyone in this server right now,
+-- so a player who joins and scores shows up on the next refresh, before their round-end
+-- write has reached the ordered store.
 local function fetch(stat: string, store: OrderedDataStore?): { Row }
 	local rows: { Row } = {}
+	local index: { [number]: Row } = {}
 	if store then
 		local ok, err = pcall(function()
 			local page = store:GetSortedAsync(false, ROWS):GetCurrentPage()
 			for _, entry in page do
 				local userId = tonumber(entry.key)
-				if userId and typeof(entry.value) == "number" then
-					table.insert(rows, { UserId = userId, Value = entry.value })
+				if userId and typeof(entry.value) == "number" and not index[userId] then
+					local row = { UserId = userId, Value = entry.value }
+					index[userId] = row
+					table.insert(rows, row)
 				end
 			end
 		end)
 		if not ok then
 			warn("[Leaderboard] fetch failed for", stat, err)
 		end
-		return rows
 	end
 	for _, player in Players:GetPlayers() do
 		local profile = PlayerDataService.Get(player)
 		local value = profile and (profile :: any)[stat]
 		if typeof(value) == "number" and value > 0 then
-			table.insert(rows, { UserId = player.UserId, Value = value })
+			local row = index[player.UserId]
+			if row then
+				row.Value = math.max(row.Value, value)
+			else
+				row = { UserId = player.UserId, Value = value }
+				index[player.UserId] = row
+				table.insert(rows, row)
+			end
 		end
 	end
 	table.sort(rows, function(a, b)
@@ -132,32 +144,6 @@ local function fetch(stat: string, store: OrderedDataStore?): { Row }
 	while #rows > ROWS do
 		table.remove(rows)
 	end
-	return rows
-end
-
--- The place's creator stands in on any board or podium that has room, until real
--- players fill it (a board is never blank on a brand-new server or datastore).
-local function creatorId(): number
-	if game.CreatorType == Enum.CreatorType.User and game.CreatorId > 0 then
-		return game.CreatorId
-	end
-	return L.PlaceholderUserId
-end
-
-local function withPlaceholder(rows: { Row }, stat: string, limit: number): { Row }
-	local id = creatorId()
-	if id <= 0 or #rows >= limit then
-		return rows
-	end
-	for _, row in rows do
-		if row.UserId == id then
-			return rows
-		end
-	end
-	local live = Players:GetPlayerByUserId(id)
-	local profile = live and PlayerDataService.Get(live)
-	local value = profile and (profile :: any)[stat]
-	table.insert(rows, { UserId = id, Value = if typeof(value) == "number" then value else 0, Placeholder = true })
 	return rows
 end
 
@@ -178,7 +164,7 @@ local function render(board: Board, rows: { Row })
 		photo.Visible = row ~= nil
 		if row then
 			name.Text = nameOf(row.UserId)
-			score.Text = if row.Placeholder and row.Value <= 0 then "Creator · beat me!" else string.format("%s %s", formatNumber(row.Value), board.Unit)
+			score.Text = string.format("%s %s", formatNumber(row.Value), board.Unit)
 			photo.Image = thumbOf(row.UserId)
 		end
 	end
@@ -195,7 +181,7 @@ end
 
 local function refresh(board: Board)
 	local ok, err = pcall(function()
-		render(board, withPlaceholder(fetch(board.Stat, board.Store), board.Stat, ROWS))
+		render(board, fetch(board.Stat, board.Store))
 	end)
 	if not ok then
 		warn("[Leaderboard] render failed for", board.Stat, err)
@@ -486,9 +472,7 @@ local function updateHall(rows: { Row })
 			end
 			continue
 		end
-		slot.Label.Text = if row.Placeholder and row.Value <= 0
-			then string.format("#%d %s\n<font color=\"#FFD23C\">Creator · beat me!</font>", rank, nameOf(row.UserId))
-			else string.format("#%d %s\n<font color=\"#FFD23C\">%s %s</font>", rank, nameOf(row.UserId), formatNumber(row.Value), L.Hall.Unit)
+		slot.Label.Text = string.format("#%d %s\n<font color=\"#FFD23C\">%s %s</font>", rank, nameOf(row.UserId), formatNumber(row.Value), L.Hall.Unit)
 		if slot.UserId ~= row.UserId or not slot.Statue then
 			slot.UserId = row.UserId
 			local statue = buildStatue(row.UserId, slot.Spot, "Legend" .. rank, folder)
@@ -532,7 +516,7 @@ local function hallRows(): { Row }
 		end
 		table.insert(rows, row)
 	end
-	return withPlaceholder(rows, L.Hall.Stat, #hallSlots)
+	return rows
 end
 
 local hallBusy = false

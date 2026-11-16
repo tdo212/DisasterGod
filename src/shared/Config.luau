@@ -970,9 +970,7 @@ local Config = {
 		DancerLight = 1.6, -- board spotlight brightness on the dancer (template ships 10)
 		-- Hall of Legends podium in the lodge: the all-time top three of this stat stand on it
 		Hall = { Stat = "RoundsSurvived", Unit = "rounds", Subtitle = "Most rounds survived · all time" },
-		-- empty boards / podium places: the game's owner stands in (game.CreatorId for a
-		-- user-owned place; this id when group-owned), then metallic mannequins hold the rest
-		PlaceholderUserId = 7892599940,
+		-- podium places nobody has claimed yet hold gold / silver / bronze metal mannequins
 		HallPlaceholderColors = { Color3.fromRGB(255, 205, 70), Color3.fromRGB(200, 206, 218), Color3.fromRGB(205, 128, 60) },
 		Boards = {
 			{ Stat = "RoundsSurvived", Title = "TOP SURVIVORS", Unit = "rounds" },
