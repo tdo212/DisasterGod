@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
@@ -270,6 +271,28 @@ local shopOpener: ((string?) -> ())? = nil
 -- MenuController hands over its OpenShop (it requires this module, so not the reverse).
 function HUDController.SetShopOpener(fn: (string?) -> ())
 	shopOpener = fn
+end
+
+-- The round bar and the currency bar ride up into the Roblox top-bar row (the strip
+-- the GUI inset reserves, empty in the middle and on the right) instead of sitting
+-- under it. Re-run whenever the screen or the UI scale changes.
+local function liftIntoTopbar()
+	local function apply()
+		local inset = GuiService:GetGuiInset()
+		local up = inset.Y / math.max(Components.rootScale(layer), 0.01)
+		for _, name in { "RoundBar", "Wallet" } do
+			local obj = layer:FindFirstChild(name)
+			if obj and obj:IsA("GuiObject") then
+				obj.Position = UDim2.new(obj.Position.X.Scale, obj.Position.X.Offset, 0, Theme.Layout.TopbarMargin - up)
+			end
+		end
+	end
+	apply()
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+	local scale = layer:FindFirstChildOfClass("UIScale")
+	if scale then
+		scale:GetPropertyChangedSignal("Scale"):Connect(apply)
+	end
 end
 
 local function buildCoins()
@@ -1097,6 +1120,7 @@ function HUDController.Start()
 
 	buildRoundBar()
 	buildCoins()
+	liftIntoTopbar()
 	buildGodChance()
 	buildBanner()
 	buildWelcomeOffer()

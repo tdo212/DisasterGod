@@ -210,11 +210,16 @@ local function followJumpButton()
 			local size = math.max(56, jump.AbsoluteSize.X * 0.8)
 			dashButton.Size = UDim2.fromOffset(size, size)
 			dashButton.AnchorPoint = Vector2.new(1, 1)
-			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y + jump.AbsoluteSize.Y)
+			-- jump's AbsolutePosition is screen space; this ScreenGui's origin is shifted by the
+			-- device safe area (notch) and the top-bar inset, so convert into its space
+			local origin = gui.AbsolutePosition
+			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - origin.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y - origin.Y + jump.AbsoluteSize.Y)
 		end
 		apply()
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
+		table.insert(conns, gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
+		table.insert(conns, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
 	end
 	bind()
 	playerGui.DescendantAdded:Connect(function(d)
