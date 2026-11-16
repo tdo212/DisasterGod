@@ -781,7 +781,7 @@ local Config = {
 			{ Coins = 750, Cosmetic = "Sunforged", Fallback = { Coins = 1500 } },
 		} :: { { Coins: number, Spins: number?, SolarFlare: boolean?, Cosmetic: string?, Fallback: { Coins: number, Spins: number? }? } },
 		FirstWinMultiplier = 2, -- first survived round and first God win each day
-		ChestOffset = Vector3.new(-20, 0, -30), -- in the lodge, from LobbyOrigin
+		ChestOffset = Vector3.new(-12, 0, -31), -- in the lodge, from LobbyOrigin (clear of the God skin plinths' prompts)
 	},
 
 	-- Round-end superlatives on the summary screen.
@@ -822,6 +822,35 @@ local Config = {
 		MaxLights = 10, -- PointLights per map from dressing (lamps, holo boards)
 		FurniturePerFloor = 2, -- furnished pieces per floor of each highrise
 		FurnitureMax = 50, -- per map (part budget)
+	},
+
+	-- Sky Lodge showcase (World/Lobby.luau + World/LodgeProps.luau build it; the client's
+	-- LodgeController animates it). Decorative lodge lights (pedestals, lanterns, signs)
+	-- share the Details.MaxLights budget; the chandeliers, hearth and podium are extra.
+	Lodge = {
+		DisplayTag = "LodgeDisplay", -- CollectionService tag on showcase models the client animates
+		FlickerTag = "LodgeFlicker", -- lights that flicker (hearth, lanterns)
+		AuraTag = "LodgeAura", -- display particle auras (off in Low-FX)
+		AnimateDistance = 170, -- displays only idle-animate while the camera is this close to them
+		AnimateRate = 30, -- animation updates per second
+		DisplaySpin = 22, -- degrees per second, turntable spin of a showcased item
+		OrbitSpin = 75, -- degrees per second, orbiting shards / coins / runes
+		BobHeight = 0.35, -- studs up and down
+		BobSpeed = 1.6, -- radians per second
+		AuraRate = 5, -- particles per second per display aura (none in Low-FX)
+		FlickerAmount = 0.3, -- hearth and lantern lights wobble by this fraction
+		FlickerSpeed = 7,
+		SignPixelsPerStud = 50, -- SurfaceGui resolution on the signboards
+		HeaderDistance = 140, -- billboard name tags over the displays hide past this
+		-- per God skin display: particle aura style
+		Auras = {
+			StormEye = { Texture = "rbxasset://textures/particles/sparkles_main.dds", Color = Color3.fromRGB(140, 200, 255), Size = 0.5, Speed = 1.2 },
+			StoneFist = { Texture = "rbxasset://textures/particles/smoke_main.dds", Color = Color3.fromRGB(190, 175, 160), Size = 1.1, Speed = 0.6 },
+			MagmaClaw = { Texture = "rbxasset://textures/particles/fire_main.dds", Color = Color3.fromRGB(255, 120, 40), Size = 0.45, Speed = 2.2 },
+			CyberGauntlet = { Texture = "rbxasset://textures/particles/sparkles_main.dds", Color = Color3.fromRGB(70, 240, 255), Size = 0.35, Speed = 1.6 },
+			CelestialMask = { Texture = "rbxasset://textures/particles/sparkles_main.dds", Color = Color3.fromRGB(255, 225, 120), Size = 0.55, Speed = 0.8 },
+			StormSovereign = { Texture = "rbxasset://textures/particles/smoke_main.dds", Color = Color3.fromRGB(120, 135, 170), Size = 1.2, Speed = 0.7 },
+		} :: { [string]: { Texture: string, Color: Color3, Size: number, Speed: number } },
 	},
 
 	-- Enterable interiors dropped onto empty ground on every arena (MapService). Each is a

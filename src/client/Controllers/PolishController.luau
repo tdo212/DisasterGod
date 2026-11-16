@@ -20,6 +20,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config") :: ModuleScript)
 local GodSkins = require(Shared:WaitForChild("GodSkins") :: ModuleScript)
+local Signage = require(Shared:WaitForChild("Signage") :: ModuleScript)
 local Remotes = require(Shared:WaitForChild("Remotes") :: ModuleScript)
 
 local UI = script.Parent.Parent:WaitForChild("UI")
@@ -666,6 +667,14 @@ local function buildScreen()
 	frame.Material = Enum.Material.Neon
 	frame.Transparency = 0.4
 	frame.Parent = fxFolder
+	-- stud-style header plate above the screen, tilted with it (clear of the back wall)
+	Signage.board(fxFolder, screen.CFrame * CFrame.new(0, 7.9, -0.45), 13, 2.1, {
+		Name = "ArenaCamSign",
+		Title = "ARENA CAM",
+		Subtitle = "LIVE · watch the round",
+		Icon = "📺",
+		Accent = Color3.fromRGB(255, 80, 80),
+	})
 	-- a dark mounting arm from the back of the screen into the wall
 	local mount = screen.Position + screen.CFrame.LookVector * -0.4
 	local wallZ = origin.Z + PR.ArenaCamWallZ

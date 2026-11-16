@@ -14,8 +14,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Builder = require(script.Parent.Builder)
+local LodgeProps = require(script.Parent.LodgeProps)
 local Config = require(ReplicatedStorage.Shared.Config)
 local GodSkins = require(ReplicatedStorage.Shared.GodSkins)
+local Signage = require(ReplicatedStorage.Shared.Signage)
 
 local ROCK = Color3.fromRGB(125, 105, 90)
 local ROCK_DARK = Color3.fromRGB(95, 82, 75)
@@ -54,6 +56,7 @@ local OBBY_PADS = 11
 local OBBY_STEP_Z = 8
 local OBBY_RISE = 1.5
 local DIVIDER_X = 67
+local CHORD_Y = WALL_H - 2.7 -- underside of the tie beams' lower chords (signs hang to here)
 
 export type LobbyInfo = {
 	Model: Model,
@@ -154,6 +157,32 @@ local function chandelier(parent: Instance, L: Vector3, offset: Vector3)
 	end
 end
 
+-- Detail over the shell: stone-and-wood wainscot, arched side windows with mullions,
+-- heraldic shields on the wall posts and framed banners high on the back wall.
+local function architecture(model: Model, L: Vector3, beams: { number })
+	local f = folder(model, "Architecture")
+	LodgeProps.wainscot(f, L, HALF_X, FRONT_Z - BACK_Z, beams, function(side: number, z: number): boolean
+		return side < 0 and z > 15 and z < 35 -- behind the hearth
+	end)
+	-- back wall: a cap rail on the stone base
+	Builder.block(f, "BackCapRail", L + Vector3.new(0, 4.2, BACK_Z + 0.3), Vector3.new(HALF_X * 2, 0.45, 0.7), LOG, Enum.Material.Wood)
+	local shieldColors = { Color3.fromRGB(150, 40, 45), Color3.fromRGB(40, 80, 150), Color3.fromRGB(40, 110, 60) }
+	for _, side in { -1, 1 } do
+		for z = BACK_Z + 10, FRONT_Z - 10, 20 do
+			LodgeProps.archWindow(f, L, side * HALF_X, -side, z, 6, 26, 17.4)
+		end
+		local i = 0
+		for z = BACK_Z + 20, FRONT_Z - 20, 20 do
+			i += 1
+			LodgeProps.shield(f, L + Vector3.new(side * (HALF_X - 0.45), 29.5, z), -side, shieldColors[i % #shieldColors + 1])
+		end
+	end
+	local bannerColors = { Color3.fromRGB(140, 30, 40), Color3.fromRGB(35, 60, 130) }
+	for i, x in { -68, -44, 44, 68 } do
+		LodgeProps.banner(f, L + Vector3.new(x, 30, BACK_Z + 0.45), Vector3.new(0, 0, 1), bannerColors[i % 2 + 1], GOLD)
+	end
+end
+
 local function shell(model: Model, L: Vector3)
 	local f = folder(model, "Hall")
 
@@ -200,17 +229,34 @@ local function shell(model: Model, L: Vector3)
 	end
 	local header = Builder.block(f, "FrontHeader", L + Vector3.new(0, 30, FRONT_Z + 1), Vector3.new(HALF_X * 2 + 4, 8, 2), PLASTER, Enum.Material.Plaster)
 	Builder.block(f, "HeaderBeam", L + Vector3.new(0, 26.4, FRONT_Z + 1), Vector3.new(DECK_HALF_X * 2 + 3, 1.2, 2.6), LOG, Enum.Material.Wood)
-	local outSign = Builder.block(f, "LodgeSign", L + Vector3.new(0, 30, FRONT_Z + 2.2), Vector3.new(40, 6, 0.4), LOG_DARK, Enum.Material.Wood)
-	Builder.sign(outSign, Enum.NormalId.Back, "SKY LODGE", Color3.fromRGB(255, 225, 140))
-	local inSign = Builder.block(f, "DeckSign", L + Vector3.new(0, 30, FRONT_Z - 0.2), Vector3.new(36, 5, 0.4), LOG_DARK, Enum.Material.Wood)
-	Builder.sign(inSign, Enum.NormalId.Front, "OBSERVATION DECK", Color3.fromRGB(120, 240, 255))
+	local out = L + Vector3.new(0, 30, FRONT_Z + 2.7)
+	Signage.board(f, CFrame.lookAt(out, out + Vector3.new(0, 0, 1)), 40, 6, {
+		Name = "LodgeSign",
+		Title = "SKY LODGE",
+		Icon = "🏔️",
+		Accent = Color3.fromRGB(255, 200, 90),
+		Backing = LOG_DARK,
+		BackingMaterial = Enum.Material.Wood,
+	})
+	Signage.board(f, CFrame.new(L + Vector3.new(0, 30, FRONT_Z - 0.7)), 36, 5, {
+		Name = "DeckSign",
+		Title = "OBSERVATION DECK",
+		Subtitle = "watch the arena below",
+		Icon = "🔭",
+		Accent = Color3.fromRGB(120, 240, 255),
+		Backing = LOG_DARK,
+		BackingMaterial = Enum.Material.Wood,
+	})
 	noShadow(header)
 
 	-- ceiling, beams and a pitched roof
 	noShadow(Builder.block(f, "Ceiling", L + Vector3.new(0, WALL_H + 1, 0), Vector3.new(HALF_X * 2 + 4, 2, FRONT_Z - BACK_Z + 4), LOG, Enum.Material.WoodPlanks))
+	local beams = {}
 	for z = BACK_Z + 10, FRONT_Z - 10, 20 do
 		noShadow(Builder.block(f, "Beam", L + Vector3.new(0, WALL_H - 1, z), Vector3.new(HALF_X * 2, 2, 2), LOG_DARK, Enum.Material.Wood))
+		table.insert(beams, z)
 	end
+	LodgeProps.trusses(f, L, HALF_X, WALL_H - 1, beams)
 	noShadow(Builder.block(f, "RidgeBeam", L + Vector3.new(0, WALL_H - 1.5, 0), Vector3.new(2.4, 1.6, FRONT_Z - BACK_Z), LOG_DARK, Enum.Material.Wood))
 	local roofLen = (FRONT_Z - BACK_Z) / 2 + 6
 	for _, dir in { 1, -1 } do
@@ -226,24 +272,27 @@ local function shell(model: Model, L: Vector3)
 	for _, p in { Vector3.new(-74, 0, -54), Vector3.new(-74, 0, 52), Vector3.new(18.2, 0, -55), Vector3.new(-18.2, 0, -55), Vector3.new(48, 0, 54) } do
 		plant(f, L + p)
 	end
+	architecture(model, L, beams)
 end
 
 -- Fireside lounge against the west wall.
 local function lounge(model: Model, L: Vector3)
 	local f = folder(model, "Lounge")
 	local z0 = 25
-	Builder.block(f, "Hearth", L + Vector3.new(-77.5, 7, z0), Vector3.new(5, 14, 16), STONE, Enum.Material.Cobblestone)
-	Builder.block(f, "Chimney", L + Vector3.new(-78.5, 24, z0), Vector3.new(3, 20, 8), STONE, Enum.Material.Cobblestone)
-	Builder.block(f, "Mantel", L + Vector3.new(-74.6, 10.5, z0), Vector3.new(1.6, 0.8, 18), WOOD, Enum.Material.Wood)
-	Builder.block(f, "Firebox", L + Vector3.new(-75.1, 3, z0), Vector3.new(0.4, 5, 8), Color3.fromRGB(30, 24, 22), Enum.Material.Slate)
-	local logs = Builder.block(f, "FireLogs", L + Vector3.new(-74.4, 1, z0), Vector3.new(2, 1.2, 5), LOG_DARK, Enum.Material.Wood)
+	local logs = LodgeProps.hearth(f, L, z0)
 	local fire = Instance.new("Fire")
 	fire.Size = 5
 	fire.Heat = 4
 	fire.Color = Color3.fromRGB(255, 140, 40)
 	fire.SecondaryColor = Color3.fromRGB(255, 220, 90)
 	fire.Parent = logs
-	pointLight(logs, 28, 2.2, Color3.fromRGB(255, 160, 80))
+	local glow = Instance.new("PointLight")
+	glow.Range = 28
+	glow.Brightness = 2.2
+	glow.Color = Color3.fromRGB(255, 160, 80)
+	glow.Shadows = false
+	glow.Parent = logs
+	LodgeProps.flicker(glow)
 
 	local rug = Builder.block(f, "LoungeRug", L + Vector3.new(-64, 0.08, z0), Vector3.new(18, 0.08, 22), Color3.fromRGB(70, 110, 140), Enum.Material.Fabric)
 	rug.CanCollide = false
@@ -259,28 +308,7 @@ local function lounge(model: Model, L: Vector3)
 end
 
 local function shop(model: Model, L: Vector3)
-	local s = folder(model, "ShopStall")
-	local c = L + Vector3.new(-50, 0, -24)
-	local counter = Builder.block(s, "Counter", c + Vector3.new(0, 2, 4), Vector3.new(18, 4, 4), WOOD, Enum.Material.WoodPlanks)
-	Builder.block(s, "CounterTop", c + Vector3.new(0, 4.2, 4), Vector3.new(19, 0.4, 5), Color3.fromRGB(240, 240, 245), Enum.Material.SmoothPlastic)
-	Builder.block(s, "BackWall", c + Vector3.new(0, 5, -4), Vector3.new(18, 10, 1), Color3.fromRGB(235, 240, 250), Enum.Material.SmoothPlastic)
-	for _, x in { -8.5, 8.5 } do
-		for _, z in { -4, 5.5 } do
-			Builder.block(s, "Post", c + Vector3.new(x, 5.5, z), Vector3.new(1, 11, 1), Color3.fromRGB(70, 140, 230), Enum.Material.SmoothPlastic)
-		end
-	end
-	-- striped awning roof
-	for i = 0, 8 do
-		Builder.block(s, "Awning", c + Vector3.new(-8 + i * 2, 11.3, 1), Vector3.new(2, 0.8, 12), if i % 2 == 0 then Color3.fromRGB(60, 140, 240) else Color3.new(1, 1, 1), Enum.Material.SmoothPlastic)
-	end
-	local sign = Builder.block(s, "ShopSign", c + Vector3.new(0, 14, 6.5), Vector3.new(14, 4, 1), Color3.fromRGB(60, 140, 240), Enum.Material.SmoothPlastic)
-	Builder.sign(sign, Enum.NormalId.Back, "SHOP", Color3.new(1, 1, 1))
-	Builder.sign(sign, Enum.NormalId.Front, "SHOP", Color3.new(1, 1, 1))
-	for i = 0, 6 do
-		Builder.cylinder(s, "Bottle", c + Vector3.new(-6 + i * 2, 7.2, -3), 1.6, 0.9, RAINBOW[(i % #RAINBOW) + 1], Enum.Material.Glass)
-	end
-	Builder.block(s, "Shelf", c + Vector3.new(0, 6.2, -3), Vector3.new(16, 0.4, 1.5), WOOD, Enum.Material.Wood)
-
+	local counter = LodgeProps.gearStall(model, L + Vector3.new(-50, 0, -24))
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "ShopPrompt"
 	prompt.ActionText = "Open Shop"
@@ -313,10 +341,23 @@ local function hallOfLegends(model: Model, L: Vector3): { CFrame }
 		local top = L + Vector3.new(s.x, 1 + s.h, z)
 		spots[i] = CFrame.lookAt(top, top + Vector3.new(0, 0, 1))
 	end
-	local title = Builder.block(f, "HallTitle", L + Vector3.new(0, 23, BACK_Z + 0.3), Vector3.new(34, 5, 0.4), LOG_DARK, Enum.Material.Wood)
-	Builder.sign(title, Enum.NormalId.Back, "🏆 HALL OF LEGENDS", GOLD)
-	local sub = Builder.block(f, "HallSubtitle", L + Vector3.new(0, 19.3, BACK_Z + 0.3), Vector3.new(28, 2, 0.4), LOG_DARK, Enum.Material.Wood)
-	Builder.sign(sub, Enum.NormalId.Back, Config.Leaderboards.Hall.Subtitle, Color3.new(1, 1, 1))
+	-- an arch over the podium: marble pillars with the title board as the lintel, kept low
+	-- enough (top ~16) that the Arena Cam above it stays in view from the hall
+	for _, side in { -1, 1 } do
+		local x = side * 16.4
+		Builder.block(f, "PillarBase", L + Vector3.new(x, 0.6, z), Vector3.new(2.4, 1.2, 2.4), Color3.fromRGB(60, 62, 80), Enum.Material.Marble)
+		LodgeProps.octagon(f, "Pillar", CFrame.new(L + Vector3.new(x, 8.2, z)), 1.7, 14, MARBLE, Enum.Material.Marble, true)
+		Builder.block(f, "PillarCapital", L + Vector3.new(x, 15.5, z), Vector3.new(2.4, 0.6, 2.4), GOLD, Enum.Material.Metal)
+		Builder.part(f, { Name = "PillarFinial", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.1, CFrame = CFrame.new(L + Vector3.new(x, 16.3, z)), Color = GOLD, Material = Enum.Material.Neon, CanCollide = false })
+	end
+	local at = L + Vector3.new(0, 14.3, z)
+	Signage.board(f, CFrame.lookAt(at, at + Vector3.new(0, 0, 1)), 31, 2.8, {
+		Name = "HallTitle",
+		Title = "HALL OF LEGENDS",
+		Subtitle = Config.Leaderboards.Hall.Subtitle,
+		Icon = "🏆",
+		Accent = GOLD,
+	})
 	return spots
 end
 
@@ -326,8 +367,14 @@ local function obby(model: Model, L: Vector3): BasePart
 	local o = folder(model, "NeonClimb")
 	local start = Builder.block(o, "ObbyStart", L + Vector3.new(OBBY_X, 0.4, -46), Vector3.new(7, 0.8, 7), Color3.fromRGB(90, 230, 120), Enum.Material.Neon)
 	Builder.sign(start, Enum.NormalId.Top, "START", Color3.new(1, 1, 1))
-	local sign = Builder.block(o, "ObbySign", L + Vector3.new(OBBY_X, 11, BACK_Z + 0.3), Vector3.new(12, 3.5, 0.4), LOG_DARK, Enum.Material.Wood)
-	Builder.sign(sign, Enum.NormalId.Back, "NEON CLIMB  +" .. Config.Scoring.ObbyCoins .. " 🪙", Color3.fromRGB(140, 255, 160))
+	local signAt = L + Vector3.new(OBBY_X, 12.2, BACK_Z + 0.65)
+	Signage.board(o, CFrame.lookAt(signAt, signAt + Vector3.new(0, 0, 1)), 11.4, 4.2, {
+		Name = "ObbySign",
+		Title = "NEON CLIMB",
+		Subtitle = "OBBY · +" .. Config.Scoring.ObbyCoins .. " COINS at the loft",
+		Icon = "🧗",
+		Accent = Color3.fromRGB(110, 255, 150),
+	})
 
 	for i = 1, OBBY_PADS do
 		local x = OBBY_X + (if i % 2 == 0 then 2 else -2)
@@ -445,17 +492,61 @@ local function prompt(parent: Instance, name: string, action: string, object: st
 	return p
 end
 
--- Daily quest board (the client opens the quest window).
+-- Daily quest board (the client opens the quest window): a framed timber notice board
+-- with pinned quest notes on both sides, a little roof and a header sign.
 local function questBoard(model: Model, L: Vector3)
 	local f = folder(model, "QuestBoard")
 	local c = L + Vector3.new(-26, 0, -10)
 	local board = Builder.block(f, "Board", c + Vector3.new(0, 6.5, 0), Vector3.new(13, 6, 0.6), Color3.fromRGB(130, 88, 52), Enum.Material.WoodPlanks)
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		Builder.sign(board, face, "📜 DAILY QUESTS\n3 new every day", Color3.fromRGB(255, 225, 90))
+	for _, y in { -1, 1 } do
+		Builder.block(f, "Frame", c + Vector3.new(0, 6.5 + y * 3.15, 0), Vector3.new(13.6, 0.5, 0.9), LOG_DARK, Enum.Material.Wood)
 	end
-	for _, x in { -5.5, 5.5 } do
-		Builder.block(f, "Post", c + Vector3.new(x, 2, 0), Vector3.new(0.8, 4, 0.8), WOOD, Enum.Material.Wood)
+	for _, x in { -6.9, 6.9 } do
+		Builder.block(f, "Post", c + Vector3.new(x, 6.6, 0), Vector3.new(0.9, 13.2, 0.9), LOG, Enum.Material.Wood)
+		Builder.block(f, "PostFoot", c + Vector3.new(x, 0.25, 0), Vector3.new(1.4, 0.5, 1.4), GOLD, Enum.Material.Metal)
 	end
+	for _, dir in { -1, 1 } do
+		local roof = c + Vector3.new(0, 13.75, dir * 0.9)
+		Builder.part(f, { Name = "Roof", Size = Vector3.new(15, 0.3, 2.3), CFrame = CFrame.new(roof) * CFrame.Angles(math.rad(dir * 28), 0, 0), Color = Color3.fromRGB(120, 62, 52), Material = Enum.Material.Slate, CanCollide = false })
+	end
+	-- three quest notes per side, each with a red pin
+	for _, side in { -1, 1 } do
+		for i = 1, 3 do
+			local pos = c + Vector3.new((i - 2) * 4.2, 6.3, side * 0.34)
+			local note = Builder.part(f, {
+				Name = "QuestNote",
+				Size = Vector3.new(3.2, 3.9, 0.06),
+				CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad((i - 2) * 4)),
+				Color = Color3.fromRGB(250, 238, 205),
+				Material = Enum.Material.SmoothPlastic,
+				CanCollide = false,
+			})
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = if side < 0 then Enum.NormalId.Front else Enum.NormalId.Back
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 40
+			gui.LightInfluence = 0.4
+			gui.Parent = note
+			local text = Instance.new("TextLabel")
+			text.BackgroundTransparency = 1
+			text.Size = UDim2.fromScale(0.86, 0.8)
+			text.Position = UDim2.fromScale(0.07, 0.14)
+			text.FontFace = Font.new("rbxasset://fonts/families/Montserrat.json", Enum.FontWeight.Heavy)
+			text.TextScaled = true
+			text.TextColor3 = Color3.fromRGB(90, 60, 35)
+			text.Text = "📜\nQUEST " .. i
+			text.Parent = gui
+			Builder.part(f, { Name = "Pin", Shape = Enum.PartType.Ball, Size = Vector3.one * 0.45, CFrame = CFrame.new(pos + Vector3.new(0, 1.7, side * 0.12)), Color = Color3.fromRGB(220, 50, 50), Material = Enum.Material.SmoothPlastic, CanCollide = false })
+		end
+	end
+	Signage.board(f, CFrame.new(c + Vector3.new(0, 11.2, 0)), 13.6, 3, {
+		Name = "QuestSign",
+		Title = "DAILY QUESTS",
+		Subtitle = "3 new every day",
+		Icon = "📜",
+		Accent = Color3.fromRGB(255, 210, 80),
+		DoubleSided = true,
+	})
 	prompt(board, "QuestPrompt", "View Quests", "Daily Quests")
 end
 
@@ -464,7 +555,9 @@ local function spinStand(model: Model, L: Vector3)
 	local f = folder(model, "SpinStand")
 	local c = L + Vector3.new(26, 0, -10)
 	local hub = c + Vector3.new(0, 7.5, 0)
-	Builder.block(f, "Post", c + Vector3.new(0, 3.5, 0.9), Vector3.new(1.2, 7, 1), Color3.fromRGB(45, 50, 65), Enum.Material.Metal)
+	LodgeProps.octagon(f, "Base", CFrame.new(c + Vector3.new(0, 0.3, 0.9)), 5, 0.6, Color3.fromRGB(45, 50, 65), Enum.Material.Marble, true)
+	LodgeProps.octagon(f, "BaseLip", CFrame.new(c + Vector3.new(0, 0.7, 0.9)), 4, 0.2, GOLD, Enum.Material.Metal, true)
+	Builder.block(f, "Post", c + Vector3.new(0, 6.7, 0.9), Vector3.new(1.2, 12.6, 1), Color3.fromRGB(45, 50, 65), Enum.Material.Metal)
 	Builder.part(f, {
 		Name = "Rim",
 		Shape = Enum.PartType.Cylinder,
@@ -489,10 +582,19 @@ local function spinStand(model: Model, L: Vector3)
 	end
 	Builder.part(f, { Name = "Hub", Shape = Enum.PartType.Ball, Size = Vector3.new(2, 2, 2), CFrame = CFrame.new(hub), Color = GOLD, Material = Enum.Material.Neon })
 	Builder.block(f, "Pointer", hub + Vector3.new(0, 5.2, 0), Vector3.new(1, 1.4, 1.1), Color3.fromRGB(230, 45, 55), Enum.Material.Neon)
-	local sign = Builder.block(f, "SpinSign", hub + Vector3.new(0, 7.4, 0), Vector3.new(11, 2.4, 0.5), Color3.fromRGB(255, 60, 150), Enum.Material.SmoothPlastic)
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		Builder.sign(sign, face, "🎡 SPIN TO WIN", Color3.new(1, 1, 1))
+	-- marquee bulbs around the rim, alternating gold and white
+	for i = 0, 11 do
+		local a = math.rad(i * 30)
+		Builder.part(f, { Name = "Bulb", Shape = Enum.PartType.Ball, Size = Vector3.one * 0.6, CFrame = CFrame.new(hub + Vector3.new(math.cos(a) * 4.75, math.sin(a) * 4.75, -0.45)), Color = if i % 2 == 0 then GOLD else Color3.new(1, 1, 1), Material = Enum.Material.Neon, CanCollide = false })
 	end
+	Signage.board(f, CFrame.new(hub + Vector3.new(0, 7.1, 0.9)), 12.4, 3.2, {
+		Name = "SpinSign",
+		Title = "PRIZE WHEEL",
+		Subtitle = "spin to win!",
+		Icon = "🎡",
+		Accent = Color3.fromRGB(255, 80, 170),
+		DoubleSided = true,
+	})
 	prompt(disc, "SpinPrompt", "Spin", "Prize Wheel")
 end
 
@@ -503,82 +605,67 @@ local PASS_SPOTS = {
 	{ Key = "QuickDash", Offset = Vector3.new(28, 0, 22), Color = Color3.fromRGB(60, 230, 230) },
 }
 
--- Blocky display figure standing on `feet`. Returns the torso.
-local function mannequin(parent: Instance, feet: Vector3, color: Color3, material: Enum.Material): BasePart
-	for _, x in { -0.55, 0.55 } do
-		Builder.block(parent, "Leg", feet + Vector3.new(x, 1, 0), Vector3.new(0.95, 2, 0.95), color, material)
-		Builder.block(parent, "Arm", feet + Vector3.new(x * 2.75, 3, 0), Vector3.new(0.9, 2, 0.9), color, material)
-	end
-	local torso = Builder.block(parent, "Torso", feet + Vector3.new(0, 3, 0), Vector3.new(2, 2, 1), color, material)
-	Builder.part(parent, { Name = "Head", Shape = Enum.PartType.Ball, Size = Vector3.new(1.5, 1.5, 1.5), CFrame = CFrame.new(feet + Vector3.new(0, 4.8, 0)), Color = color, Material = material })
-	return torso
-end
-
--- Glowing pedestals in the middle of the hall that show each game pass in 3D.
+-- Game pass showcase: a glowing tiered plinth per pass with its 3D icon turning and
+-- bobbing over the projector (LodgeController animates it), a name tag with the price,
+-- and the purchase prompt. A GAME PASSES board hangs over each pair.
 local function passPedestals(model: Model, L: Vector3)
 	local root = folder(model, "PassPedestals")
 	for _, spot in PASS_SPOTS do
 		local def = Config.Monetization.Passes[spot.Key]
 		local f = folder(root, spot.Key)
 		local base = L + spot.Offset
-		local pedestal = Builder.cylinder(f, "Pedestal", base + Vector3.new(0, 0.6, 0), 1.2, 7, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
-		local glow = Builder.cylinder(f, "Glow", base + Vector3.new(0, 1.25, 0), 0.15, 6, spot.Color, Enum.Material.Neon)
-		pointLight(glow, 12, 0.8, spot.Color)
-		local feet = base + Vector3.new(0, 1.3, 0)
-		local neon = spot.Key == "GodPriority"
-		local torso = mannequin(f, feet, if neon then spot.Color else Color3.fromRGB(235, 236, 242), if neon then Enum.Material.Neon else Enum.Material.SmoothPlastic)
-
-		if spot.Key == "VIP" then
-			Builder.cylinder(f, "Crown", feet + Vector3.new(0, 5.8, 0), 0.6, 1.6, spot.Color, Enum.Material.Neon)
-			for i, color in RAINBOW do
-				local streak = Builder.block(f, "Trail", feet + Vector3.new(0, 1.6 + i * 0.4, 3), Vector3.new(0.25, 0.3, 4.5 - i * 0.3), color, Enum.Material.Neon)
-				streak.CanCollide = false
-			end
-		elseif spot.Key == "GodPriority" then
-			for _, x in { -2.7, 2.7 } do
-				local orb = Builder.part(f, { Name = "Orb", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.6, 1.6), CFrame = CFrame.new(feet + Vector3.new(x, 4.6, 0)), Color = Color3.fromRGB(230, 200, 255), Material = Enum.Material.Neon, CanCollide = false })
-				orb.Transparency = 0.1
-			end
-		elseif spot.Key == "DoubleCoins" then
-			for _, x in { -2.4, 2.4 } do
-				for k = 0, 4 do
-					Builder.cylinder(f, "Coin", feet + Vector3.new(x, 0.2 + k * 0.36, 0.4), 0.3, 1.7, GOLD, Enum.Material.Metal)
-				end
-			end
-		else
-			for i = 1, 4 do
-				local streak = Builder.block(f, "Streak", feet + Vector3.new((i - 2.5) * 0.7, 1 + i * 0.8, 3.2), Vector3.new(0.2, 0.2, 5), spot.Color, Enum.Material.Neon)
-				streak.CanCollide = false
-			end
-		end
-
-		local gui = Instance.new("BillboardGui")
-		gui.Name = "PassLabel"
-		gui.Size = UDim2.new(11, 0, 3.6, 0)
-		gui.StudsOffset = Vector3.new(0, 5.4, 0)
-		gui.MaxDistance = 120
-		gui.Parent = torso
-		local label = Instance.new("TextLabel")
-		label.BackgroundTransparency = 1
-		label.Size = UDim2.fromScale(1, 1)
-		label.Font = Enum.Font.FredokaOne
-		label.TextScaled = true
-		label.RichText = true
-		label.TextColor3 = Color3.new(1, 1, 1)
-		label.Text = string.format("%s %s\n<font color=\"#FFD23C\">R$ %d</font>", def.Icon, def.Name, def.Price)
-		label.Parent = gui
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 3
-		stroke.Parent = label
-
-		local p = prompt(pedestal, "PassPrompt", "Get " .. def.Name, def.Description)
+		local plinth = LodgeProps.plinth(f, base, 6.5, spot.Color, 3.4)
+		LodgeProps.light(plinth.Pedestal, 13, 0.8, spot.Color)
+		LodgeProps.passIcon(f, spot.Key, CFrame.new(base + Vector3.new(0, plinth.Top + 2.7, 0)))
+		Signage.billboard(plinth.Pedestal, {
+			Title = def.Name,
+			Subtitle = "R$ " .. def.Price,
+			Accent = spot.Color,
+			Offset = Vector3.new(0, 8.2, 0),
+			Width = 6.4,
+			Height = 2.05,
+		})
+		local p = prompt(plinth.Pedestal, "PassPrompt", "Get " .. def.Name, def.Description)
 		p:SetAttribute("PassKey", spot.Key)
+	end
+	for _, side in { -1, 1 } do
+		local at = L + Vector3.new(side * 33, 21.4, 10)
+		local sign = Signage.board(root, CFrame.new(at), 16, 3.8, {
+			Name = "PassSign",
+			Title = "GAME PASSES",
+			Subtitle = "perks that last forever",
+			Icon = "⭐",
+			Accent = GOLD,
+			DoubleSided = true,
+		})
+		Signage.hang(root, sign, L.Y + CHORD_Y)
 	end
 end
 
--- God skin display: a small statue of every skin either side of the spawn, facing the
--- hall. The prompt opens the shop's Style tab (MenuController).
+-- God skin showcase: every skin on its own plinth either side of the spawn, facing the
+-- hall, turning slowly with its shards orbiting and a particle aura. The prompt opens the
+-- shop's Style tab (MenuController). A GOD SKINS board hangs over each trio.
 local SKIN_SPOTS = { Vector3.new(-40, 0, -42), Vector3.new(-30, 0, -42), Vector3.new(-20, 0, -42), Vector3.new(20, 0, -42), Vector3.new(30, 0, -42), Vector3.new(40, 0, -42) }
+
+-- 3000 -> "3,000"
+local function commas(n: number): string
+	local s = tostring(math.floor(n))
+	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return (out:gsub("^,", ""))
+end
+
+-- (the coin emoji has no glyph in the sign font, so prices say COINS)
+local function skinPrice(def: any): string
+	if def.Exclusive then
+		return "EXCLUSIVE"
+	elseif def.Coins then
+		return commas(def.Coins) .. " COINS"
+	elseif def.Product then
+		local product = Config.Monetization.Products[def.Product]
+		return if product then "R$ " .. product.Price else "PREMIUM"
+	end
+	return "FREE · DEFAULT"
+end
 
 local function skinDisplays(model: Model, L: Vector3)
 	local root = folder(model, "SkinDisplays")
@@ -593,30 +680,41 @@ local function skinDisplays(model: Model, L: Vector3)
 			break
 		end
 		local base = L + spot
-		local pedestal = Builder.cylinder(root, "SkinPedestal", base + Vector3.new(0, 0.75, 0), 1.5, 6, Color3.fromRGB(45, 48, 66), Enum.Material.Marble)
-		local glow = Builder.cylinder(root, "SkinGlow", base + Vector3.new(0, 1.55, 0), 0.15, 5, def.Color, Enum.Material.Neon)
-		pointLight(glow, 10, 0.6, def.Color)
+		local f = folder(root, def.Id)
+		local plinth = LodgeProps.plinth(f, base, 5.6, def.Color, 2.4)
+		if i == 2 or i == 5 then
+			LodgeProps.light(plinth.Pedestal, 18, 0.7, def.Color) -- one per trio
+		end
+		local center = base + Vector3.new(0, plinth.Top + 3.6, 0)
 		local statue = GodSkins.build(def.Id, Config.Cosmetics.DisplayScale)
-		statue:PivotTo(CFrame.new(base + Vector3.new(0, 5.2, 0)) * CFrame.Angles(0, math.rad(180), 0))
-		statue.Parent = root
-		local gui = Instance.new("BillboardGui")
-		gui.Name = "SkinLabel"
-		gui.Size = UDim2.new(8, 0, 2.2, 0)
-		gui.StudsOffset = Vector3.new(0, 7.6, 0)
-		gui.MaxDistance = 90
-		gui.Parent = pedestal
-		local label = Instance.new("TextLabel")
-		label.BackgroundTransparency = 1
-		label.Size = UDim2.fromScale(1, 1)
-		label.Font = Enum.Font.FredokaOne
-		label.TextScaled = true
-		label.TextColor3 = Color3.new(1, 1, 1)
-		label.Text = def.Icon .. " " .. def.Name
-		label.Parent = gui
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 3
-		stroke.Parent = label
-		prompt(pedestal, "CosmeticPrompt", "View God Skins", def.Name)
+		statue:PivotTo(CFrame.new(center) * CFrame.Angles(0, math.rad(180), 0))
+		statue.Parent = f
+		LodgeProps.animate(statue, 0.6, true)
+		local aura = Config.Lodge.Auras[def.Id]
+		if aura then
+			LodgeProps.aura(plinth.Pedestal, center, aura, 1)
+		end
+		Signage.billboard(plinth.Pedestal, {
+			Title = def.Name,
+			Subtitle = skinPrice(def),
+			Accent = def.Color,
+			Offset = Vector3.new(0, 8.4, 0),
+			Width = 5.4,
+			Height = 1.75,
+		})
+		prompt(plinth.Pedestal, "CosmeticPrompt", "View God Skins", def.Name)
+	end
+	for _, side in { -1, 1 } do
+		local at = L + Vector3.new(side * 30, 21, BACK_Z + 10)
+		local sign = Signage.board(root, CFrame.lookAt(at, at + Vector3.new(0, 0, 1)), 16, 3.6, {
+			Name = "SkinSign",
+			Title = "GOD SKINS",
+			Subtitle = "rule the sky in style",
+			Icon = "✋",
+			Accent = Color3.fromRGB(190, 120, 255),
+			DoubleSided = true,
+		})
+		Signage.hang(root, sign, L.Y + CHORD_Y)
 	end
 end
 
@@ -646,6 +744,7 @@ function Lobby.build(parent: Instance): LobbyInfo
 	model.Name = "SkyLodge"
 	model.Parent = parent
 
+	LodgeProps.resetLights()
 	shell(model, L)
 	lounge(model, L)
 	deck(model, L)
@@ -681,6 +780,21 @@ function Lobby.build(parent: Instance): LobbyInfo
 	end
 
 	local perch = godPerch(model)
+
+	-- hygiene: nothing in the lodge needs touch events except the obby finish (and the
+	-- spawn); small trim casts no shadow
+	local minVolume = Config.Performance.ShadowMinVolume
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			if d ~= finish and d ~= spawn then
+				d.CanTouch = false
+			end
+			if d.Size.X * d.Size.Y * d.Size.Z < minVolume then
+				d.CastShadow = false
+			end
+		end
+	end
 
 	return {
 		Model = model,
