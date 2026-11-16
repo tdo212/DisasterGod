@@ -289,6 +289,8 @@ local function buildGui()
 		Components.corner(b, Theme.Radius.Medium)
 		Components.stroke(b, Theme.Stroke.Heavy)
 		Components.gradient(b, def.Color:Lerp(Color3.new(1, 1, 1), 0.35), def.Color)
+		Components.studs(b)
+		Components.block(b, def.Color)
 		b.Parent = gearBar
 		Components.icon({ Name = "Icon", Icon = def.Id, TextSize = 34, Size = UDim2.fromScale(0.78, 0.78), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = b })
 		if not Components.isTouch() then

@@ -44,7 +44,12 @@ local BADGE_COLORS: { [string]: { Color3 } } = {
 	["Good Value"] = { C.BlueLight, C.Blue },
 	["Great Value"] = { C.OrangeLight, C.Orange },
 	["Most Value"] = { C.Pink, C.Purple },
+	["Best Value"] = { C.Pink, C.Purple },
 	["Starter Deal"] = { C.GreenLight, C.Green },
+	["Legendary"] = { C.PurpleLight, C.Purple },
+	["Next Round"] = { C.PinkLight, C.Pink },
+	["Day 7 Streak"] = { C.OrangeLight, C.Orange },
+	["Starter"] = { C.GreyLight, C.Grey },
 }
 
 local abilityIcons: { [string]: string } = {}
@@ -53,7 +58,25 @@ for _, def in Config.Disasters.Abilities do
 end
 
 ---------------------------------------------------------------------------
--- card building
+-- card building (stud UI: square blocks with a darker depth edge, a light inner rim,
+-- a studded face and a green sheen buy button)
+
+-- shop layout: Theme.Shop, with Theme.ShopTouch overrides on phones
+local S = table.clone(Theme.Shop)
+if Components.isTouch() then
+	for key, value in Theme.ShopTouch do
+		(S :: any)[key] = value
+	end
+end
+local hintLabel: TextLabel? = nil
+local TAB_HINTS: { [string]: string } = {
+	Gear = "Gear lasts one round · use it from your hotbar",
+	Kits = "Every kit also gets Seismic Ping · equip one, then play God",
+	Style = "God Skins hover over your hand for everyone to see",
+	Coins = "Coins buy gear, God Kits and skins",
+	Passes = "Bought once, active every round",
+	Specials = "Panic saves fire automatically when they would save you",
+}
 
 type CardSpec = {
 	Order: number,
@@ -66,72 +89,225 @@ type CardSpec = {
 	Button: string,
 	ButtonColor: Color3?,
 	ButtonLight: Color3?,
+	Abilities: { string }?, -- God kits: the five disasters as a row of icons
 	OnClick: () -> (),
 }
+
+-- gold ribbon pinned across the top edge of a card or hero
+local function ribbon(parent: GuiObject, text: string, colors: { Color3 }, width: UDim, x: UDim, anchorX: number)
+	local badge = Instance.new("Frame")
+	badge.Name = "Badge"
+	badge.Size = UDim2.new(width.Scale, width.Offset, 0, 24)
+	badge.Position = UDim2.new(x.Scale, x.Offset, 0, -12)
+	badge.AnchorPoint = Vector2.new(anchorX, 0)
+	badge.BackgroundColor3 = Color3.new(1, 1, 1)
+	badge.ZIndex = 3
+	Components.corner(badge, Theme.Radius.Small)
+	Components.stroke(badge, Theme.Stroke.Thick)
+	Components.gradient(badge, colors[1], colors[2], 90)
+	Components.rim(badge, colors[2])
+	badge.Parent = parent
+	local label = Components.label({ Name = "Text", Text = string.upper(text), TextSize = 15, Size = UDim2.fromScale(1, 1), Parent = badge })
+	label.ZIndex = 4
+	return badge
+end
 
 local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextLabel)
 	local frame = Instance.new("Frame")
 	frame.Name = spec.Title
 	frame.LayoutOrder = spec.Order
-	frame.Size = UDim2.fromOffset(170, 270)
+	frame.Size = UDim2.fromOffset(S.CardWidth, if spec.Abilities then S.KitCardHeight else S.CardHeight)
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
 	Components.corner(frame, Theme.Radius.Large)
 	Components.stroke(frame, Theme.Stroke.Heavy)
 	Components.gradient(frame, spec.Top, spec.Bottom)
 	Components.studs(frame, nil, Theme.Radius.Large)
+	Components.block(frame, spec.Bottom, Theme.Block.DepthCard)
 	frame.Parent = parent
 
 	if spec.Badge and spec.Badge ~= "" then
-		local colors = BADGE_COLORS[spec.Badge] or { C.BlueLight, C.Blue }
-		local badge = Instance.new("Frame")
-		badge.Name = "Badge"
-		badge.Size = UDim2.new(1, -16, 0, 28)
-		badge.Position = UDim2.new(0.5, 0, 0, 8)
-		badge.AnchorPoint = Vector2.new(0.5, 0)
-		badge.BackgroundColor3 = Color3.new(1, 1, 1)
-		Components.corner(badge, Theme.Radius.Small)
-		Components.stroke(badge, Theme.Stroke.Thick)
-		Components.gradient(badge, colors[1], colors[2], 0)
-		badge.Parent = frame
-		Components.label({ Name = "Text", Text = spec.Badge, TextSize = 18, Size = UDim2.fromScale(1, 1), Parent = badge })
+		ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.GoldLight, C.Gold }, UDim.new(1, -24), UDim.new(0.5, 0), 0.5)
 	end
-	Components.icon({ Name = "Icon", Icon = spec.Icon, TextSize = 52, Size = UDim2.fromOffset(72, 72), Position = UDim2.new(0.5, 0, 0, 38), AnchorPoint = Vector2.new(0.5, 0), Parent = frame })
-	Components.label({ Name = "Title", Text = spec.Title, TextSize = 20, Size = UDim2.new(1, -10, 0, 26), Position = UDim2.fromOffset(5, 112), Parent = frame })
-	local pill = Components.panel({
-		Name = "Info",
-		Size = UDim2.new(1, -20, 0, 48),
-		Position = UDim2.new(0.5, 0, 0, 142),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Color = Color3.fromRGB(20, 26, 36),
-		Transparency = 0.35,
-		Radius = Theme.Radius.Medium,
-		Parent = frame,
-	})
-	local sub = Components.label({ Name = "Text", Text = spec.Subtitle, TextSize = 16, Size = UDim2.new(1, -8, 1, 0), Position = UDim2.fromOffset(4, 0), Parent = pill })
+	Components.label({ Name = "Title", Text = spec.Title, TextSize = if #spec.Title > 13 then 16 else 19, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 10), Parent = frame })
+	Components.icon({ Name = "Icon", Icon = spec.Icon, TextSize = 48, Size = UDim2.fromOffset(64, 64), Position = UDim2.new(0.5, 0, 0, 36), AnchorPoint = Vector2.new(0.5, 0), Parent = frame })
+	local sub = Components.label({ Name = "Subtitle", Text = spec.Subtitle, TextSize = 14, Size = UDim2.new(1, -14, 0, 46), Position = UDim2.fromOffset(7, 102), StrokeThickness = Theme.Stroke.Thin, Parent = frame })
+	sub.FontFace = Theme.FontFaceBold
 	sub.TextWrapped = true
+	if spec.Abilities then
+		-- the kit's five disasters in a dark well
+		local well = Instance.new("Frame")
+		well.Name = "Abilities"
+		well.Size = UDim2.new(1, -14, 0, 38)
+		well.Position = UDim2.new(0.5, 0, 0, 150)
+		well.AnchorPoint = Vector2.new(0.5, 0)
+		well.BackgroundColor3 = C.Outline
+		well.BackgroundTransparency = 0.7
+		well.Parent = frame
+		local row = Instance.new("UIListLayout")
+		row.FillDirection = Enum.FillDirection.Horizontal
+		row.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		row.VerticalAlignment = Enum.VerticalAlignment.Center
+		row.SortOrder = Enum.SortOrder.LayoutOrder
+		row.Padding = UDim.new(0, 2)
+		row.Parent = well
+		for i, id in spec.Abilities do
+			local icon = Components.icon({ Name = id, Icon = abilityIcons[id] or "?", TextSize = 18, Size = UDim2.fromOffset(S.AbilityIcon, S.AbilityIcon), Parent = well })
+			icon.LayoutOrder = i
+		end
+	end
 	local button = Components.button({
 		Name = "Buy",
 		Text = spec.Button,
-		TextSize = 24,
-		Size = UDim2.new(1, -20, 0, 52),
+		TextSize = 22,
+		Size = UDim2.new(1, -16, 0, 42),
 		Position = UDim2.new(0.5, 0, 1, -10),
 		AnchorPoint = Vector2.new(0.5, 1),
 		Color = spec.ButtonColor or C.Green,
 		ColorLight = spec.ButtonLight or C.GreenLight,
+		Sheen = true,
 		Parent = frame,
 		OnClick = spec.OnClick,
 	})
 	return frame, button, sub
 end
 
--- A page of cards in a row; scrolls sideways (thumb-friendly) when they don't fit.
+type HeroSpec = {
+	Name: string,
+	Top: Color3,
+	Bottom: Color3,
+	Title: string,
+	Bullets: { string },
+	Icons: { string },
+	Badge: string?,
+	ListPrice: string?, -- struck-through "was" price beside the button
+	Button: string,
+	Height: number?,
+	OnClick: () -> (),
+}
+
+-- Wide featured offer at the top of a tab (stud reference's BUNDLE card): yellow title,
+-- two bullets, a sheen buy button, the item art on a translucent halo on the right.
+local function hero(parent: GuiObject, spec: HeroSpec): (Frame, TextButton, { TextLabel })
+	local h = spec.Height or S.HeroHeight
+	local frame = Instance.new("Frame")
+	frame.Name = "Hero" .. spec.Name
+	frame.Size = UDim2.new(1, -20, 0, h)
+	frame.Position = UDim2.new(0.5, 0, 0, S.PageTop)
+	frame.AnchorPoint = Vector2.new(0.5, 0)
+	frame.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.corner(frame, Theme.Radius.Large)
+	Components.stroke(frame, Theme.Stroke.Heavy)
+	Components.gradient(frame, spec.Top, spec.Bottom)
+	Components.studs(frame, nil, Theme.Radius.Large)
+	Components.block(frame, spec.Bottom, Theme.Block.DepthCard)
+	frame.Parent = parent
+	-- translucent diagonal stripes and a halo square behind the art
+	local art = Components.sheen(frame, S.HeroStripeTransparency)
+	art.Name = "Stripes"
+	for _, stripe in art:GetChildren() do
+		if stripe:IsA("Frame") then
+			stripe.Position = UDim2.fromScale((stripe.Position.X.Scale - 0.2), 0.5)
+		end
+	end
+	local halo = Instance.new("Frame")
+	halo.Name = "Halo"
+	halo.Size = UDim2.fromOffset(h + 50, h - 24)
+	halo.Position = UDim2.new(1, -14, 0.5, 0)
+	halo.AnchorPoint = Vector2.new(1, 0.5)
+	halo.BackgroundColor3 = Color3.new(1, 1, 1)
+	halo.BackgroundTransparency = 0.78
+	local haloCorner = Instance.new("UICorner")
+	haloCorner.CornerRadius = UDim.new(0, 18)
+	haloCorner.Parent = halo
+	Components.stroke(halo, 3, spec.Top)
+	halo.Parent = frame
+	local n = #spec.Icons
+	for i, key in spec.Icons do
+		local size = if n == 1 then h - 34 else h - 62
+		local icon = Components.icon({
+			Name = "Art" .. i,
+			Icon = key,
+			TextSize = 60,
+			Size = UDim2.fromOffset(size, size),
+			Position = UDim2.new(1, -14 - (h + 50) / 2 + (i - (n + 1) / 2) * (size * 0.62), 0.5, if n == 1 then 0 else (if i % 2 == 0 then -14 else 12)),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Parent = frame,
+		})
+		icon.ZIndex = 2
+	end
+	Components.label({ Name = "Title", Text = spec.Title, TextSize = S.HeroTitleSize, Color = S.HeroTitleColor, StrokeThickness = Theme.Stroke.Window, XAlign = Enum.TextXAlignment.Left, Size = UDim2.new(1, -240, 0, S.HeroTitleSize + 6), Position = UDim2.fromOffset(16, 6), Parent = frame })
+	local bullets: { TextLabel } = {}
+	-- only as many bullet lines as fit above the buy button
+	local room = math.min(S.HeroBullets, math.floor((h - 10 - S.HeroButtonHeight - S.HeroBulletTop) / 20))
+	for i, text in spec.Bullets do
+		if i > room then
+			break
+		end
+		local b = Components.label({ Name = "Bullet" .. i, Text = "•  " .. text, TextSize = 16, XAlign = Enum.TextXAlignment.Left, Size = UDim2.new(1, -240, 0, 20), Position = UDim2.fromOffset(18, S.HeroBulletTop + (i - 1) * 21), Parent = frame })
+		b.FontFace = Theme.FontFaceBold
+		table.insert(bullets, b)
+	end
+	local button = Components.button({
+		Name = "Buy",
+		Text = spec.Button,
+		TextSize = 24,
+		Size = UDim2.fromOffset(S.HeroButtonWidth, S.HeroButtonHeight),
+		Position = UDim2.new(0, 16, 1, -12),
+		AnchorPoint = Vector2.new(0, 1),
+		Color = C.Green,
+		ColorLight = C.GreenLight,
+		Sheen = true,
+		Parent = frame,
+		OnClick = spec.OnClick,
+	})
+	if spec.ListPrice then
+		local was = Components.label({ Name = "ListPrice", Text = spec.ListPrice, TextSize = 18, Color = C.RedLight, Size = UDim2.fromOffset(70, 24), Position = UDim2.new(0, 16 + S.HeroButtonWidth + 8, 1, -21), AnchorPoint = Vector2.new(0, 0.5), Parent = frame })
+		local strike = Instance.new("Frame")
+		strike.Size = UDim2.new(0.8, 0, 0, 3)
+		strike.Position = UDim2.fromScale(0.1, 0.5)
+		strike.BackgroundColor3 = C.Red
+		strike.BorderSizePixel = 0
+		strike.Rotation = -10
+		strike.Parent = was
+	end
+	if spec.Badge and spec.Badge ~= "" then
+		ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.PinkLight, C.Pink }, UDim.new(0, 170), UDim.new(1, -14 - (h + 50) / 2), 0.5)
+	end
+	return frame, button, bullets
+end
+
+-- Slim purple strip above a card row (God Kits loadout, Passes): icon, gold title,
+-- and a right-aligned status line that callers update.
+local function strip(parent: GuiObject, icon: string, title: string, statusText: string): TextLabel
+	local frame = Instance.new("Frame")
+	frame.Name = "Strip"
+	frame.Size = UDim2.new(1, -20, 0, S.StripHeight)
+	frame.Position = UDim2.new(0.5, 0, 0, S.PageTop)
+	frame.AnchorPoint = Vector2.new(0.5, 0)
+	frame.BackgroundColor3 = Color3.new(1, 1, 1)
+	Components.corner(frame, Theme.Radius.Large)
+	Components.stroke(frame, Theme.Stroke.Heavy)
+	Components.gradient(frame, C.PurpleLight:Lerp(C.Purple, 0.5), C.Purple:Lerp(C.Outline, 0.25))
+	Components.studs(frame, nil, Theme.Radius.Large)
+	Components.block(frame, C.Purple, Theme.Block.Depth)
+	frame.Parent = parent
+	Components.icon({ Name = "Icon", Icon = icon, TextSize = 30, Size = UDim2.fromOffset(42, 42), Position = UDim2.new(0, 10, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Parent = frame })
+	Components.label({ Name = "Title", Text = title, TextSize = 26, Color = S.HeroTitleColor, XAlign = Enum.TextXAlignment.Left, Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.fromOffset(60, 0), Parent = frame })
+	local status = Components.label({ Name = "Status", Text = statusText, TextSize = 17, XAlign = Enum.TextXAlignment.Right, Size = UDim2.new(0.5, -20, 1, 0), Position = UDim2.new(1, -14, 0, 0), AnchorPoint = Vector2.new(1, 0), Parent = frame })
+	status.FontFace = Theme.FontFaceBold
+	return status
+end
+
+-- A page of cards in a row under an optional hero; scrolls sideways (thumb-friendly)
+-- when the cards don't fit.
 local function grid(parent: GuiObject, name: string, top: number?): ScrollingFrame
+	local y = S.PageTop + (top or 0)
 	local page = Instance.new("ScrollingFrame")
 	page.Name = name
 	page.BackgroundTransparency = 1
 	page.BorderSizePixel = 0
-	page.Size = UDim2.new(1, 0, 1, -92 - (top or 0))
-	page.Position = UDim2.fromOffset(0, 56 + (top or 0))
+	page.Size = UDim2.new(1, 0, 1, -y - S.FooterHeight)
+	page.Position = UDim2.fromOffset(0, y)
 	page.CanvasSize = UDim2.new()
 	page.AutomaticCanvasSize = Enum.AutomaticSize.X
 	page.ScrollingDirection = Enum.ScrollingDirection.X
@@ -141,15 +317,17 @@ local function grid(parent: GuiObject, name: string, top: number?): ScrollingFra
 	page.Visible = false
 	page.Parent = parent
 	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 8)
-	pad.PaddingRight = UDim.new(0, 8)
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.PaddingTop = UDim.new(0, 14) -- room for the ribbons
+	pad.PaddingBottom = UDim.new(0, 12) -- and the depth edge
 	pad.Parent = page
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 14)
+	layout.Padding = UDim.new(0, S.CardGap)
 	layout.Parent = page
 	-- centred while the cards fit; left-aligned once they overflow so the first card can be scrolled to
 	local function fit()
@@ -161,6 +339,25 @@ local function grid(parent: GuiObject, name: string, top: number?): ScrollingFra
 	return page
 end
 
+-- A tab page holding a hero / strip plus its card grid (switched as one by selectTab).
+local function holder(content: Frame, name: string): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.BackgroundTransparency = 1
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.Visible = false
+	frame.Parent = content
+	pages[name] = frame
+	return frame
+end
+
+local function strips(page: GuiObject, name: string, top: number): ScrollingFrame
+	local g = grid(page, name .. "Cards", top)
+	pages[name .. "Cards"] = nil -- shown with its holder
+	g.Visible = true
+	return g
+end
+
 local function selectTab(name: string)
 	for tab, page in pages do
 		page.Visible = tab == name
@@ -169,7 +366,11 @@ local function selectTab(name: string)
 		local stroke = button:FindFirstChildOfClass("UIStroke")
 		if stroke then
 			stroke.Color = if tab == name then C.Gold else C.Outline
+			stroke.Thickness = if tab == name then Theme.Stroke.Window else Theme.Stroke.Heavy
 		end
+	end
+	if hintLabel then
+		hintLabel.Text = TAB_HINTS[name] or ""
 	end
 end
 
@@ -185,12 +386,26 @@ end
 -- pages
 
 local function buildGearPage(content: Frame)
-	local page = grid(content, "Gear")
+	local page = holder(content, "Gear")
+	local kit = M.Products.SurvivalKit
+	hero(page, {
+		Name = "SurvivalKit",
+		Top = C.BlueLight,
+		Bottom = C.Blue,
+		Title = "SURVIVAL KIT",
+		Bullets = { "1x Speed Soda, Balloon Glider and Shield", "Instant: no coins needed" },
+		Icons = { "SpeedSoda", "Glider", "Shield" },
+		Button = Store.robux(kit.Price),
+		OnClick = function()
+			Store.promptProduct("SurvivalKit")
+		end,
+	})
+	local cards = strips(page, "Gear", S.HeroHeight + S.HeroGap)
 	for i, def in Config.Gear do
-		local _, _, sub = card(page, {
+		local _, _, sub = card(cards, {
 			Order = i,
-			Top = def.Color:Lerp(Color3.new(1, 1, 1), 0.4),
-			Bottom = def.Color,
+			Top = C.BlueLight,
+			Bottom = C.Blue,
 			Icon = def.Icon,
 			Title = def.DisplayName,
 			Subtitle = def.Description,
@@ -201,8 +416,7 @@ local function buildGearPage(content: Frame)
 		})
 		local function refresh()
 			local n = player:GetAttribute(Attributes.GearPrefix .. def.Id) :: number? or 0
-			local use = if Components.isTouch() then "tap it on your hotbar" else "Key " .. def.Key
-			sub.Text = string.format("%s\nOwned x%d · %s", def.Description, n, use)
+			sub.Text = string.format("%s · %ds\nOwned x%d", def.Description, def.Duration, n)
 		end
 		player:GetAttributeChangedSignal(Attributes.GearPrefix .. def.Id):Connect(refresh)
 		refresh()
@@ -211,19 +425,30 @@ end
 
 -- God loadouts: buy with coins, then equip. The equipped kit is your hotbar as God.
 local function buildKitsPage(content: Frame)
-	local page = grid(content, "Kits")
-	for i, kit in Config.Kits do
-		local list = {}
-		for _, id in kit.Abilities do
-			table.insert(list, abilityIcons[id] or "?")
+	local page = holder(content, "Kits")
+	local status = strip(page, "PlayGod", "YOUR GOD LOADOUT", "")
+	local function refreshStatus()
+		local id = player:GetAttribute(Attributes.Kit)
+		local name = "The Architect"
+		for _, kit in Config.Kits do
+			if kit.Id == id then
+				name = kit.Name
+			end
 		end
-		local _, button = card(page, {
+		status.Text = "Equipped: " .. name
+	end
+	player:GetAttributeChangedSignal(Attributes.Kit):Connect(refreshStatus)
+	refreshStatus()
+	local cards = strips(page, "Kits", S.StripHeight + S.HeroGap)
+	for i, kit in Config.Kits do
+		local _, button = card(cards, {
 			Order = i,
 			Top = kit.Color:Lerp(Color3.new(1, 1, 1), 0.45),
 			Bottom = kit.Color,
 			Icon = kit.Icon,
 			Title = kit.Name,
-			Subtitle = table.concat(list, " ") .. "\n" .. kit.Description,
+			Subtitle = kit.Description,
+			Abilities = kit.Abilities,
 			Button = "",
 			OnClick = function()
 				local owned = player:GetAttribute(Attributes.KitPrefix .. kit.Id) == true
@@ -257,16 +482,15 @@ local styleCategory = "GodSkin"
 local styleStrips: { [string]: ScrollingFrame } = {}
 local styleButtons: { [string]: TextButton } = {}
 local STYLE_TABS = {
-	{ Id = "GodSkin", Title = "🖐️ God Skins" },
-	{ Id = "Vfx", Title = "⚡ Disaster FX" },
-	{ Id = "Finisher", Title = "💥 Finishers" },
+	{ Id = "GodSkin", Title = "God Skins", Icon = "PlayGod" },
+	{ Id = "Vfx", Title = "Disaster FX", Icon = "⚡" },
+	{ Id = "Finisher", Title = "Finishers", Icon = "🎉" },
 }
 
 local function showStyle(category: string)
 	styleCategory = category
-	local visible = pages.Style ~= nil and pages.Style.Visible
-	for id, strip in styleStrips do
-		strip.Visible = visible and id == category
+	for id, cards in styleStrips do
+		cards.Visible = id == category
 	end
 	for id, button in styleButtons do
 		local stroke = button:FindFirstChildOfClass("UIStroke")
@@ -276,44 +500,116 @@ local function showStyle(category: string)
 	end
 end
 
+-- Buy / equip a cosmetic (cards and the Style hero share this).
+local function cosmeticClick(def: any)
+	local owned = player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) == true
+	if owned then
+		Remotes.get("CosmeticAction"):FireServer("Equip", def.Id)
+	elseif def.Exclusive then
+		HUDController.Popup("REACH DAY 7 OF YOUR LOGIN STREAK", C.GoldLight)
+	elseif def.Coins then
+		Remotes.get("CosmeticAction"):FireServer("Buy", def.Id)
+	elseif def.Product and not Store.promptProduct(def.Product) then
+		HUDController.Popup("COMING SOON", C.GoldLight)
+	end
+end
+
+local function cosmeticButton(button: TextButton, def: any)
+	local product = if def.Product then M.Products[def.Product] else nil
+	local equipAttr = Attributes.EquipPrefix .. def.Category
+	local function refresh()
+		local owned = player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) == true
+		local equipped = player:GetAttribute(equipAttr) == def.Id
+		if equipped then
+			Components.setText(button, "EQUIPPED ✔")
+			Components.setColors(button, C.GreyLight, C.Grey, true)
+		elseif owned then
+			Components.setText(button, "EQUIP")
+			Components.setColors(button, C.BlueLight, C.Blue, true)
+		elseif def.Exclusive then
+			Components.setText(button, "🔒 DAY 7")
+			Components.setColors(button, C.GreyLight, C.Grey, true)
+		elseif def.Coins then
+			Components.setText(button, "💰 " .. HUDController.FormatNumber(def.Coins))
+			Components.setColors(button, C.GreenLight, C.Green, true)
+		elseif product then
+			Components.setText(button, if product.Id == 0 then "SOON" else Store.robux(product.Price))
+			Components.setColors(button, C.GreenLight, C.Green, true)
+		end
+	end
+	player:GetAttributeChangedSignal(Attributes.CosmeticPrefix .. def.Id):Connect(refresh)
+	player:GetAttributeChangedSignal(equipAttr):Connect(refresh)
+	refresh()
+end
+
 local function buildStylePage(content: Frame)
-	local holder = Instance.new("Frame")
-	holder.Name = "Style"
-	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.fromScale(1, 1)
-	holder.Visible = false
-	holder.Parent = content
-	pages.Style = holder
+	local page = holder(content, "Style")
 	local row = Instance.new("Frame")
 	row.Name = "Categories"
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 34)
-	row.Position = UDim2.fromOffset(0, 52)
-	row.Parent = holder
+	row.Size = UDim2.new(1, 0, 0, S.CategoryHeight)
+	row.Position = UDim2.fromOffset(0, S.PageTop)
+	row.Parent = page
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 8)
+	layout.Padding = UDim.new(0, 10)
 	layout.Parent = row
+	-- the featured skin sits under the category row
+	local featured: any = nil
+	for _, def in Config.Cosmetics.Items do
+		if def.Id == S.FeaturedSkin then
+			featured = def
+		end
+	end
+	local heroTop = S.CategoryHeight + S.HeroGap
+	if S.StyleHeroHeight <= 0 then
+		featured = nil -- phones: no room for the banner
+	end
+	if featured then
+		local product = if featured.Product then M.Products[featured.Product] else nil
+		local frame, button = hero(page, {
+			Name = "Featured",
+			Top = C.GoldLight,
+			Bottom = C.Orange,
+			Title = string.upper(featured.Name),
+			Bullets = { "Legendary God Skin: hovers over the arena", featured.Description },
+			Icons = { featured.Icon },
+			Badge = if product and product.Badge ~= "" then product.Badge else nil,
+			Button = "",
+			Height = S.StyleHeroHeight,
+			OnClick = function()
+				cosmeticClick(featured)
+			end,
+		})
+		frame.Position = UDim2.new(0.5, 0, 0, S.PageTop + heroTop)
+		cosmeticButton(button, featured)
+	end
+	local cardTop = heroTop + (if featured then S.StyleHeroHeight + S.HeroGap else 0)
 	for i, tab in STYLE_TABS do
 		local b = Components.button({
 			Name = tab.Id,
 			Text = tab.Title,
 			TextSize = 17,
-			Size = UDim2.fromOffset(170, 32),
-			Color = C.Purple,
-			ColorLight = C.PurpleLight,
+			Size = UDim2.fromOffset(170, S.CategoryHeight - 4),
+			Color = C.Pink,
+			ColorLight = C.PinkLight,
 			Parent = row,
 			OnClick = function()
 				showStyle(tab.Id)
 			end,
 		})
 		b.LayoutOrder = i
+		local label = b:FindFirstChild("Text") :: TextLabel?
+		if label then
+			label.Position = UDim2.fromOffset(14, 0)
+		end
+		Components.icon({ Name = "Icon", Icon = tab.Icon, TextSize = 18, Size = UDim2.fromOffset(24, 24), Position = UDim2.new(0, 8, 0.5, -2), AnchorPoint = Vector2.new(0, 0.5), ZIndex = 2, Parent = b })
 		styleButtons[tab.Id] = b
-		local strip = grid(holder, tab.Id, 40)
+		local cards = grid(page, tab.Id, cardTop)
 		pages[tab.Id] = nil -- strips are switched by showStyle, not selectTab
-		styleStrips[tab.Id] = strip
+		styleStrips[tab.Id] = cards
 	end
 	local order: { [string]: number } = {}
 	for _, def in Config.Cosmetics.Items do
@@ -329,63 +625,42 @@ local function buildStylePage(content: Frame)
 			Badge = if def.Exclusive then "Day 7 Streak" elseif product and product.Badge ~= "" then product.Badge elseif def.Coins == nil and def.Product == nil then "Starter" else nil,
 			Button = "",
 			OnClick = function()
-				local owned = player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) == true
-				if owned then
-					Remotes.get("CosmeticAction"):FireServer("Equip", def.Id)
-				elseif def.Exclusive then
-					HUDController.Popup("REACH DAY 7 OF YOUR LOGIN STREAK", C.GoldLight)
-				elseif def.Coins then
-					Remotes.get("CosmeticAction"):FireServer("Buy", def.Id)
-				elseif def.Product and not Store.promptProduct(def.Product) then
-					HUDController.Popup("COMING SOON", C.GoldLight)
-				end
+				cosmeticClick(def)
 			end,
 		})
-		local equipAttr = Attributes.EquipPrefix .. def.Category
-		local function refresh()
-			local owned = player:GetAttribute(Attributes.CosmeticPrefix .. def.Id) == true
-			local equipped = player:GetAttribute(equipAttr) == def.Id
-			if equipped then
-				Components.setText(button, "EQUIPPED ✔")
-				Components.setColors(button, C.GreyLight, C.Grey, true)
-			elseif owned then
-				Components.setText(button, "EQUIP")
-				Components.setColors(button, C.BlueLight, C.Blue, true)
-			elseif def.Exclusive then
-				Components.setText(button, "🔒 DAY 7")
-				Components.setColors(button, C.GreyLight, C.Grey, true)
-			elseif def.Coins then
-				Components.setText(button, "💰 " .. HUDController.FormatNumber(def.Coins))
-				Components.setColors(button, C.GreenLight, C.Green, true)
-			elseif product then
-				Components.setText(button, if product.Id == 0 then "SOON" else Store.robux(product.Price))
-				Components.setColors(button, C.PinkLight, C.Pink, true)
-			end
-		end
-		player:GetAttributeChangedSignal(Attributes.CosmeticPrefix .. def.Id):Connect(refresh)
-		player:GetAttributeChangedSignal(equipAttr):Connect(refresh)
-		refresh()
+		cosmeticButton(button, def)
 	end
-	holder:GetPropertyChangedSignal("Visible"):Connect(function()
-		showStyle(styleCategory)
-	end)
+	showStyle(styleCategory)
 end
 
 local function buildCoinsPage(content: Frame)
-	local page = grid(content, "Coins")
-	for i, key in { "CoinsSmall", "CoinsMedium", "CoinsLarge", "CoinsHuge" } do
+	local page = holder(content, "Coins")
+	local vault = M.Products.CoinsHuge
+	hero(page, {
+		Name = "Vault",
+		Top = C.GoldLight,
+		Bottom = C.Gold:Lerp(C.Orange, 0.35),
+		Title = string.upper(vault.Name),
+		Bullets = { "+" .. HUDController.FormatNumber(vault.Coins or 0) .. " coins", "Enough for any God Kit, twice over" },
+		Icons = { vault.Icon, "🪙" },
+		Badge = vault.Badge,
+		Button = Store.robux(vault.Price),
+		OnClick = function()
+			Store.promptProduct("CoinsHuge")
+		end,
+	})
+	local cards = strips(page, "Coins", S.HeroHeight + S.HeroGap)
+	for i, key in { "CoinsSmall", "CoinsMedium", "CoinsLarge" } do
 		local def = M.Products[key]
-		card(page, {
+		card(cards, {
 			Order = i,
-			Top = C.GreenLight,
-			Bottom = C.Green,
+			Top = C.GoldLight,
+			Bottom = C.Gold:Lerp(C.Orange, 0.35),
 			Icon = def.Icon,
 			Title = def.Name,
 			Subtitle = "+" .. HUDController.FormatNumber(def.Coins or 0) .. " coins",
 			Badge = def.Badge,
 			Button = Store.robux(def.Price),
-			ButtonColor = C.Blue,
-			ButtonLight = C.BlueLight,
 			OnClick = function()
 				Store.promptProduct(key)
 			end,
@@ -394,10 +669,12 @@ local function buildCoinsPage(content: Frame)
 end
 
 local function buildPassesPage(content: Frame)
-	local page = grid(content, "Passes")
+	local page = holder(content, "Passes")
+	strip(page, "🏅", "GAME PASSES", "Own them forever")
+	local cards = strips(page, "Passes", S.StripHeight + S.HeroGap)
 	for i, key in { "DoubleCoins", "VIP", "GodPriority", "QuickDash" } do
 		local def = M.Passes[key]
-		local _, button = card(page, {
+		local _, button = card(cards, {
 			Order = i,
 			Top = C.PurpleLight,
 			Bottom = C.Purple,
@@ -422,15 +699,16 @@ local function buildPassesPage(content: Frame)
 end
 
 local function buildSpecialsPage(content: Frame)
-	local page = grid(content, "Specials")
+	local page = holder(content, "Specials")
 	local god = M.Products.GodNextRound
-	local _, godButton = card(page, {
-		Order = 1,
-		Top = C.Pink,
+	local _, godButton, bullets = hero(page, {
+		Name = "BeTheGod",
+		Top = C.PurpleLight,
 		Bottom = C.Purple,
-		Icon = god.Icon,
-		Title = "Be the God",
-		Subtitle = "Guaranteed God next round",
+		Title = "BE THE GOD",
+		Bullets = { "Guaranteed God next round", "" },
+		Icons = { god.Icon, "⭐" },
+		Badge = "Next Round",
 		Button = Store.robux(god.Price),
 		OnClick = function()
 			if player:GetAttribute(Attributes.GodQueued) ~= true then
@@ -442,27 +720,20 @@ local function buildSpecialsPage(content: Frame)
 		local queued = player:GetAttribute(Attributes.GodQueued) == true
 		Components.setText(godButton, if queued then "QUEUED ✔" else Store.robux(god.Price))
 		setOwnedLook(godButton, queued)
+		local chance = player:GetAttribute(Attributes.GodChance) :: number? or 0
+		local line = bullets[2]
+		if line then
+			line.Text = string.format("•  Your God Chance: %s%%", if chance % 1 == 0 then tostring(math.floor(chance)) else string.format("%.1f", chance))
+		end
 	end
 	player:GetAttributeChangedSignal(Attributes.GodQueued):Connect(refreshGod)
+	player:GetAttributeChangedSignal(Attributes.GodChance):Connect(refreshGod)
 	refreshGod()
 
-	local kit = M.Products.SurvivalKit
-	card(page, {
-		Order = 2,
-		Top = C.BlueLight,
-		Bottom = C.Blue,
-		Icon = kit.Icon,
-		Title = kit.Name,
-		Subtitle = "1x Soda, Glider and Shield",
-		Button = Store.robux(kit.Price),
-		OnClick = function()
-			Store.promptProduct("SurvivalKit")
-		end,
-	})
-
+	local cards = strips(page, "Specials", S.HeroHeight + S.HeroGap)
 	local welcome = M.Products.WelcomePack
-	local _, welcomeButton = card(page, {
-		Order = 3,
+	local _, welcomeButton = card(cards, {
+		Order = 1,
 		Top = C.OrangeLight,
 		Bottom = C.Orange,
 		Icon = welcome.Icon,
@@ -484,36 +755,9 @@ local function buildSpecialsPage(content: Frame)
 	player:GetAttributeChangedSignal(Attributes.WelcomeClaimed):Connect(refreshWelcome)
 	refreshWelcome()
 
-	-- panic saves: charges that fire automatically
-	for i, key in { "SaveGlider", "SaveAegis" } do
-		local def = M.Products[key]
-		local kind = def.Save or ""
-		local _, button, sub = card(page, {
-			Order = 4 + i,
-			Top = if kind == "Glider" then C.BlueLight else C.GoldLight,
-			Bottom = if kind == "Glider" then C.Blue else C.Gold,
-			Icon = def.Icon,
-			Title = def.Name,
-			Subtitle = "",
-			Button = "",
-			OnClick = function()
-				if not Store.promptProduct(key) then
-					HUDController.Popup("COMING SOON", C.GoldLight)
-				end
-			end,
-		})
-		local function refresh()
-			local n = player:GetAttribute(Attributes.SavePrefix .. kind) :: number? or 0
-			sub.Text = string.format("%s\nAuto-fires · you have x%d", if kind == "Glider" then "Catches a fatal fall" else "Blocks one fatal hit", n)
-			Components.setText(button, if def.Id == 0 then "SOON" else Store.robux(def.Price))
-		end
-		player:GetAttributeChangedSignal(Attributes.SavePrefix .. kind):Connect(refresh)
-		refresh()
-	end
-
 	local revive = M.Products.Revive
-	card(page, {
-		Order = 4,
+	card(cards, {
+		Order = 2,
 		Top = C.PinkLight,
 		Bottom = C.Pink,
 		Icon = revive.Icon,
@@ -529,39 +773,69 @@ local function buildSpecialsPage(content: Frame)
 			end
 		end,
 	})
+
+	-- panic saves: charges that fire automatically
+	for i, key in { "SaveGlider", "SaveAegis" } do
+		local def = M.Products[key]
+		local kind = def.Save or ""
+		local _, button, sub = card(cards, {
+			Order = 2 + i,
+			Top = if kind == "Glider" then C.BlueLight else C.GoldLight,
+			Bottom = if kind == "Glider" then C.Blue else C.Gold,
+			Icon = def.Icon,
+			Title = def.Name,
+			Subtitle = "",
+			Button = "",
+			OnClick = function()
+				if not Store.promptProduct(key) then
+					HUDController.Popup("COMING SOON", C.GoldLight)
+				end
+			end,
+		})
+		local function refresh()
+			local n = player:GetAttribute(Attributes.SavePrefix .. kind) :: number? or 0
+			sub.Text = string.format("%s\nYou have x%d", if kind == "Glider" then "Catches a fatal fall" else "Blocks one fatal hit", n)
+			Components.setText(button, if def.Id == 0 then "SOON" else Store.robux(def.Price))
+		end
+		player:GetAttributeChangedSignal(Attributes.SavePrefix .. kind):Connect(refresh)
+		refresh()
+	end
 end
 
 local function buildShop()
-	shop = Components.window(layer, "Shop", UDim2.fromOffset(780, 470))
+	shop = Components.window(layer, "Shop!", UDim2.fromOffset(S.Width, S.Height))
 	local content = shop.Content
 
 	local tabs = Instance.new("Frame")
 	tabs.Name = "Tabs"
 	tabs.BackgroundTransparency = 1
-	tabs.Size = UDim2.new(1, 0, 0, 46)
+	tabs.Size = UDim2.new(1, 0, 0, S.TabHeight)
 	tabs.Parent = content
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 10)
+	layout.Padding = UDim.new(0, 8)
 	layout.Parent = tabs
-	local tabColors = {
-		Gear = { C.BlueLight, C.Blue },
-		Kits = { C.PinkLight, C.Pink },
-		Style = { C.PurpleLight, C.Purple },
-		Coins = { C.GreenLight, C.Green },
-		Passes = { C.PurpleLight, C.Purple },
-		Specials = { C.OrangeLight, C.Orange },
+	-- category colours: survivor gear blue, God purple, style pink, coins gold, passes
+	-- deep purple, specials orange
+	local tabStyle = {
+		Gear = { C.BlueLight, C.Blue, "SpeedSoda" },
+		Kits = { C.PurpleLight, C.Purple, "PlayGod" },
+		Style = { C.PinkLight, C.Pink, "⭐" },
+		Coins = { C.GoldLight, C.Gold:Lerp(C.Orange, 0.35), "Coin" },
+		Passes = { C.PurpleLight:Lerp(C.Purple, 0.6), C.Purple:Lerp(C.Outline, 0.3), "Passes" },
+		Specials = { C.OrangeLight, C.Orange, "🎁" },
 	}
 	for i, name in TAB_ORDER do
+		local style = tabStyle[name]
 		local b = Components.button({
 			Name = name,
 			Text = TAB_TITLES[name] or name,
-			TextSize = 19,
-			Size = UDim2.fromOffset(116, 42),
-			Color = tabColors[name][2],
-			ColorLight = tabColors[name][1],
+			TextSize = 18,
+			Size = UDim2.fromOffset(S.TabWidth, S.TabHeight - 6),
+			Color = style[2],
+			ColorLight = style[1],
 			Parent = tabs,
 			OnClick = function()
 				selectTab(name)
@@ -569,6 +843,11 @@ local function buildShop()
 			end,
 		})
 		b.LayoutOrder = i
+		local label = b:FindFirstChild("Text") :: TextLabel?
+		if label then
+			label.Position = UDim2.fromOffset(15, 0)
+		end
+		Components.icon({ Name = "Icon", Icon = style[3], TextSize = 20, Size = UDim2.fromOffset(28, 28), Position = UDim2.new(0, 6, 0.5, -2), AnchorPoint = Vector2.new(0, 0.5), ZIndex = 2, Parent = b })
 		tabButtons[name] = b
 	end
 
@@ -579,19 +858,32 @@ local function buildShop()
 	buildPassesPage(content)
 	buildSpecialsPage(content)
 
+	-- wallet (left) and a per-tab hint (right) along the bottom
+	Components.icon({ Name = "WalletCoin", Icon = "Coin", TextSize = 24, Size = UDim2.fromOffset(32, 32), Position = UDim2.new(0, 4, 1, -2), AnchorPoint = Vector2.new(0, 1), Parent = content })
 	local wallet = Components.label({
 		Name = "Wallet",
 		Text = "",
-		TextSize = 22,
+		TextSize = 24,
 		Color = C.Gold,
-		Size = UDim2.fromOffset(220, 26),
-		Position = UDim2.new(1, -4, 1, -2),
+		Size = UDim2.fromOffset(200, 30),
+		Position = UDim2.new(0, 42, 1, -3),
+		AnchorPoint = Vector2.new(0, 1),
+		XAlign = Enum.TextXAlignment.Left,
+		Parent = content,
+	})
+	hintLabel = Components.label({
+		Name = "Hint",
+		Text = "",
+		TextSize = 14,
+		Size = UDim2.new(1, -260, 0, 26),
+		Position = UDim2.new(1, -4, 1, -4),
 		AnchorPoint = Vector2.new(1, 1),
 		XAlign = Enum.TextXAlignment.Right,
+		StrokeThickness = Theme.Stroke.Thin,
 		Parent = content,
 	})
 	local function refreshWallet()
-		wallet.Text = "💰 " .. HUDController.FormatNumber(player:GetAttribute(Attributes.Coins) :: number? or 0)
+		wallet.Text = HUDController.FormatNumber(player:GetAttribute(Attributes.Coins) :: number? or 0)
 	end
 	player:GetAttributeChangedSignal(Attributes.Coins):Connect(refreshWallet)
 	refreshWallet()
@@ -680,6 +972,7 @@ function MenuController.Start()
 	end)
 
 	SpectateController.SetShopOpener(MenuController.OpenShop)
+	HUDController.SetShopOpener(MenuController.OpenShop)
 	local spectateTile = Components.tile(sidebar, "Spectate", "Spectate", C.Blue, 5)
 	spectateTile.Activated:Connect(SpectateController.Toggle)
 

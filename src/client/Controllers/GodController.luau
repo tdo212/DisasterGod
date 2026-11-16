@@ -128,6 +128,9 @@ local function buildSlots()
 		local tint = if utility then RADAR elseif def.Tier == "Major" then C.Purple else C.Blue
 		Components.gradient(slot, tint:Lerp(Color3.new(1, 1, 1), 0.25), tint:Lerp(Color3.new(0, 0, 0), 0.35), 90, true)
 		Components.studs(slot)
+		if not utility then
+			Components.block(slot, tint:Lerp(Color3.new(0, 0, 0), 0.35))
+		end
 		slot.Parent = slotHolder
 		local scale = Instance.new("UIScale")
 		scale.Parent = slot
@@ -138,7 +141,7 @@ local function buildSlots()
 		end
 		local cost = Components.label({ Name = "Cost", Text = tostring(def.Cost), TextSize = 18, Color = C.GoldLight, Size = UDim2.fromOffset(30, 20), Position = UDim2.new(1, -4, 1, -8), AnchorPoint = Vector2.new(1, 1), XAlign = Enum.TextXAlignment.Right, Parent = slot })
 		cost.ZIndex = 3
-		Components.label({ Name = "Name", Text = def.DisplayName, TextSize = 15, Size = UDim2.new(1, 16, 0, 18), Position = UDim2.new(0.5, 0, 1, 4), AnchorPoint = Vector2.new(0.5, 0), Parent = slot })
+		Components.label({ Name = "Name", Text = def.DisplayName, TextSize = 15, Size = UDim2.new(1, 16, 0, 18), Position = UDim2.new(0.5, 0, 1, if utility then 4 else 4 + Theme.Block.Depth), AnchorPoint = Vector2.new(0.5, 0), Parent = slot })
 
 		local cd = Instance.new("Frame")
 		cd.Name = "Cooldown"

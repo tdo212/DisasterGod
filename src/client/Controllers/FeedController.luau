@@ -200,9 +200,11 @@ function FeedController.Start()
 	list.Position = UDim2.new(1, -14, 0, if Components.isTouch() then F.TopOffsetTouch else F.TopOffset)
 	list.Size = UDim2.fromOffset(WIDTH, F.MaxLines * 34)
 	list.Parent = layer
-	-- phones: the God card and offers take the right edge in the lobby; the feed steps
-	-- left of them (and below the round bar) while they're up
-	if Components.isTouch() then
+	-- the God card and offers take the right edge in the lobby; the feed steps left of
+	-- them (and, on phones, below the round bar) while they're up
+	do
+		local touch = Components.isTouch()
+		local top = if touch then F.TopOffsetTouch else F.TopOffset
 		task.spawn(function()
 			local hud = player:WaitForChild("PlayerGui"):WaitForChild("HUD", 30)
 			local card = hud and hud:FindFirstChild("GodChance", true) :: GuiObject?
@@ -211,8 +213,8 @@ function FeedController.Start()
 			end
 			local function dodge()
 				list.Position = if card.Visible
-					then UDim2.new(1, -14 - F.DodgeTouch.X, 0, F.DodgeTouch.Y)
-					else UDim2.new(1, -14, 0, F.TopOffsetTouch)
+					then UDim2.new(1, -14 - F.Dodge.X, 0, if touch then F.Dodge.Y else top)
+					else UDim2.new(1, -14, 0, top)
 			end
 			card:GetPropertyChangedSignal("Visible"):Connect(dodge)
 			dodge()

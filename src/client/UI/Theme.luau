@@ -16,7 +16,7 @@ local Theme = {
 		Panel = Color3.fromRGB(26, 30, 40),
 		PanelLight = Color3.fromRGB(62, 66, 84),
 		Slot = Color3.fromRGB(18, 20, 28),
-		Window = Color3.fromRGB(22, 25, 34), -- window body: near-opaque dark (UIReference MainFrame), high contrast under white text
+		Window = Color3.fromRGB(56, 61, 71), -- window body: translucent slate (stud shop reference), the scene shows through
 		WindowLight = Color3.fromRGB(40, 46, 60),
 		Header = Color3.fromRGB(40, 190, 225), -- cyan studded header
 		HeaderLight = Color3.fromRGB(80, 225, 250),
@@ -40,12 +40,25 @@ local Theme = {
 		GreyLight = Color3.fromRGB(190, 195, 210),
 	},
 
-	-- square-cut blocks like the reference (just enough rounding to soften pixels)
+	-- square-cut blocks like the reference (mitred outlines, no rounding)
 	Radius = {
-		Small = UDim.new(0, 3),
-		Medium = UDim.new(0, 4),
-		Large = UDim.new(0, 5),
+		Small = UDim.new(0, 0),
+		Medium = UDim.new(0, 0),
+		Large = UDim.new(0, 0),
 		Pill = UDim.new(1, 0),
+	},
+
+	-- Stud block construction (Figma "Survive The God" stud UI): a darker depth edge under
+	-- the face, a light inner rim, and translucent sheen stripes on buy buttons.
+	Block = {
+		Depth = 6, -- px of darker extrusion below the face
+		DepthCard = 8, -- cards, window headers and hero banners
+		DepthDarken = 0.55, -- depth = base colour this far toward black
+		Rim = 2, -- inner light rim thickness
+		RimLighten = 0.55, -- rim = base colour this far toward white
+		RimTransparency = 0.2,
+		SheenTransparency = 0.8, -- the white diagonal stripes on buy buttons
+		WindowTransparency = 0.3, -- translucent window body
 	},
 
 	Stroke = {
@@ -74,6 +87,57 @@ local Theme = {
 	Gloss = {
 		LipStart = 0.84,
 		LipDarken = 0.3,
+	},
+
+	-- Currency bar (HUDController): coin balance, "+" top-up, Friend Boost pill.
+	Wallet = {
+		Width = 190,
+		Height = 50,
+		Gap = 10, -- between the bar and the "+" button
+		FriendWidth = 200,
+	},
+
+	-- Shop window layout (MenuController), from the Figma stud UI at 2/3 scale.
+	Shop = {
+		Width = 840,
+		Height = 612,
+		TabWidth = 124,
+		TabHeight = 46,
+		PageTop = 56, -- below the tab row
+		HeroHeight = 150, -- featured offer banner (Gear, Coins, Specials)
+		HeroTitleSize = 36,
+		HeroBulletTop = 50,
+		HeroBullets = 2, -- bullet lines shown (phones show one)
+		HeroButtonHeight = 42,
+		StyleHeroHeight = 104, -- the featured God Skin under Style's category row
+		HeroGap = 10,
+		HeroButtonWidth = 170,
+		HeroTitleColor = Color3.fromRGB(255, 226, 31),
+		HeroStripeTransparency = 0.82,
+		StripHeight = 52, -- God Kits loadout / Passes title strip
+		CategoryHeight = 36, -- Style's category row
+		FooterHeight = 34, -- wallet + hint line
+		CardWidth = 150,
+		CardHeight = 236,
+		KitCardHeight = 250, -- room for the five-disaster row
+		CardGap = 10,
+		AbilityIcon = 25,
+		FeaturedSkin = "CelestialMask",
+	},
+	-- Phones: a shorter shop so the window fits a 540-unit-tall touch canvas at ~0.95
+	-- scale (one hero bullet, no featured skin banner on Style).
+	ShopTouch = {
+		Height = 540,
+		HeroHeight = 112,
+		HeroTitleSize = 30,
+		HeroBulletTop = 42,
+		HeroBullets = 1,
+		HeroButtonHeight = 38,
+		StripHeight = 48,
+		FooterHeight = 28,
+		CardHeight = 214,
+		KitCardHeight = 242,
+		StyleHeroHeight = 0,
 	},
 
 	-- UI is authored for these canvas sizes and scaled to fit the screen.

@@ -260,41 +260,79 @@ local function buildRoundBar()
 end
 
 ---------------------------------------------------------------------------
--- coins + streak (bottom left; top right on touch so the thumbstick stays clear)
+-- Currency bar (top right, PC and phones): a dark stud block with the coin sticker
+-- overhanging its left end, the balance in gold and a green "+" top-up that opens the
+-- shop's Coins tab. The Friend Boost pill and the survival streak sit under it on PC
+-- and to its left on phones (the God card takes the space under it there).
+
+local shopOpener: ((string?) -> ())? = nil
+
+-- MenuController hands over its OpenShop (it requires this module, so not the reverse).
+function HUDController.SetShopOpener(fn: (string?) -> ())
+	shopOpener = fn
+end
 
 local function buildCoins()
+	local W = Theme.Wallet
 	local frame = Instance.new("Frame")
 	frame.Name = "Wallet"
 	frame.BackgroundTransparency = 1
-	frame.Size = UDim2.fromOffset(if touch then 190 else 250, 56)
-	if touch then
-		frame.Position = UDim2.new(1, -12, 0, 2)
-		frame.AnchorPoint = Vector2.new(1, 0)
-	else
-		frame.Position = UDim2.new(0, 16, 1, -14)
-		frame.AnchorPoint = Vector2.new(0, 1)
-	end
+	frame.Size = UDim2.fromOffset(W.Width + W.Gap + W.Height, W.Height)
+	frame.Position = UDim2.new(1, -12, 0, 6)
+	frame.AnchorPoint = Vector2.new(1, 0)
 	frame.Parent = layer
-	Components.icon({ Name = "Icon", Icon = "Coin", TextSize = 38, Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(0, 3), Parent = frame })
+	local bar = Components.panel({
+		Name = "Bar",
+		Size = UDim2.fromOffset(W.Width, W.Height),
+		Color = C.Panel,
+		Transparency = 0.08,
+		Studs = true,
+		Depth = Theme.Block.Depth,
+		Parent = frame,
+	})
+	Components.rim(bar, C.PanelLight)
+	Components.icon({ Name = "Icon", Icon = "Coin", TextSize = 40, Size = UDim2.fromOffset(W.Height + 10, W.Height + 10), Position = UDim2.new(0, -18, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), ZIndex = 2, Parent = bar })
 	local amount = Components.label({
 		Name = "Amount",
-		Text = "$0",
-		TextSize = 40,
-		Size = UDim2.new(1, -52, 0, 52),
-		Position = UDim2.fromOffset(52, 0),
+		Text = "0",
+		TextSize = if touch then 32 else 36,
+		Size = UDim2.new(1, -52, 1, -2),
+		Position = UDim2.fromOffset(46, 0),
 		Color = C.Gold,
 		XAlign = Enum.TextXAlignment.Left,
 		StrokeThickness = Theme.Stroke.Heavy,
-		Parent = frame,
+		Parent = bar,
 	})
+	Components.button({
+		Name = "TopUp",
+		Text = "+",
+		TextSize = 40,
+		Size = UDim2.fromOffset(W.Height, W.Height),
+		Position = UDim2.new(1, 0, 0, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		Color = C.Green,
+		ColorLight = C.GreenLight,
+		Sheen = true,
+		Parent = frame,
+		OnClick = function()
+			local open = shopOpener
+			if open then
+				open("Coins")
+			end
+		end,
+	})
+	-- under the bar on PC; left of it on phones
+	local below = UDim2.new(1, -(W.Gap + W.Height), 0, W.Height + Theme.Block.Depth + 6)
+	local beside = UDim2.new(0, -10, 0, 2)
 	local streak = Components.label({
 		Name = "Streak",
 		Text = "",
-		TextSize = if touch then 17 else 20,
+		TextSize = 17,
 		Size = UDim2.fromOffset(240, 24),
-		Position = if touch then UDim2.new(1, -240, 0, 52) else UDim2.fromOffset(4, -24),
+		Position = if touch then UDim2.new(0, -10, 0, 30) else UDim2.new(1, -(W.Gap + W.Height), 0, W.Height + Theme.Block.Depth + 38),
+		AnchorPoint = Vector2.new(1, 0),
 		Color = C.OrangeLight,
-		XAlign = if touch then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left,
+		XAlign = Enum.TextXAlignment.Right,
 		Parent = frame,
 	})
 	local scale = Instance.new("UIScale")
@@ -303,7 +341,7 @@ local function buildCoins()
 	-- the counter rolls up to the new total instead of jumping
 	local shown = Instance.new("NumberValue")
 	shown:GetPropertyChangedSignal("Value"):Connect(function()
-		amount.Text = "$" .. HUDController.FormatNumber(math.floor(shown.Value + 0.5))
+		amount.Text = HUDController.FormatNumber(math.floor(shown.Value + 0.5))
 	end)
 	local function refresh()
 		local coins = player:GetAttribute(Attributes.Coins) :: number? or 0
@@ -313,7 +351,7 @@ local function buildCoins()
 			Components.tween(shown, TweenInfo.new(math.clamp((coins - last) / 400, 0.35, 1.2), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = coins })
 		else
 			shown.Value = coins
-			amount.Text = "$" .. HUDController.FormatNumber(coins)
+			amount.Text = HUDController.FormatNumber(coins)
 		end
 		last = coins
 		local s = player:GetAttribute(Attributes.Streak) :: number? or 0
@@ -323,16 +361,18 @@ local function buildCoins()
 	player:GetAttributeChangedSignal(Attributes.Streak):Connect(refresh)
 	refresh()
 
-	-- friend squad: a subtle pill while a Roblox friend is in the server (+20% round coins)
+	-- friend squad: a green pill while a Roblox friend is in the server (+20% round coins)
 	local friend = Components.panel({
 		Name = "FriendBoost",
-		Size = UDim2.fromOffset(196, 26),
-		Position = if touch then UDim2.new(1, -196, 0, 78) else UDim2.fromOffset(2, -54),
-		Color = Color3.fromRGB(30, 90, 60),
-		Transparency = 0.15,
+		Size = UDim2.fromOffset(W.FriendWidth, 26),
+		Position = if touch then beside else below,
+		AnchorPoint = Vector2.new(1, 0),
+		Color = Color3.fromRGB(47, 160, 90),
+		Depth = 3,
 		Parent = frame,
 	})
-	Components.label({ Name = "Text", Text = "👥 +" .. math.floor(Config.Scoring.FriendBoost * 100) .. "% Friend Boost", TextSize = 15, Color = C.GreenLight, Size = UDim2.fromScale(1, 1), Parent = friend })
+	Components.rim(friend, Color3.fromRGB(47, 160, 90))
+	Components.label({ Name = "Text", Text = "+" .. math.floor(Config.Scoring.FriendBoost * 100) .. "% Friend Boost", TextSize = 16, Color = Color3.fromRGB(217, 255, 208), Size = UDim2.fromScale(1, 1), Parent = friend })
 	local function refreshFriend()
 		friend.Visible = player:GetAttribute(Attributes.FriendBoost) == true
 	end
@@ -384,6 +424,7 @@ local function buildGodChance()
 	Components.stroke(card, Theme.Stroke.Heavy)
 	Components.gradient(card, C.PurpleLight, C.Purple, 90, true)
 	Components.studs(card, nil, Theme.Radius.Large)
+	Components.block(card, C.Purple, Theme.Block.DepthCard)
 	card.Parent = layer
 
 	Components.label({ Name = "Caption", Text = "Next round", TextSize = 17, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 6), Parent = card })
@@ -462,6 +503,7 @@ local function buildWelcomeOffer()
 	Components.stroke(offer, Theme.Stroke.Heavy)
 	Components.gradient(offer, C.OrangeLight, C.Orange, 90, true)
 	Components.studs(offer, nil, Theme.Radius.Large)
+	Components.block(offer, C.Orange, Theme.Block.DepthCard)
 	offer.Parent = layer
 	Components.label({ Name = "Title", Text = def.Icon .. " Welcome Pack", TextSize = 19, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, if touch then 3 else 6), Parent = offer })
 	Components.label({

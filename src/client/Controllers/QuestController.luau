@@ -150,6 +150,7 @@ end
 local tracker: TextButton? = nil
 local trackerText: TextLabel? = nil
 local trackerPulse: UIScale? = nil
+local trackerIcon: GuiObject? = nil
 
 local function inRound(): boolean
 	local role = player:GetAttribute(Attributes.Role)
@@ -170,7 +171,11 @@ local function refreshTracker()
 			claimable += 1
 		end
 	end
-	text.Text = if claimable > 0 then "🎁 CLAIM QUEST!" else string.format("📜 QUESTS %d/%d", done, #state.Quests)
+	text.Text = if claimable > 0 then "CLAIM QUEST!" else string.format("QUESTS %d/%d", done, #state.Quests)
+	local icon = trackerIcon
+	if icon then
+		Components.setIcon(icon, if claimable > 0 then "Gift" else "Quests")
+	end
 	text.TextColor3 = if claimable > 0 then C.GoldLight else C.Text
 end
 
@@ -180,16 +185,19 @@ local function buildTracker()
 	t.Name = "QuestTracker"
 	t.Text = ""
 	t.AutoButtonColor = false
-	t.Size = UDim2.fromOffset(160, 34)
+	t.Size = UDim2.fromOffset(160, 38)
 	-- PC: directly under the sidebar tiles (left column); phones: under the top-left tiles
 	t.Position = if touch then UDim2.fromOffset(12, 350) else UDim2.new(0, 16, 0.5, 156)
-	t.BackgroundColor3 = C.Window
-	t.BackgroundTransparency = 0.12
+	t.BackgroundColor3 = Color3.new(1, 1, 1)
 	t.BorderSizePixel = 0
 	Components.corner(t, Theme.Radius.Small)
-	Components.stroke(t, Theme.Stroke.Thick)
+	Components.stroke(t, Theme.Stroke.Heavy)
+	Components.gradient(t, C.OrangeLight, C.Orange, 90, true)
+	Components.studs(t)
+	Components.block(t, C.Orange)
 	t.Parent = layer
-	trackerText = Components.label({ Name = "Text", Text = "", TextSize = 16, Size = UDim2.new(1, -8, 1, 0), Position = UDim2.fromOffset(4, 0), Parent = t })
+	trackerIcon = Components.icon({ Name = "Icon", Icon = "Quests", TextSize = 22, Size = UDim2.fromOffset(34, 34), Position = UDim2.new(0, 2, 0.5, -1), AnchorPoint = Vector2.new(0, 0.5), ZIndex = 2, Parent = t })
+	trackerText = Components.label({ Name = "Text", Text = "", TextSize = 17, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(36, 0), Parent = t })
 	local pulse = Instance.new("UIScale")
 	pulse.Parent = t
 	trackerPulse = pulse

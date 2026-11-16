@@ -75,7 +75,8 @@ function Components.stroke(parent: Instance, thickness: number?, color: Color3?,
 	stroke.Thickness = thickness or Theme.Stroke.Thick
 	stroke.Color = color or C.Outline
 	stroke.ApplyStrokeMode = if contextual then Enum.ApplyStrokeMode.Contextual else Enum.ApplyStrokeMode.Border
-	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	-- square-cut blocks get mitred corners; text keeps round joins (mitre spikes glyph tips)
+	stroke.LineJoinMode = if contextual then Enum.LineJoinMode.Round else Enum.LineJoinMode.Miter
 	stroke.Parent = parent
 	return stroke
 end
@@ -116,6 +117,67 @@ function Components.studs(parent: GuiObject, transparency: number?, radius: UDim
 	Components.corner(image, radius)
 	image.Parent = parent
 	return image
+end
+
+-- Stud block depth: a darker extrusion hanging under the bottom edge. It is a child that
+-- sits outside the face's bounds, so it never covers the face (children always draw
+-- above their parent under Sibling z-ordering).
+function Components.depth(surface: GuiObject, color: Color3, px: number?): Frame
+	local depth = Instance.new("Frame")
+	depth.Name = "Depth"
+	depth.BackgroundColor3 = color:Lerp(Color3.new(0, 0, 0), Theme.Block.DepthDarken)
+	depth.BorderSizePixel = 0
+	depth.Position = UDim2.fromScale(0, 1)
+	depth.Size = UDim2.new(1, 0, 0, px or Theme.Block.Depth)
+	depth.ZIndex = surface.ZIndex
+	Components.stroke(depth, Theme.Stroke.Heavy)
+	depth.Parent = surface
+	return depth
+end
+
+-- Light inner rim just inside the black outline (a stroked inset frame).
+function Components.rim(surface: GuiObject, color: Color3, px: number?): Frame
+	local inset = px or Theme.Block.Rim
+	local rim = Instance.new("Frame")
+	rim.Name = "Rim"
+	rim.BackgroundTransparency = 1
+	rim.Position = UDim2.fromOffset(inset, inset)
+	rim.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
+	rim.ZIndex = surface.ZIndex
+	local stroke = Components.stroke(rim, inset, color:Lerp(Color3.new(1, 1, 1), Theme.Block.RimLighten))
+	stroke.Transparency = Theme.Block.RimTransparency
+	rim.Parent = surface
+	return rim
+end
+
+-- Two translucent white diagonal stripes across a buy button (clipped by a CanvasGroup,
+-- since ClipsDescendants does not clip rotated children).
+function Components.sheen(surface: GuiObject, transparency: number?): CanvasGroup
+	local group = Instance.new("CanvasGroup")
+	group.Name = "Sheen"
+	group.BackgroundTransparency = 1
+	group.Size = UDim2.fromScale(1, 1)
+	group.GroupTransparency = transparency or Theme.Block.SheenTransparency
+	group.ZIndex = surface.ZIndex
+	for _, spec in { { 0.58, 0.16 }, { 0.8, 0.04 } } do
+		local stripe = Instance.new("Frame")
+		stripe.Name = "Stripe"
+		stripe.BackgroundColor3 = Color3.new(1, 1, 1)
+		stripe.BorderSizePixel = 0
+		stripe.AnchorPoint = Vector2.new(0.5, 0.5)
+		stripe.Position = UDim2.fromScale(spec[1], 0.5)
+		stripe.Size = UDim2.new(spec[2], 0, 3, 0)
+		stripe.Rotation = 25
+		stripe.Parent = group
+	end
+	group.Parent = surface
+	return group
+end
+
+-- Depth + rim on a surface (the shared stud-block build).
+function Components.block(surface: GuiObject, color: Color3, depth: number?)
+	Components.depth(surface, color, depth)
+	Components.rim(surface, color)
 end
 
 function Components.padding(parent: GuiObject, px: number)
@@ -176,6 +238,7 @@ export type PanelProps = {
 	Transparency: number?,
 	Radius: UDim?,
 	Studs: boolean?, -- stud texture over the panel (off for tiny pills)
+	Depth: number?, -- px of darker extrusion under the panel (stud block)
 	Parent: Instance?,
 }
 
@@ -192,6 +255,9 @@ function Components.panel(props: PanelProps): Frame
 	Components.stroke(frame, Theme.Stroke.Heavy)
 	if props.Studs then
 		Components.studs(frame, Theme.Textures.StudTransparencyPanel, props.Radius)
+	end
+	if props.Depth then
+		Components.depth(frame, props.Color or C.Panel, props.Depth)
 	end
 	frame.Parent = props.Parent
 	return frame
@@ -295,6 +361,8 @@ export type ButtonProps = {
 	TextSize: number?,
 	Parent: Instance?,
 	OnClick: (() -> ())?,
+	Depth: boolean?, -- false skips the stud-block depth edge and rim (default on)
+	Sheen: boolean?, -- diagonal sheen stripes (buy buttons)
 }
 
 -- Studded glossy button with a bottom lip and press/hover juice.
@@ -312,6 +380,12 @@ function Components.button(props: ButtonProps): TextButton
 	Components.stroke(button, Theme.Stroke.Heavy)
 	Components.gradient(button, props.ColorLight or C.GreenLight, props.Color or C.Green, 90, true)
 	Components.studs(button)
+	if props.Depth ~= false then
+		Components.block(button, props.Color or C.Green)
+	end
+	if props.Sheen then
+		Components.sheen(button)
+	end
 	-- text (with its own outline) lives on a child label so the border stroke stays on the frame
 	Components.label({
 		Name = "Text",
@@ -356,11 +430,20 @@ function Components.setText(button: GuiObject, text: string)
 	end
 end
 
--- Recolour a button / card built with Components.gradient.
+-- Recolour a button / card built with Components.gradient (and its depth and rim).
 function Components.setColors(surface: GuiObject, top: Color3, bottom: Color3, lip: boolean?)
 	local gradient = surface:FindFirstChildOfClass("UIGradient")
 	if gradient then
 		gradient.Color = Components.gloss(top, bottom, lip)
+	end
+	local depth = surface:FindFirstChild("Depth")
+	if depth and depth:IsA("Frame") then
+		depth.BackgroundColor3 = bottom:Lerp(Color3.new(0, 0, 0), Theme.Block.DepthDarken)
+	end
+	local rim = surface:FindFirstChild("Rim")
+	local rimStroke = rim and rim:FindFirstChildOfClass("UIStroke")
+	if rimStroke then
+		rimStroke.Color = bottom:Lerp(Color3.new(1, 1, 1), Theme.Block.RimLighten)
 	end
 end
 
@@ -387,9 +470,9 @@ export type WindowHandle = {
 	IsOpen: () -> boolean,
 }
 
--- Modal window (UIReference "SHOP"): a dark, slightly see-through body with a heavy
--- black outline, a cyan studded header block with a huge white title, and a separate
--- square red X block to its right.
+-- Modal window (stud shop reference): a translucent slate body with a heavy black
+-- outline, a cyan studded header block (depth + rim) with a huge white title, and a
+-- separate square red X block to its right.
 function Components.window(parent: Instance, title: string, size: UDim2): WindowHandle
 	local root = Components.panel({
 		Name = title .. "Window",
@@ -397,7 +480,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = C.Window,
-		Transparency = 0.05,
+		Transparency = Theme.Block.WindowTransparency,
 		Radius = Theme.Radius.Small,
 		Studs = false,
 		Parent = parent,
@@ -422,6 +505,7 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 	Components.stroke(header, Theme.Stroke.Heavy)
 	Components.gradient(header, C.HeaderLight, C.Header, 90, true)
 	Components.studs(header, nil, Theme.Radius.Small)
+	Components.block(header, C.Header, Theme.Block.DepthCard)
 	header.Parent = root
 
 	Components.label({
@@ -438,8 +522,8 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
-	content.Size = UDim2.new(1, -24, 1, -80)
-	content.Position = UDim2.fromOffset(12, 70)
+	content.Size = UDim2.new(1, -24, 1, -90)
+	content.Position = UDim2.fromOffset(12, 80)
 	content.Parent = root
 
 	local open = false
@@ -472,6 +556,10 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Parent = root,
 		OnClick = close,
 	})
+	local closeDepth = closeButton:FindFirstChild("Depth")
+	if closeDepth and closeDepth:IsA("Frame") then
+		closeDepth.Size = UDim2.new(1, 0, 0, Theme.Block.DepthCard)
+	end
 	closeButton.ZIndex = 3
 
 	handle = {
@@ -507,6 +595,7 @@ function Components.tile(parent: Instance, icon: string, caption: string, color:
 	Components.stroke(tile, Theme.Stroke.Heavy)
 	Components.gradient(tile, color:Lerp(Color3.new(1, 1, 1), 0.4), color, 90, true)
 	Components.studs(tile)
+	Components.block(tile, color)
 	tile.Parent = parent
 
 	Components.icon({
