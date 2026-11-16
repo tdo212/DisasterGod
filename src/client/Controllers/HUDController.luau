@@ -212,7 +212,7 @@ local function buildRoundBar()
 			elseif t > M.IntermissionDuration - M.LobbyBreak then
 				-- the lobby break: free time to shop, spin and explore before the vote
 				local left = t - (M.IntermissionDuration - M.LobbyBreak)
-				title.Text = string.format("🛒 Lobby break · shop & explore · vote in <font color=\"#FFD23C\">%ds</font>", left)
+				title.Text = string.format("Shop & explore · vote in <font color=\"#FFD23C\">%ds</font>", left)
 			else
 				title.Text = string.format("Round starts in <font color=\"#FFD23C\">%ds</font>", t)
 			end
@@ -261,10 +261,10 @@ local function buildRoundBar()
 end
 
 ---------------------------------------------------------------------------
--- Currency bar (top right, PC and phones): a dark stud block with the coin sticker
--- overhanging its left end, the balance in gold and a green "+" top-up that opens the
--- shop's Coins tab. The Friend Boost pill and the survival streak sit under it on PC
--- and to its left on phones (the God card takes the space under it there).
+-- Currency bar (top right on phones, bottom left on PC): a dark stud block with the
+-- coin sticker overhanging its left end, the balance in gold and a green "+" top-up
+-- that opens the shop's Coins tab. The Friend Boost pill and the survival streak sit
+-- above it on PC and to its left on phones (the God card takes the space under it).
 
 local shopOpener: ((string?) -> ())? = nil
 
@@ -273,9 +273,10 @@ function HUDController.SetShopOpener(fn: (string?) -> ())
 	shopOpener = fn
 end
 
--- The round bar and the currency bar ride up into the Roblox top-bar row (the strip
--- the GUI inset reserves, empty in the middle and on the right) instead of sitting
--- under it. Re-run whenever the screen or the UI scale changes.
+-- Phones: the round bar and the currency bar ride up into the Roblox top-bar row (the
+-- strip the GUI inset reserves, empty in the middle and on the right) instead of
+-- sitting under it. Re-run whenever the screen or the UI scale changes. PC keeps them
+-- under the top bar.
 local function liftIntoTopbar()
 	local function apply()
 		local inset = GuiService:GetGuiInset()
@@ -301,8 +302,13 @@ local function buildCoins()
 	frame.Name = "Wallet"
 	frame.BackgroundTransparency = 1
 	frame.Size = UDim2.fromOffset(W.Width + W.Gap + W.Height, W.Height)
-	frame.Position = UDim2.new(1, -12, 0, 6)
-	frame.AnchorPoint = Vector2.new(1, 0)
+	if touch then
+		frame.Position = UDim2.new(1, -12, 0, 6)
+		frame.AnchorPoint = Vector2.new(1, 0)
+	else
+		frame.Position = UDim2.new(0, 30, 1, -14 - Theme.Block.Depth)
+		frame.AnchorPoint = Vector2.new(0, 1)
+	end
 	frame.Parent = layer
 	local bar = Components.panel({
 		Name = "Bar",
@@ -344,18 +350,18 @@ local function buildCoins()
 			end
 		end,
 	})
-	-- under the bar on PC; left of it on phones
-	local below = UDim2.new(1, -(W.Gap + W.Height), 0, W.Height + Theme.Block.Depth + 6)
+	-- phones: left of the bar; PC: above it (the bar sits bottom left)
 	local beside = UDim2.new(0, -10, 0, 2)
+	local above = UDim2.new(0, -12, 0, -62)
 	local streak = Components.label({
 		Name = "Streak",
 		Text = "",
 		TextSize = 17,
 		Size = UDim2.fromOffset(240, 24),
-		Position = if touch then UDim2.new(0, -10, 0, 30) else UDim2.new(1, -(W.Gap + W.Height), 0, W.Height + Theme.Block.Depth + 38),
-		AnchorPoint = Vector2.new(1, 0),
+		Position = if touch then UDim2.new(0, -10, 0, 30) else UDim2.new(0, -10, 0, -30),
+		AnchorPoint = if touch then Vector2.new(1, 0) else Vector2.zero,
 		Color = C.OrangeLight,
-		XAlign = Enum.TextXAlignment.Right,
+		XAlign = if touch then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left,
 		Parent = frame,
 	})
 	local scale = Instance.new("UIScale")
@@ -388,8 +394,8 @@ local function buildCoins()
 	local friend = Components.panel({
 		Name = "FriendBoost",
 		Size = UDim2.fromOffset(W.FriendWidth, 26),
-		Position = if touch then beside else below,
-		AnchorPoint = Vector2.new(1, 0),
+		Position = if touch then beside else above,
+		AnchorPoint = if touch then Vector2.new(1, 0) else Vector2.zero,
 		Color = Color3.fromRGB(47, 160, 90),
 		Depth = 3,
 		Parent = frame,
@@ -1120,7 +1126,9 @@ function HUDController.Start()
 
 	buildRoundBar()
 	buildCoins()
-	liftIntoTopbar()
+	if touch then
+		liftIntoTopbar()
+	end
 	buildGodChance()
 	buildBanner()
 	buildWelcomeOffer()

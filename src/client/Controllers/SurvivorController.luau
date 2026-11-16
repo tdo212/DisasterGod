@@ -182,6 +182,7 @@ end
 
 local TOUCH_DASH_SIZE = 76
 local TOUCH_DASH_GAP = 10
+local TOUCH_DASH_FALLBACK = UDim2.new(1, -40, 1, -150) -- until a jump button shows
 
 -- Touch: the dash sits up and to the left of Roblox's jump button (never on top of it),
 -- at 80% of its size. TouchGui is rebuilt on some respawns / rotations, so re-find it.
@@ -202,6 +203,12 @@ local function followJumpButton()
 		end
 		table.clear(conns)
 		local function apply()
+			if not ((touchGui :: any).Enabled and jump.Visible) then
+				-- no on-screen jump button (touch controls off): bottom-right fallback
+				dashButton.AnchorPoint = Vector2.new(1, 1)
+				dashButton.Position = TOUCH_DASH_FALLBACK
+				return
+			end
 			if jump.AbsoluteSize.X < 1 then
 				return
 			end
@@ -219,6 +226,8 @@ local function followJumpButton()
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
 		table.insert(conns, gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))
+		table.insert(conns, jump:GetPropertyChangedSignal("Visible"):Connect(apply))
+		table.insert(conns, (touchGui :: any):GetPropertyChangedSignal("Enabled"):Connect(apply))
 		table.insert(conns, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply))
 	end
 	bind()
@@ -245,7 +254,7 @@ local function buildGui()
 		-- touch: real pixels just left of the jump button (not in the scaled layer);
 		-- fallback spot (no TouchGui yet) is clear of where the jump button sits
 		Size = if touch then UDim2.fromOffset(TOUCH_DASH_SIZE, TOUCH_DASH_SIZE) else UDim2.fromOffset(150, 66),
-		Position = if touch then UDim2.new(1, -40, 1, -150) else UDim2.new(1, -24, 1, -24),
+		Position = if touch then TOUCH_DASH_FALLBACK else UDim2.new(1, -24, 1, -24),
 		AnchorPoint = Vector2.new(1, 1),
 		Color = C.Blue,
 		ColorLight = C.BlueLight,
