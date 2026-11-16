@@ -254,7 +254,7 @@ Three quests a day (UTC), the same for everyone: two drawn from `Config.Quests.P
 - **Quick settings** (gear tile, SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
 
 ## Prize wheel
-Every slice shows its icon, the prize in words ("1,500 COINS", "BE THE GOD", "FREE GOD KIT") and its odds. A big **SPINS** counter in the window's top-left shows how many spins you have (gold, red at zero) and pops when it changes. While the wheel turns, a ratchet whirl (`Config.Audio.Ui.SpinWhirl`) slows with it under the per-slice ticks, and a hit plays when it lands.
+A purple SPIN WHEEL header with the red X over a gold-rimmed wheel ringed with blinking bulbs: alternating purple and gold slices (the last one lavender, so no two neighbours match), a gold pointer at 12 o'clock and a star hub. Every slice shows its icon, the prize in words ("1,500 COINS", "BE THE GOD", "FREE GOD KIT") and its odds. The bottom row is **SPIN 1** [R$ price] · **SPIN [n]** (your banked spins; it pops when the count changes) · **SPIN 10** [R$ price], with the free-spin countdown underneath. Where paid random items are restricted the two price buttons give way to "Earn Free Spins via Quests & Daily Login!". While the wheel turns, a ratchet whirl (`Config.Audio.Ui.SpinWhirl`) slows with it under the per-slice ticks, and a hit plays when it lands.
 Players bank spins: one to start, a free one every 10 minutes (5 for VIP, banking stops at 3), one for finishing the daily quests, and Robux packs of 1 or 10. The server rolls the weighted reward and the wheel shows the real odds on every segment.
 
 | Reward | Odds |

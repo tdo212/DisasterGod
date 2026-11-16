@@ -1,7 +1,8 @@
 --!strict
--- SpinController: the prize wheel window. A pie wheel with the real odds on every
--- segment, a centre SPIN! hub, the red pointer, and the bottom row from the reference:
--- [buy 1 spin] [Spin! xN] [buy 10 spins] with the free-spin countdown underneath.
+-- SpinController: the prize wheel window. A purple SPIN WHEEL header with the red X, a
+-- gold-rimmed pie wheel ringed with blinking bulbs (alternating purple and gold segments,
+-- the real odds on every one), a gold pointer at 12 o'clock and a star hub, and the bottom
+-- row: SPIN 1 [price] · SPIN [n] · SPIN 10 [price], with the free-spin countdown under it.
 --
 -- The pie is drawn without image assets: each half of the wheel is a clipped frame
 -- holding stacked circles, each cut to a half-plane by a transparency gradient
@@ -35,10 +36,15 @@ local REWARDS = S.Rewards
 local COUNT = #REWARDS
 local THETA = 360 / COUNT
 local RIM = 348 -- outer ring diameter
-local DISC = 304 -- pie diameter
+local DISC = 300 -- pie diameter
 local RADIUS = DISC / 2
-local RIM_BLUE = Color3.fromRGB(190, 215, 245)
-local SEPARATOR = Color3.fromRGB(16, 48, 16)
+local RIM_GOLD = Color3.fromRGB(255, 196, 40)
+local RIM_GOLD_LIGHT = Color3.fromRGB(255, 236, 130)
+local SEPARATOR = Color3.fromRGB(70, 24, 120)
+local HEADER_PURPLE = Color3.fromRGB(120, 50, 210)
+local BULBS = 16
+local WHEEL_TOP = 66 -- top of the rim, under the header
+local ROW_TOP = WHEEL_TOP + RIM + 14 -- the SPIN 1 / SPIN [n] / SPIN 10 row
 -- transparent first half, opaque second half: a circle with this gradient at rotation r
 -- shows the half-disc covering angles [r, r + 180) clockwise from 12 o'clock
 local HALF_CUT = NumberSequence.new({
@@ -71,14 +77,15 @@ local function prizeText(reward: any): string
 end
 
 local icons: { GuiObject } = {}
+local bulbs: { Frame } = {}
 local prizes: { TextLabel } = {} -- what the slice wins, in words ("1,500 COINS")
 local odds: { TextLabel } = {}
-local spinTag: TextLabel
-local countLabel: TextLabel -- the big "spins left" number in the window
-local countPanel: Frame
+local spinButton: TextButton -- SPIN [n]
+local spinLabel: TextLabel
 local timerLabel: TextLabel
 local buyButtons: { TextButton } = {}
 local wheelAngle = 0
+local blink = 0
 local spinning = false
 local waiting = false
 local open = false
@@ -141,6 +148,11 @@ local function render()
 	end
 end
 
+-- A UIStroke with mitred joins draws a square around a pill frame: circles use round joins.
+local function roundStroke(object: GuiObject, thickness: number)
+	Components.stroke(object, thickness).LineJoinMode = Enum.LineJoinMode.Round
+end
+
 local function circle(parent: Instance, name: string, diameter: number, color: Color3): Frame
 	local f = Instance.new("Frame")
 	f.Name = name
@@ -154,12 +166,22 @@ local function circle(parent: Instance, name: string, diameter: number, color: C
 	return f
 end
 
-local function buildWheel(parent: Frame): TextButton
-	local rim = circle(parent, "Rim", RIM, RIM_BLUE)
-	rim.Position = UDim2.new(0.5, 0, 0, RIM / 2 + 14)
-	Components.stroke(rim, Theme.Stroke.Heavy)
-	Components.gradient(rim, Color3.new(1, 1, 1), RIM_BLUE)
-	local ring = circle(rim, "Ring", DISC + 12, C.Outline)
+local function buildWheel(parent: Frame)
+	-- black outline, gold rim, dark inner ring, then the pie
+	local outline = circle(parent, "Outline", RIM + 8, C.Outline)
+	outline.Position = UDim2.new(0.5, 0, 0, WHEEL_TOP + RIM / 2)
+	local rim = circle(outline, "Rim", RIM, Color3.new(1, 1, 1))
+	Components.gradient(rim, RIM_GOLD_LIGHT, RIM_GOLD)
+	local ring = circle(rim, "Ring", DISC + 10, SEPARATOR)
+
+	-- bulbs around the rim (they blink while the window is open)
+	for b = 1, BULBS do
+		local bulb = circle(rim, "Bulb" .. b, 14, Color3.new(1, 1, 1))
+		onCircle(bulb, (b - 0.5) * 360 / BULBS, (RIM + DISC + 10) / 4)
+		bulb.ZIndex = 2
+		roundStroke(bulb, 2)
+		bulbs[b] = bulb
+	end
 
 	local disc = Instance.new("Frame")
 	disc.Name = "Disc"
@@ -205,7 +227,7 @@ local function buildWheel(parent: Frame): TextButton
 	for i, reward in REWARDS do
 		local line = Instance.new("Frame")
 		line.Name = "Separator" .. i
-		line.Size = UDim2.fromOffset(4, RADIUS)
+		line.Size = UDim2.fromOffset(3, RADIUS)
 		line.AnchorPoint = Vector2.new(0.5, 0.5)
 		line.BackgroundColor3 = SEPARATOR
 		line.BorderSizePixel = 0
@@ -218,53 +240,50 @@ local function buildWheel(parent: Frame): TextButton
 			TextSize = 18,
 			Size = UDim2.fromOffset(130, 22),
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Color = C.GoldLight,
 			Parent = overlay,
 		})
 		odds[i] = Components.label({
 			Name = "Odds" .. i,
 			Text = string.format("%.2f%%", reward.Weight / totalWeight * 100),
-			TextSize = 19,
-			Size = UDim2.fromOffset(110, 24),
+			TextSize = 16,
+			Size = UDim2.fromOffset(110, 20),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Parent = overlay,
 		})
 	end
 
-	-- centre hub: the SPIN! button
-	local hubRing = circle(overlay, "HubRing", 92, C.Gold)
+	-- centre hub: a gold ring around a purple star cap (spinning is the button below)
+	local hubRing = circle(overlay, "HubRing", 78, Color3.new(1, 1, 1))
 	hubRing.ZIndex = 3
-	Components.stroke(hubRing, Theme.Stroke.Thick)
-	local hub = Instance.new("TextButton")
-	hub.Name = "Hub"
-	hub.Text = ""
-	hub.AutoButtonColor = false
-	hub.Size = UDim2.fromOffset(76, 76)
-	hub.Position = UDim2.fromScale(0.5, 0.5)
-	hub.AnchorPoint = Vector2.new(0.5, 0.5)
-	hub.BackgroundColor3 = Color3.new(1, 1, 1)
-	Components.corner(hub, Theme.Radius.Pill)
-	Components.stroke(hub, Theme.Stroke.Thick)
-	Components.gradient(hub, C.GreenLight, C.Green)
-	Components.label({ Name = "Text", Text = "SPIN!", TextSize = 20, Size = UDim2.fromScale(1, 1), Parent = hub })
-	Components.pressable(hub, 1.08)
-	hub.Parent = hubRing
+	Components.gradient(hubRing, RIM_GOLD_LIGHT, RIM_GOLD)
+	roundStroke(hubRing, Theme.Stroke.Thick)
+	local cap = circle(hubRing, "Cap", 58, Color3.new(1, 1, 1))
+	Components.gradient(cap, C.PurpleLight, HEADER_PURPLE)
+	roundStroke(cap, 2)
+	Components.label({ Name = "Star", Text = "⭐", TextSize = 34, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = cap })
 
-	-- red gem pointer at 12 o'clock
-	local pointer = Instance.new("Frame")
-	pointer.Name = "Pointer"
-	pointer.Size = UDim2.fromOffset(34, 34)
-	pointer.Position = UDim2.new(0.5, 0, 0, 6)
-	pointer.AnchorPoint = Vector2.new(0.5, 0.5)
-	pointer.Rotation = 45
-	pointer.BackgroundColor3 = Color3.new(1, 1, 1)
-	pointer.BorderSizePixel = 0
-	pointer.ZIndex = 6
-	Components.corner(pointer, Theme.Radius.Small)
-	Components.stroke(pointer, Theme.Stroke.Thick)
-	Components.gradient(pointer, C.RedLight, C.Red, 45)
-	pointer.Parent = rim
-	return hub
+	-- gold pointer at 12 o'clock, tip down into the wheel: the bottom half of a diamond
+	local clip = Instance.new("Frame")
+	clip.Name = "Pointer"
+	clip.BackgroundTransparency = 1
+	clip.ClipsDescendants = true
+	clip.Size = UDim2.fromOffset(52, 30)
+	clip.Position = UDim2.new(0.5, 0, 0, -10)
+	clip.AnchorPoint = Vector2.new(0.5, 0)
+	clip.ZIndex = 6
+	clip.Parent = outline
+	local diamond = Instance.new("Frame")
+	diamond.Name = "Diamond"
+	diamond.Size = UDim2.fromOffset(36, 36)
+	diamond.Position = UDim2.new(0.5, 0, 0, 0)
+	diamond.AnchorPoint = Vector2.new(0.5, 0.5)
+	diamond.Rotation = 45
+	diamond.BackgroundColor3 = Color3.new(1, 1, 1)
+	diamond.BorderSizePixel = 0
+	diamond.ZIndex = 6
+	Components.gradient(diamond, RIM_GOLD_LIGHT, RIM_GOLD, 45)
+	Components.stroke(diamond, Theme.Stroke.Thick)
+	diamond.Parent = clip
 end
 
 ---------------------------------------------------------------------------
@@ -362,11 +381,9 @@ end
 local shownCount = -1
 local function refreshCounts()
 	local n = spins()
-	spinTag.Text = "x" .. tostring(n)
-	countLabel.Text = tostring(n)
-	countLabel.TextColor3 = if n > 0 then C.GoldLight else C.RedLight
+	spinLabel.Text = string.format("SPIN [%d]", n)
 	if shownCount >= 0 and n ~= shownCount then
-		local pop = countPanel:FindFirstChildOfClass("UIScale")
+		local pop = spinButton:FindFirstChildOfClass("UIScale")
 		if pop then
 			pop.Scale = 1.25
 			Components.tween(pop, Theme.Tweens.Pop, { Scale = 1 })
@@ -388,23 +405,33 @@ local function refreshTimer()
 	end
 end
 
-local function buyButton(parent: Instance, key: string, x: number, anchorX: number): TextButton
+-- A gold price pill with its caption ("SPIN 10") above it; x is the column centre.
+local function buyButton(parent: Instance, key: string, x: number): TextButton
 	local def = M.Products[key]
+	local caption = Components.label({
+		Name = key .. "Caption",
+		Text = string.format("SPIN %d", def.Spins or 1),
+		TextSize = 22,
+		Size = UDim2.fromOffset(160, 26),
+		Position = UDim2.new(0.5, x, 0, ROW_TOP),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Parent = parent,
+	})
 	local button = Components.button({
 		Name = key,
 		Text = Store.robux(def.Price),
 		TextSize = 26,
-		Size = UDim2.fromOffset(152, 56),
-		Position = UDim2.new(0.5, x, 0, 398),
-		AnchorPoint = Vector2.new(anchorX, 0),
-		Color = C.Blue,
-		ColorLight = C.BlueLight,
+		Size = UDim2.fromOffset(150, 54),
+		Position = UDim2.new(0.5, x, 0, ROW_TOP + 28),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = RIM_GOLD,
+		ColorLight = RIM_GOLD_LIGHT,
 		Parent = parent,
 		OnClick = function()
 			Store.promptProduct(key)
 		end,
 	})
-	Components.tag(button, "x" .. tostring(def.Spins or 1), UDim2.new(1, 8, 1, 6), Vector2.new(1, 1))
+	button:SetAttribute("Caption", caption.Name)
 	table.insert(buyButtons, button)
 	return button
 end
@@ -425,7 +452,7 @@ local function build()
 	root = Instance.new("Frame")
 	root.Name = "SpinWheel"
 	root.BackgroundTransparency = 1
-	root.Size = UDim2.fromOffset(600, 500)
+	root.Size = UDim2.fromOffset(600, ROW_TOP + 120)
 	root.Position = UDim2.fromScale(0.5, 0.5)
 	root.AnchorPoint = Vector2.new(0.5, 0.5)
 	root.Visible = false
@@ -434,16 +461,25 @@ local function build()
 	rootScale = Instance.new("UIScale")
 	rootScale.Parent = root
 
-	local hub = buildWheel(root)
-	hub.Activated:Connect(requestSpin)
-
+	-- header: a purple title bar with the red X block on its right
+	local header = Components.panel({
+		Name = "Header",
+		Size = UDim2.fromOffset(360, 52),
+		Position = UDim2.new(0.5, 0, 0, 4),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = HEADER_PURPLE,
+		Transparency = 0,
+		Parent = root,
+	})
+	Components.block(header, HEADER_PURPLE)
+	Components.label({ Name = "Title", Text = "SPIN WHEEL", TextSize = 32, Size = UDim2.fromScale(1, 1), Parent = header })
 	Components.button({
 		Name = "Close",
 		Text = "X",
 		TextSize = 34,
-		Size = UDim2.fromOffset(58, 58),
-		Position = UDim2.new(1, -30, 0, 10),
-		AnchorPoint = Vector2.new(1, 0),
+		Size = UDim2.fromOffset(56, 56),
+		Position = UDim2.new(0.5, 194, 0, 2),
+		AnchorPoint = Vector2.new(0, 0),
 		Color = C.Red,
 		ColorLight = C.RedLight,
 		Parent = root,
@@ -452,42 +488,26 @@ local function build()
 		end,
 	})
 
-	-- how many spins you have, big and in the window
-	countPanel = Components.panel({
-		Name = "SpinCount",
-		Size = UDim2.fromOffset(128, 104),
-		Position = UDim2.fromOffset(6, 10),
-		Color = C.Window,
-		Transparency = 0.05,
-		Parent = root,
-	})
-	local countScale = Instance.new("UIScale")
-	countScale.Parent = countPanel
-	Components.label({ Name = "Title", Text = "🎡 SPINS", TextSize = 20, Color = C.HeaderLight, Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 6), Parent = countPanel })
-	countLabel = Components.label({
-		Name = "Count",
-		Text = "0",
-		TextSize = 56,
-		Color = C.GoldLight,
-		StrokeThickness = Theme.Stroke.Heavy,
-		Size = UDim2.new(1, 0, 0, 64),
-		Position = UDim2.fromOffset(0, 32),
-		Parent = countPanel,
-	})
+	buildWheel(root)
 
-	buyButton(root, "Spin1", -144, 1)
-	local spin = Components.button({
+	-- bottom row: SPIN 1 [price] · SPIN [n] · SPIN 10 [price]
+	buyButton(root, "Spin1", -196)
+	spinButton = Components.button({
 		Name = "Spin",
-		Text = "⏫ Spin!",
-		TextSize = 34,
-		Size = UDim2.fromOffset(264, 68),
-		Position = UDim2.new(0.5, 0, 0, 392),
+		Text = "SPIN [0]",
+		TextSize = 30,
+		Size = UDim2.fromOffset(200, 62),
+		Position = UDim2.new(0.5, 0, 0, ROW_TOP + 22),
 		AnchorPoint = Vector2.new(0.5, 0),
+		Sheen = true,
 		Parent = root,
 		OnClick = requestSpin,
 	})
-	spinTag = Components.tag(spin, "x0", UDim2.new(1, 10, 0, -10), Vector2.new(1, 0))
-	buyButton(root, "Spin10", 144, 0)
+	spinLabel = (spinButton:FindFirstChild("Text") or spinButton:FindFirstChildWhichIsA("TextLabel", true)) :: TextLabel
+	if not spinButton:FindFirstChildOfClass("UIScale") then
+		Instance.new("UIScale").Parent = spinButton
+	end
+	buyButton(root, "Spin10", 196)
 
 	-- where Robux spins aren't allowed (PolicyService), the buy buttons give way to a note
 	local freeNote = Components.label({
@@ -496,13 +516,17 @@ local function build()
 		TextSize = 20,
 		Color = C.GoldLight,
 		Size = UDim2.new(1, 0, 0, 26),
-		Position = UDim2.fromOffset(0, 362),
+		Position = UDim2.fromOffset(0, ROW_TOP - 6),
 		Parent = root,
 	})
 	local function refreshPolicy()
 		local allowed = Store.paidRandomAllowed()
 		for _, button in buyButtons do
 			button.Visible = allowed
+			local caption = root:FindFirstChild(button:GetAttribute("Caption") :: string)
+			if caption and caption:IsA("GuiObject") then
+				caption.Visible = allowed
+			end
 		end
 		freeNote.Visible = not allowed
 	end
@@ -512,10 +536,10 @@ local function build()
 	timerLabel = Components.label({
 		Name = "Timer",
 		Text = "",
-		TextSize = 24,
+		TextSize = 22,
 		Color = C.GreenLight,
-		Size = UDim2.new(1, 0, 0, 30),
-		Position = UDim2.fromOffset(0, 466),
+		Size = UDim2.new(1, 0, 0, 28),
+		Position = UDim2.fromOffset(0, ROW_TOP + 90),
 		Parent = root,
 	})
 	render()
@@ -594,6 +618,11 @@ function SpinController.Start()
 			task.wait(0.25)
 			if open then
 				refreshTimer()
+				blink += 1
+				local phase = blink // 2 % 2
+				for b, bulb in bulbs do
+					bulb.BackgroundColor3 = if (b + phase) % 2 == 0 then Color3.new(1, 1, 1) else RIM_GOLD_LIGHT
+				end
 			end
 		end
 	end)

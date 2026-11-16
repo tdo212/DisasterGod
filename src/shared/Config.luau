@@ -283,11 +283,11 @@ local GodPacks: { [string]: Types.GodPack } = {
 
 -- Spin wheel segments. Odds shown to players are Weight / total weight.
 local SpinRewards: { Types.SpinReward } = {
-	{ Id = "God", Label = "GOD", Icon = "😈", Kind = "God", Amount = 1, Weight = 8, Color = Color3.fromRGB(255, 70, 20) },
-	{ Id = "Jackpot", Label = "1,500", Icon = "🏆", Kind = "Coins", Amount = 1500, Weight = 12, Color = Color3.fromRGB(140, 240, 20) },
-	{ Id = "Coins400", Label = "400", Icon = "💰", Kind = "Coins", Amount = 400, Weight = 25, Color = Color3.fromRGB(95, 205, 20) },
-	{ Id = "Kit", Label = "KIT", Icon = "🎒", Kind = "Kit", Amount = 1, Weight = 20, Color = Color3.fromRGB(140, 240, 20) },
-	{ Id = "Coins150", Label = "150", Icon = "🪙", Kind = "Coins", Amount = 150, Weight = 35, Color = Color3.fromRGB(95, 205, 20) },
+	{ Id = "God", Label = "GOD", Icon = "😈", Kind = "God", Amount = 1, Weight = 8, Color = Color3.fromRGB(125, 45, 215) },
+	{ Id = "Jackpot", Label = "1,500", Icon = "🏆", Kind = "Coins", Amount = 1500, Weight = 12, Color = Color3.fromRGB(255, 200, 40) },
+	{ Id = "Coins400", Label = "400", Icon = "💰", Kind = "Coins", Amount = 400, Weight = 25, Color = Color3.fromRGB(150, 65, 235) },
+	{ Id = "Kit", Label = "KIT", Icon = "🎒", Kind = "Kit", Amount = 1, Weight = 20, Color = Color3.fromRGB(255, 210, 60) },
+	{ Id = "Coins150", Label = "150", Icon = "🪙", Kind = "Coins", Amount = 150, Weight = 35, Color = Color3.fromRGB(185, 120, 255) },
 }
 
 -- Daily quest pool. Two are drawn per day, plus a "survive on the map of the day" quest.
