@@ -261,10 +261,10 @@ local function buildRoundBar()
 end
 
 ---------------------------------------------------------------------------
--- Currency bar (top right on phones, bottom left on PC): a dark stud block with the
--- coin sticker overhanging its left end, the balance in gold and a green "+" top-up
--- that opens the shop's Coins tab. The Friend Boost pill and the survival streak sit
--- above it on PC and to its left on phones (the God card takes the space under it).
+-- Currency bar (top right, just above the event feed): a dark stud block with the coin
+-- sticker overhanging its left end, the balance in gold and a green "+" top-up that
+-- opens the shop's Coins tab. The Friend Boost pill and the survival streak sit to its
+-- left. On phones it rides up into the Roblox top-bar row (liftIntoTopbar).
 
 local shopOpener: ((string?) -> ())? = nil
 
@@ -302,13 +302,8 @@ local function buildCoins()
 	frame.Name = "Wallet"
 	frame.BackgroundTransparency = 1
 	frame.Size = UDim2.fromOffset(W.Width + W.Gap + W.Height, W.Height)
-	if touch then
-		frame.Position = UDim2.new(1, -12, 0, 6)
-		frame.AnchorPoint = Vector2.new(1, 0)
-	else
-		frame.Position = UDim2.new(0, 30, 1, -14 - Theme.Block.Depth)
-		frame.AnchorPoint = Vector2.new(0, 1)
-	end
+	frame.Position = UDim2.new(1, -12, 0, 6)
+	frame.AnchorPoint = Vector2.new(1, 0)
 	frame.Parent = layer
 	local bar = Components.panel({
 		Name = "Bar",
@@ -350,18 +345,16 @@ local function buildCoins()
 			end
 		end,
 	})
-	-- phones: left of the bar; PC: above it (the bar sits bottom left)
-	local beside = UDim2.new(0, -10, 0, 2)
-	local above = UDim2.new(0, -12, 0, -62)
+	-- Friend Boost and the streak sit to the left of the bar (the feed is under it)
 	local streak = Components.label({
 		Name = "Streak",
 		Text = "",
 		TextSize = 17,
 		Size = UDim2.fromOffset(240, 24),
-		Position = if touch then UDim2.new(0, -10, 0, 30) else UDim2.new(0, -10, 0, -30),
-		AnchorPoint = if touch then Vector2.new(1, 0) else Vector2.zero,
+		Position = UDim2.new(0, -10, 0, 30),
+		AnchorPoint = Vector2.new(1, 0),
 		Color = C.OrangeLight,
-		XAlign = if touch then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left,
+		XAlign = Enum.TextXAlignment.Right,
 		Parent = frame,
 	})
 	local scale = Instance.new("UIScale")
@@ -394,8 +387,8 @@ local function buildCoins()
 	local friend = Components.panel({
 		Name = "FriendBoost",
 		Size = UDim2.fromOffset(W.FriendWidth, 26),
-		Position = if touch then beside else above,
-		AnchorPoint = if touch then Vector2.new(1, 0) else Vector2.zero,
+		Position = UDim2.new(0, -10, 0, 2),
+		AnchorPoint = Vector2.new(1, 0),
 		Color = Color3.fromRGB(47, 160, 90),
 		Depth = 3,
 		Parent = frame,

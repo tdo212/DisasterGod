@@ -616,7 +616,7 @@ local Config = {
 
 	-- Kill feed and clutch callouts.
 	Feed = {
-		TopOffset = 8, -- PC: feed hugs the top-right corner (the wallet is bottom-left)
+		TopOffset = 70, -- PC: feed right under the top-right currency bar
 		TopOffsetTouch = 84, -- phones: just under the top-right wallet and streak line
 		Dodge = Vector2.new(196, 112), -- phones, lobby: feed shifts this far left / sits this low beside the God card
 		MaxLines = 5,
