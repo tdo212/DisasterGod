@@ -294,7 +294,7 @@ The UI is authored against a smaller canvas on touch devices so everything is la
 Every control hint matches the device: role cards, the God and spectate hints, the key chips on DASH, taunt and hotbar buttons (PC only), gear hotbar keys (hidden on touch) and the shop's gear text. Server banners write `{tap}` / `{Tap}` / `{TAP}` and the client swaps in tap or click (`Components.inputText`).
 
 ## Economy
-- Coins come from surviving (+40, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
+- Coins come from surviving (+60, plus 10 per streak round), close calls, obby clears, participation (+10), and as God, eliminations and destruction.
 - Coins buy gear and God kits. Profiles (coins, streaks, gear, welcome-pack flag, recent receipt IDs) persist through DataStore on live servers; Studio sessions stay in memory.
 
 ## Cosmetics (`Config.Cosmetics`, CosmeticService / CosmeticController)
