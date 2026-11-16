@@ -181,7 +181,7 @@ end
 -- UI
 
 local TOUCH_DASH_SIZE = 76
-local TOUCH_DASH_GAP = 10
+local TOUCH_DASH_GAP = 14 -- px between DASH and the jump button (TAUNT keeps 12 px left of DASH)
 local TOUCH_DASH_FALLBACK = UDim2.new(1, -40, 1, -150) -- until a jump button shows
 
 -- Touch: the dash sits up and to the left of Roblox's jump button (never on top of it),
@@ -216,11 +216,11 @@ local function followJumpButton()
 			-- free for the God card and offers
 			local size = math.max(56, jump.AbsoluteSize.X * 0.8)
 			dashButton.Size = UDim2.fromOffset(size, size)
-			dashButton.AnchorPoint = Vector2.new(1, 1)
+			dashButton.AnchorPoint = Vector2.new(1, 0.5)
 			-- jump's AbsolutePosition is screen space; this ScreenGui's origin is shifted by the
 			-- device safe area (notch) and the top-bar inset, so convert into its space
 			local origin = gui.AbsolutePosition
-			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - origin.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y - origin.Y + jump.AbsoluteSize.Y)
+			dashButton.Position = UDim2.fromOffset(jump.AbsolutePosition.X - origin.X - TOUCH_DASH_GAP, jump.AbsolutePosition.Y - origin.Y + jump.AbsoluteSize.Y / 2)
 		end
 		apply()
 		table.insert(conns, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(apply))

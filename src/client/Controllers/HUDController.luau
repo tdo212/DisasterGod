@@ -434,8 +434,10 @@ local function buildGodChance()
 	card.AutoButtonColor = false
 	card.BackgroundColor3 = Color3.new(1, 1, 1)
 	if touch then
+		-- the wallet rides in the top-bar row on phones, so the stack starts near the top
+		-- and ends well above the jump / DASH thumb zone
 		card.Size = UDim2.fromOffset(164, 196)
-		card.Position = UDim2.new(1, -12, 0, 84)
+		card.Position = UDim2.new(1, -12, 0, Theme.Layout.TouchCardTop)
 		card.AnchorPoint = Vector2.new(1, 0)
 	else
 		card.Size = UDim2.fromOffset(176, 214)
@@ -515,7 +517,7 @@ local function buildWelcomeOffer()
 	if touch then
 		-- ends above the jump button (DASH sits beside it, not above)
 		offer.Size = UDim2.fromOffset(164, 98)
-		offer.Position = UDim2.new(1, -12, 0, 286)
+		offer.Position = UDim2.new(1, -12, 0, Theme.Layout.TouchCardTop + 196 + Theme.Block.DepthCard + 8)
 	else
 		offer.Size = UDim2.fromOffset(176, 126)
 		offer.Position = UDim2.new(1, -16, 0.5, 76)
@@ -571,7 +573,9 @@ local function buildWelcomeOffer()
 	end)
 	local function refresh()
 		local played = player:GetAttribute(Attributes.RoundsPlayed) :: number? or 0
-		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and played >= 1 and offersVisible()
+		-- lobby only: never during a round, even for spectators (keeps the thumb zone clear)
+		local inRound = ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active"
+		offer.Visible = player:GetAttribute(Attributes.WelcomeClaimed) ~= true and played >= 1 and offersVisible() and not inRound
 	end
 	player:GetAttributeChangedSignal(Attributes.WelcomeClaimed):Connect(refresh)
 	player:GetAttributeChangedSignal(Attributes.RoundsPlayed):Connect(refresh)
