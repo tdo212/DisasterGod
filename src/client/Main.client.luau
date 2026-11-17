@@ -30,7 +30,7 @@ local order = {
 	"CommunityController", -- lodge community reward + the one-time favourite prompt
 	"EmoteController", -- after SurvivorController (attaches to its DASH button)
 	"SaveController",
-	"PolishController", -- after HUD / Spectate (intro camera, danger edges, cheers, lodge Arena Cam)
+	"PolishController", -- after HUD / Spectate (intro camera, danger edges, lodge Arena Cam)
 	"LodgeController", -- idle animation of the lodge showcase (displays, flicker, auras)
 	"RoleRevealController", -- round-start GOD vs SURVIVORS card
 	"KillConfirmController", -- the God's hitmarker + sound on a kill

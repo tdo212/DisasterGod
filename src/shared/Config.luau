@@ -482,6 +482,20 @@ local Config = {
 		GritAlive = 2, -- this many survivors or fewer left (of 3+) ...
 		GritDamage = 0.8, -- ... take this share of disaster damage
 		MaxHit = 48, -- no single disaster hit does more than this (fluid / void still kill)
+		WarningScale = 0.85, -- every disaster's telegraph x this ...
+		SuddenDeathWarningScale = 0.65, -- ... and x this in sudden death (God Overdrive)
+	},
+
+	-- The Rising Tide (MatchService): every round the sea climbs from FluidStartY toward
+	-- FluidEndY, pushing survivors off the streets and onto what is still standing.
+	Tide = {
+		StartElapsed = 30, -- seconds into the round (prep included) the tide starts rising ...
+		MidShare = 0.55, -- ... reaching this share of the way to FluidEndY by sudden death
+		FinalShare = 0.8, -- sudden death: the rest of the way in this share of its time
+		FlashStartElapsed = 12, -- Flash Flood twist: right after prep ...
+		FlashMidShare = 0.8, -- ... higher before sudden death ...
+		FlashExtraHeight = 6, -- ... and this many studs past FluidEndY at the peak
+		BannerColor = Color3.fromRGB(70, 170, 255),
 	},
 
 	-- Low-population servers (1-3 real players): AI survivor bots fill the arena, a brand-new
@@ -507,6 +521,7 @@ local Config = {
 		BotPathSamples = 6, -- ground checks along the straight walk to a goal
 		BotMaxDrop = 8, -- a bigger drop anywhere on the way rules the goal out (no walking off edges)
 		BotEdgeShare = 0.85, -- goals stay inside this share of the arena radius
+		BotWaterMargin = 2, -- goals must stand this far above the rising tide
 		BotJumpChance = 0.06, -- per think
 		BotHitCooldown = 0.3, -- one hit per bot per this many seconds (ticking disasters)
 		BotCorpseTime = 4,
@@ -733,7 +748,7 @@ local Config = {
 			{ Id = "TwilightStorm", Name = "Twilight Storm", Icon = "⛈️", Description = "Darker skies, same bright warnings", Color = Color3.fromRGB(130, 140, 255) },
 			{ Id = "Hyperdrive", Name = "Hyperdrive", Icon = "💨", Description = "Dash and Chaos Energy recharge 25% faster", Color = Color3.fromRGB(90, 230, 255) },
 			{ Id = "AirDrops", Name = "Air Drops", Icon = "📦", Description = "Supply crates land mid-round", Color = Color3.fromRGB(120, 240, 120) },
-			{ Id = "FlashFlood", Name = "Flash Flood", Icon = "🌊", Description = "The arena floods in sudden death: keep some high ground standing", Color = Color3.fromRGB(70, 170, 255) },
+			{ Id = "FlashFlood", Name = "Flash Flood", Icon = "🌊", Description = "The tide comes in early and climbs higher: keep some high ground standing", Color = Color3.fromRGB(70, 170, 255) },
 		} :: { { Id: string, Name: string, Icon: string, Description: string, Color: Color3 } },
 		BouncyRestitution = 0.85,
 		BrittleScale = 2, -- wood and glass structure damage
@@ -781,12 +796,22 @@ local Config = {
 		Cooldown = 1.2,
 	},
 
-	-- Spectator cheers / aid: eliminated or waiting players spend coins (ProgressionService).
-	Cheers = {
-		Cheer = { Cost = 10, Icon = "🎆", Name = "Cheer" },
-		Berry = { Cost = 25, Icon = "🫐", Name = "Speed Berry", Speed = 26, Seconds = 5 },
-		Bandage = { Cost = 25, Icon = "🩹", Name = "Bandage", Heal = 30 },
-		Cooldown = 6,
+	-- Spectate view (SpectateController): follow cam over the God and every living survivor,
+	-- or the free cam with ghost bolts. Sizes are canvas units.
+	Spectate = {
+		LostHold = 1.5, -- seconds the view stays put after the watched player goes down
+		TickSeconds = 0.25,
+		BarWidth = 520,
+		BarHeight = 118,
+		BarLift = 22, -- bar bottom, above the screen bottom
+		ArrowSize = 56,
+		Pad = 12,
+		RowHeight = 32,
+		ModeWidth = 132,
+		LodgeWidth = 112,
+		Gap = 8,
+		WaitingWidth = 560, -- the Waiting card (not spectating)
+		WaitingLift = 150,
 	},
 
 	-- Mastery tracks: counters on the profile unlock tiered titles shown over your head.
@@ -1056,7 +1081,35 @@ local Config = {
 			{ Id = "Dash", Text = "Press Q (or click DASH) to dash out of danger", TextTouch = "Tap DASH to dash out of danger" },
 			{ Id = "Hide", Text = "Follow the arrows: hide indoors and stand still", TextTouch = "Follow the arrows: hide indoors and stand still" },
 			{ Id = "GodCast", Text = "Pick a disaster (1-5), then click to cast", TextTouch = "Pick a disaster, then tap the arena to cast" },
+			-- the God's other disasters: each step points at one you haven't used yet
+			-- ({key} / {name} / {tip} are filled in from that hotbar slot and GodTips)
+			{ Id = "GodMix", Text = "Press {key} for {name}: {tip}", TextTouch = "Tap {name}: {tip}" },
+			{ Id = "GodMix2", Text = "Press {key} for {name}: {tip}. Mixing disasters pays COMBO coins!", TextTouch = "Tap {name}: {tip}. Mixing pays COMBOS!" },
 		} :: { { Id: string, Text: string, TextTouch: string? } },
+		-- casting the same disaster this many times in a row brings up a "mix it up" nudge
+		-- (at most once a round) pointing at one you haven't tried
+		NudgeRepeat = 3,
+		NudgeText = "Mix it up! Press {key} for {name}: {tip}",
+		NudgeTextTouch = "Mix it up! Tap {name}: {tip}",
+		NudgeSeconds = 7,
+		GodTips = {
+			Lightning = "a fast strike on one spot",
+			Gust = "blasts survivors off rooftops",
+			Meteor = "rains meteors over a wide area",
+			Tornado = "a twister that hunts survivors",
+			FaultCleave = "splits the ground and drops buildings",
+			ChainLightning = "a bolt that jumps between survivors",
+			Eruption = "a lava burst that keeps burning",
+			Glitch = "a pulse that throws survivors around",
+			GravitySingularity = "pulls survivors in, then explodes",
+			TectonicSpire = "spikes up through every floor",
+			ChainArc = "lightning that crawls along metal",
+			MeteorBarrage = "a huge meteor storm",
+			PyroclastSurge = "a lava wave that sweeps a street",
+			SystemOverride = "scrambles survivors' screens",
+			AstralCollapse = "a collapsing star that crushes a wide area",
+			MaelstromVortex = "a storm vortex that drags survivors in",
+		} :: { [string]: string },
 		Cinematics = { "IntroSurvivor", "IntroGod" }, -- first-round cinematic (saved like steps); a player sees only one of them, once
 		ArrowImage = "rbxassetid://136636775487081", -- yellow pointer arrow (tools/icons/gen_tutorial.py)
 		BeamTexture = "rbxassetid://130409304561613", -- white chevron strip for the ground beam
@@ -1497,7 +1550,7 @@ local Config = {
 
 	-- Attribute names used to replicate state to clients.
 	Attributes = {
-		Spectating = "Spectating", -- local player, client-only: the spectate view (cheer bar) is open
+		Spectating = "Spectating", -- local player, client-only: the spectate view is open
 		CommunityClaimed = "CommunityClaimed", -- Player: the community reward has been paid
 		CommunityGroupId = "CommunityGroupId", -- ReplicatedStorage: the group the lodge board invites to (0 = none)
 		RoundPhase = "RoundPhase", -- ReplicatedStorage

@@ -7,8 +7,6 @@
 --     in the Sky Lodge pays today's reward once (day 3: a spin token, day 7: the Golden
 --     Trail dash). First survived round and first God win each day pay double.
 --   * Quick settings (SaveSetting remote): Low-FX, camera shake, music and SFX persist.
---   * Spectator cheers (Config.Cheers): eliminated or waiting players spend coins on a
---     firework over a survivor, a speed berry or a bandage.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,13 +22,11 @@ local AnalyticsService = require(script.Parent.AnalyticsService)
 local Attributes = Config.Attributes
 local MA = Config.Mastery
 local D = Config.Daily
-local CH = Config.Cheers
 
 local ProgressionService = {}
 
 local popup = Remotes.get("Popup")
 local GOLD = Color3.fromRGB(255, 210, 60)
-local lastCheer: { [Player]: number } = {}
 
 local function today(): number
 	return math.floor(os.time() / 86400)
@@ -283,59 +279,6 @@ local function buildChest()
 end
 
 ---------------------------------------------------------------------------
--- spectator cheers / aid
-
-local function onCheer(player: Player, kind: any, targetId: any)
-	if typeof(kind) ~= "string" or typeof(targetId) ~= "number" then
-		return
-	end
-	local def = (CH :: any)[kind]
-	if typeof(def) ~= "table" or not def.Cost then
-		return
-	end
-	if ReplicatedStorage:GetAttribute(Attributes.RoundPhase) ~= "Active" then
-		return
-	end
-	-- only players who are out of the round can cheer
-	if RoleService.IsAliveSurvivor(player) or RoleService.GetGod() == player then
-		return
-	end
-	local target = Players:GetPlayerByUserId(targetId)
-	if not target or target == player or not RoleService.IsAliveSurvivor(target) then
-		return
-	end
-	local now = os.clock()
-	if (lastCheer[player] or 0) + CH.Cooldown > now then
-		return
-	end
-	if not PlayerDataService.SpendCoins(player, def.Cost) then
-		popup:FireClient(player, "Not enough coins", Color3.fromRGB(255, 110, 100))
-		return
-	end
-	lastCheer[player] = now
-	local character = target.Character
-	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not (hrp and humanoid) then
-		return
-	end
-	Remotes.get("ClientEffect"):FireAllClients("Cheer", kind, hrp.Position)
-	if kind == "Berry" then
-		target:SetAttribute(Attributes.SpeedUntil, workspace:GetServerTimeNow() + def.Seconds)
-		humanoid.WalkSpeed = def.Speed
-		task.delay(def.Seconds, function()
-			if humanoid.Parent and humanoid.WalkSpeed == def.Speed then
-				humanoid.WalkSpeed = Config.Player.WalkSpeed
-			end
-		end)
-	elseif kind == "Bandage" then
-		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + def.Heal)
-	end
-	Remotes.get("Feed"):FireAllClients(string.format("%s %s sent %s a %s!", def.Icon, player.DisplayName, target.DisplayName, def.Name), Color3.fromRGB(255, 170, 220))
-	popup:FireClient(target, string.format("%s %s FROM %s", def.Icon, string.upper(def.Name), string.upper(player.DisplayName)), Color3.fromRGB(255, 170, 220))
-end
-
----------------------------------------------------------------------------
 
 local SETTINGS = { LowFx = "boolean", Shake = "number", Music = "boolean", Sfx = "boolean" }
 
@@ -392,7 +335,6 @@ function ProgressionService.Init()
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
-		lastCheer[player] = nil
 		task.defer(refreshFriends)
 	end)
 	Players.PlayerAdded:Connect(function()
@@ -400,7 +342,6 @@ function ProgressionService.Init()
 	end)
 	task.defer(refreshFriends)
 	Remotes.get("ClaimStreak").OnServerEvent:Connect(claimStreak)
-	Remotes.get("Cheer").OnServerEvent:Connect(onCheer)
 	Remotes.get("SaveSetting").OnServerEvent:Connect(function(player, key, value)
 		local kind = if typeof(key) == "string" then SETTINGS[key] else nil
 		local profile = PlayerDataService.Get(player) :: any

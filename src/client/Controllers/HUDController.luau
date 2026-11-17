@@ -34,7 +34,7 @@ local touch = false
 local function offersVisible(): boolean
 	local phase = ReplicatedStorage:GetAttribute(Attributes.RoundPhase)
 	local role = player:GetAttribute(Attributes.Role)
-	-- the spectate view's cheer bar sits on the right too: the offers make room for it
+	-- the spectate view keeps the screen clear: the offers step aside while it's open
 	return (phase ~= "Active" or role == "Spectator") and player:GetAttribute(Attributes.Spectating) ~= true
 end
 

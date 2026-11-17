@@ -1265,7 +1265,15 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	end
 	CosmeticService.CastGesture(ground, id)
 	AnalyticsService.AbilityUsed(caster, id, def.Tier)
-	task.spawn(execute, def, ground, dir, caster)
+	-- telegraphs get shorter as the round heats up (Config.Balance): late-round survivors
+	-- can't side-step every strike on a flattened map
+	local warnScale = if state.SuddenDeath then Config.Balance.SuddenDeathWarningScale else Config.Balance.WarningScale
+	local live = def
+	if warnScale ~= 1 then
+		live = table.clone(def)
+		live.WarningTime = def.WarningTime * warnScale
+	end
+	task.spawn(execute, live, ground, dir, caster)
 	return true
 end
 

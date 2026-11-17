@@ -24,7 +24,6 @@ local NAMES = {
 	"Feed", -- S->C (text, color) kill feed / clutch callouts
 	"CosmeticAction", -- C->S ("Buy" | "Equip", cosmeticId) coin cosmetics + equipping
 	"MapVote", -- C->S (candidateIndex) intermission map vote
-	"Cheer", -- C->S (kind, targetUserId) spectator cheers / aid, paid in coins
 	"ClaimStreak", -- C->S () open today's lodge streak chest
 	"SaveSetting", -- C->S (key, value) quick settings (LowFx, Shake, Music, Sfx)
 	"Analytics", -- C->S (event, detail?) UI-only funnel steps (Config.Analytics.ClientEvents)

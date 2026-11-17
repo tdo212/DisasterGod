@@ -46,6 +46,13 @@ local active: Step? = nil
 local activeSince = 0
 local doneLocal: { [string]: boolean } = {}
 local flags: { [string]: boolean } = {} -- events seen this session (dashed, cast, voted...)
+local castIds: { [string]: boolean } = {} -- disasters you've cast as the God this session
+local castKinds = 0
+local lastCastId: string? = nil
+local sameStreak = 0
+local nudgedRound = -1 -- the round the "mix it up" nudge last showed in
+local nudgeSince = 0
+local castsSinceNudge = 0
 local skipped = false
 local paused = false
 
@@ -118,6 +125,50 @@ local function godSlot(): GuiObject?
 	return best
 end
 
+-- The first hotbar disaster you haven't cast yet (Seismic Ping is a utility, skipped),
+-- with its key number, display name and tip.
+local function untriedSlot(): (GuiObject?, number, string, string)
+	local root = playerGui():FindFirstChild("GodHUD")
+	local holder = root and root:FindFirstChild("Slots", true)
+	if not holder then
+		return nil, 0, "", ""
+	end
+	local list: { GuiObject } = {}
+	for _, c in holder:GetChildren() do
+		if c:IsA("GuiObject") and c.Visible then
+			table.insert(list, c)
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.AbsolutePosition.X < b.AbsolutePosition.X
+	end)
+	for i, slot in list do
+		local id = slot.Name
+		if not castIds[id] and id ~= "SeismicPing" then
+			local name = id
+			for _, def in Config.Disasters.Abilities do
+				if def.Id == id then
+					name = def.DisplayName
+				end
+			end
+			return slot, i, name, TU.GodTips[id] or "a different disaster"
+		end
+	end
+	return nil, 0, "", ""
+end
+
+local function fill(template: string): string
+	local _, key, name, tip = untriedSlot()
+	local text = template:gsub("{key}", tostring(key))
+	text = text:gsub("{name}", name)
+	text = text:gsub("{tip}", tip)
+	return text
+end
+
+local function godMixWhen(): boolean
+	return inRound() and role() == "DisasterGod" and ReplicatedStorage:GetAttribute(Attributes.CastingOpen) == true and (untriedSlot()) ~= nil
+end
+
 local function nearestHideout(): Vector3?
 	local arena = workspace:FindFirstChild("Arena")
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -149,7 +200,12 @@ type Rule = {
 	Target: (() -> GuiObject?)?,
 	World: (() -> Vector3?)?,
 	Done: () -> boolean,
+	Dynamic: boolean?, -- the hint text has {key} / {name} / {tip} filled in live
 }
+
+local function untriedTarget(): GuiObject?
+	return (untriedSlot())
+end
 
 local RULES: { [string]: Rule } = {
 	Dash = {
@@ -186,7 +242,37 @@ local RULES: { [string]: Rule } = {
 			return flags.Cast == true
 		end,
 	},
+	GodMix = {
+		When = function()
+			return isDone("GodCast") and godMixWhen()
+		end,
+		Target = untriedTarget,
+		Dynamic = true,
+		Done = function()
+			return castKinds >= 2
+		end,
+	},
+	GodMix2 = {
+		When = function()
+			return isDone("GodMix") and godMixWhen()
+		end,
+		Target = untriedTarget,
+		Dynamic = true,
+		Done = function()
+			return castKinds >= 3
+		end,
+	},
+	-- not a saved step: the "mix it up" nudge after casting one disaster over and over
+	GodNudge = {
+		When = godMixWhen,
+		Target = untriedTarget,
+		Dynamic = true,
+		Done = function()
+			return (castsSinceNudge > 0 and sameStreak == 1) or os.clock() - nudgeSince > TU.NudgeSeconds
+		end,
+	},
 }
+local NUDGE: Step = { Id = "GodNudge", Text = TU.NudgeText, TextTouch = TU.NudgeTextTouch }
 
 ---------------------------------------------------------------------------
 -- visuals
@@ -364,9 +450,17 @@ end
 
 ---------------------------------------------------------------------------
 
+local function stepText(step: Step): string
+	local text = if touch and step.TextTouch then step.TextTouch else step.Text
+	local rule = RULES[step.Id]
+	return "👉 " .. (if rule and rule.Dynamic then fill(text) else text)
+end
+
 local function finish(step: Step)
-	doneLocal[step.Id] = true
-	Remotes.get("TutorialSeen"):FireServer(step.Id)
+	if step.Id ~= NUDGE.Id then
+		doneLocal[step.Id] = true
+		Remotes.get("TutorialSeen"):FireServer(step.Id)
+	end
 	Analytics.track("TutorialStep", step.Id .. ":done")
 	active = nil
 	hint.Visible = false
@@ -377,9 +471,9 @@ end
 local function start(step: Step)
 	active = step
 	activeSince = os.clock()
-	hintLabel.Text = "👉 " .. (if touch and step.TextTouch then step.TextTouch else step.Text)
+	hintLabel.Text = stepText(step)
 	-- the God's hotbar is taller: lift the card clear of it
-	local god = step.Id == "GodCast"
+	local god = string.sub(step.Id, 1, 3) == "God"
 	local lift = if god then (if touch then TU.GodHintLiftTouch else TU.GodHintLift) else (if touch then TU.HintLiftTouch else TU.HintLift)
 	hint.Position = UDim2.new(0.5, 0, 1, -lift)
 	hint.Visible = true
@@ -396,6 +490,9 @@ local function tick()
 		if rule.Done() then
 			finish(step)
 			return
+		end
+		if rule.Dynamic then
+			hintLabel.Text = stepText(step) -- the slot it points at can change as you cast
 		end
 		-- pause (hide, don't time out) while a card / banner / window is up
 		if busy() then
@@ -421,6 +518,15 @@ local function tick()
 		return
 	end
 	if busy() then
+		return
+	end
+	-- one disaster cast over and over: point at another (once a round)
+	local round = ReplicatedStorage:GetAttribute(Attributes.RoundNumber)
+	if sameStreak >= TU.NudgeRepeat and nudgedRound ~= round and RULES.GodNudge.When() then
+		nudgedRound = if typeof(round) == "number" then round else 0
+		nudgeSince = os.clock()
+		castsSinceNudge = 0
+		start(NUDGE)
 		return
 	end
 	for _, s in TU.Steps do
@@ -476,9 +582,18 @@ function TutorialController.Start()
 			end)
 		end
 	end)
-	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string)
+	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, _at: any, abilityId: any)
 		if kind == "GodCast" and role() == "DisasterGod" then
 			flags.Cast = true
+			if typeof(abilityId) == "string" then
+				if not castIds[abilityId] then
+					castIds[abilityId] = true
+					castKinds += 1
+				end
+				sameStreak = if abilityId == lastCastId then sameStreak + 1 else 1
+				lastCastId = abilityId
+				castsSinceNudge += 1
+			end
 		end
 	end)
 

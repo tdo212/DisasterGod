@@ -521,16 +521,25 @@ function MapService.Build(name: string): Types.MapInfo
 	return info
 end
 
--- Raise the sea to FluidEndY over `duration` seconds.
-function MapService.StartFluid(duration: number)
+-- Raise the sea to `targetY` over `duration` seconds (the Rising Tide; a later call
+-- takes over from wherever the last one got to).
+function MapService.RaiseFluid(targetY: number, duration: number)
 	local info = current
 	local s = sea
 	if not (info and s) then
 		return
 	end
 	fluid = s
-	local goal = CFrame.new(info.Center.X, info.FluidEndY, info.Center.Z)
-	TweenService:Create(s, TweenInfo.new(duration * 0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = goal }):Play()
+	local goal = CFrame.new(info.Center.X, targetY, info.Center.Z)
+	TweenService:Create(s, TweenInfo.new(math.max(0.5, duration), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = goal }):Play()
+end
+
+-- Raise the sea to FluidEndY over `duration` seconds.
+function MapService.StartFluid(duration: number)
+	local info = current
+	if info then
+		MapService.RaiseFluid(info.FluidEndY, duration * 0.8)
+	end
 end
 
 -- Current top surface of the rising fluid, or nil when not rising.

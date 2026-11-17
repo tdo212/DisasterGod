@@ -420,10 +420,22 @@ local function active(god: Player?)
 	local finalRush = false
 	local startSurvivors = 0
 	local hadBots = BotService.AliveCount() > 0
+	local tideRising = false
 	ReplicatedStorage:SetAttribute(Attributes.FinalRush, false)
 	while state.TimeRemaining > 0 do
 		tick()
 		local elapsed = M.RoundDuration - state.TimeRemaining
+		-- the Rising Tide (Config.Tide): every round the sea creeps up over the streets, so
+		-- survivors are pushed onto upper floors and rooftops as the buildings come down
+		local flood = MutatorService.Get() == "FlashFlood"
+		local info = MapService.GetCurrent()
+		if not tideRising and info and elapsed >= (if flood then Config.Tide.FlashStartElapsed else Config.Tide.StartElapsed) then
+			tideRising = true
+			local share = if flood then Config.Tide.FlashMidShare else Config.Tide.MidShare
+			local untilSudden = math.max(1, state.TimeRemaining - M.SuddenDeathDuration)
+			MapService.RaiseFluid(info.FluidStartY + (info.FluidEndY - info.FluidStartY) * share, untilSudden)
+			banner:FireAllClients("THE " .. info.FluidName .. " IS RISING", "Get off the streets: climb to upper floors and rooftops!", Config.Tide.BannerColor)
+		end
 		if not castingOpen and elapsed >= M.PrepDuration then
 			startSurvivors = #RoleService.GetAliveSurvivors() + BotService.AliveCount()
 			castingOpen = true
@@ -435,11 +447,11 @@ local function active(god: Player?)
 			suddenDeath = true
 			setSubPhase("SuddenDeath")
 			DisasterService.SetSuddenDeath(true)
-			-- God Overdrive: the fluid only rises on a Flash Flood round (a Chaos Twist,
-			-- announced at the start), so the finale is the God against the last few
-			local flood = MutatorService.Get() == "FlashFlood"
-			if flood then
-				MapService.StartFluid(M.SuddenDeathDuration)
+			-- God Overdrive: the tide climbs to its peak (higher still on a Flash Flood round),
+			-- so the finale is the God against the last few on the high ground
+			local peak = if info then info.FluidEndY + (if flood then Config.Tide.FlashExtraHeight else 0) else nil
+			if peak then
+				MapService.RaiseFluid(peak, M.SuddenDeathDuration * Config.Tide.FinalShare)
 			end
 			local reached = RoleService.GetAliveSurvivors()
 			local godNow = RoleService.GetGod()
@@ -449,10 +461,8 @@ local function active(god: Player?)
 			AnalyticsService.SuddenDeath(reached)
 			EnvironmentService.SetMood("SuddenDeath", 3)
 			siren = AudioService.playGlobal("Siren", Config.Audio.SirenVolume, true)
-			if flood then
-				local info = MapService.GetCurrent()
-				local fluidName = if info then info.FluidName else "WATER"
-				banner:FireAllClients("SUDDEN DEATH", fluidName .. " IS RISING — GET TO HIGH GROUND!", RED)
+			if info then
+				banner:FireAllClients("SUDDEN DEATH", info.FluidName .. " SURGING · GOD OVERDRIVE · GET TO HIGH GROUND!", RED)
 			else
 				banner:FireAllClients("SUDDEN DEATH", "GOD OVERDRIVE — DOUBLE CHAOS ENERGY. KEEP MOVING!", RED)
 			end

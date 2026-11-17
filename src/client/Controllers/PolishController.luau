@@ -6,7 +6,7 @@
 --   * Danger edges: a disaster telegraph that lands outside your view pulses a red glow on
 --     that edge of the screen.
 --   * Stress cues (ClientEffect "Stress"): dust sifts out of a building about to give way
---     and nearby cameras tremble. Cheers (ClientEffect "Cheer"): fireworks over a survivor.
+--     and nearby cameras tremble.
 --   * Arena Cam: a holographic screen in the Sky Lodge shows a live miniature of the match
 --     (big parts only, refreshed once a second) so the lobby can watch buildings fall.
 --   * The lodge streak chest shows your own day count.
@@ -558,42 +558,6 @@ end
 ---------------------------------------------------------------------------
 -- world effects
 
-local function burst(position: Vector3, colors: { Color3 }, count: number, speed: number)
-	for i = 1, count do
-		local p = Instance.new("Part")
-		p.Anchored = true
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.CastShadow = false
-		p.Material = Enum.Material.Neon
-		p.Size = Vector3.one * 0.6
-		p.Color = colors[(i % #colors) + 1]
-		p.CFrame = CFrame.new(position)
-		p.Parent = fxFolder
-		local dir = Vector3.new(math.random() - 0.5, math.random() * 0.6 + 0.2, math.random() - 0.5).Unit
-		TweenService:Create(p, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = CFrame.new(position + dir * speed), Transparency = 1 }):Play()
-		Debris:AddItem(p, 1.2)
-	end
-end
-
-local FIREWORK = { Color3.fromRGB(255, 80, 80), Color3.fromRGB(255, 210, 60), Color3.fromRGB(90, 220, 120), Color3.fromRGB(90, 170, 255), Color3.fromRGB(220, 110, 255) }
-
-local function onCheer(kind: string, position: Vector3)
-	if lowFx() then
-		return
-	end
-	if kind == "Cheer" then
-		for k = 0, 2 do
-			task.delay(k * 0.25, function()
-				burst(position + Vector3.new(math.random(-4, 4), 14 + k * 3, math.random(-4, 4)), FIREWORK, 18, 9)
-			end)
-		end
-	else
-		burst(position + Vector3.new(0, 3, 0), if kind == "Berry" then { Color3.fromRGB(230, 60, 120) } else { Color3.fromRGB(255, 240, 230) }, 10, 4)
-	end
-end
-
 local function onStress(center: Vector3, size: Vector3, radius: number, shake: number)
 	local camera = workspace.CurrentCamera
 	if camera and (camera.Focus.Position - center).Magnitude <= radius + size.Magnitude / 2 then
@@ -1085,9 +1049,7 @@ function PolishController.Start()
 	end)
 
 	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any, d: any)
-		if kind == "Cheer" and typeof(a) == "string" and typeof(b) == "Vector3" then
-			onCheer(a, b)
-		elseif kind == "Stress" and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
+		if kind == "Stress" and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
 			onStress(a, b, if typeof(c) == "number" then c else 45, if typeof(d) == "number" then d else 0.25)
 		end
 	end)

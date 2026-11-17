@@ -131,6 +131,11 @@ local function safeWalk(from: Vector3, goal: Vector3): boolean
 			return false
 		end
 	end
+	-- stay out of the rising tide
+	local top = MapService.GetFluidTop()
+	if top and goal.Y < top + LP.BotWaterMargin then
+		return false
+	end
 	local feet = from.Y - 3
 	for i = 1, LP.BotPathSamples do
 		local point = from:Lerp(goal, i / LP.BotPathSamples)
