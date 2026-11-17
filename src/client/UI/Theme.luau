@@ -62,11 +62,11 @@ local Theme = {
 	},
 
 	Stroke = {
-		-- bold black outlines everywhere (the reference's defining feature)
-		Thin = 2.5,
-		Thick = 3.5,
-		Heavy = 4.5,
-		Window = 5,
+		-- black outlines everywhere (the reference's defining feature), kept a touch lighter
+		Thin = 2,
+		Thick = 2.75,
+		Heavy = 3.5,
+		Window = 4,
 	},
 
 	TextSize = {
@@ -153,7 +153,7 @@ local Theme = {
 		TouchReference = Vector2.new(1040, 540), -- bigger relative UI for thumbs
 		MinScale = 0.45,
 		MaxScale = 1.25,
-		TouchCardTop = 12, -- phones: God Chance card top (the wallet sits in the top-bar row above it)
+		TouchCardTop = 64, -- phones: God Chance card top (below the wallet row and its gear, mid-right like PC)
 		TopbarMargin = 6, -- round bar and currency bar: this far below the screen top, in the Roblox top-bar row
 		PhoneMaxSide = 600, -- a touch screen this short (points) gets the touch layout even with a keyboard
 		FitMargin = 0.94, -- windows shrink to fit this share of the screen

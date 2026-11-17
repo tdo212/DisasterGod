@@ -183,7 +183,7 @@ local function reveal()
 	grid.Parent = right
 
 	-- VS in the middle, on top of both halves
-	local vs = Components.label({ Name = "VS", Text = "VS", TextSize = 92, Color = YOU_GOLD, StrokeThickness = 6, Size = UDim2.fromOffset(160, 100), Position = UDim2.fromScale(0.5, 0.52), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 6, Parent = band })
+	local vs = Components.label({ Name = "VS", Text = "VS", TextSize = 92, Color = YOU_GOLD, StrokeThickness = 5, Size = UDim2.fromOffset(160, 100), Position = UDim2.fromScale(0.5, 0.52), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 6, Parent = band })
 	vs.Visible = false
 
 	-- 1) roulette: flick through everyone, slowing down, then land on the God

@@ -934,19 +934,15 @@ function MenuController.Start()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
-	-- two-column tile grid: left-centre on desktop, tucked top-left on touch so it
-	-- stays clear of the thumbstick
+	-- two-column tile grid on the left, vertically centred (phones sit it a little
+	-- higher so it ends above the thumbstick zone)
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
 	sidebar.BackgroundTransparency = 1
 	local cell, gapX, gapY = Theme.Layout.SidebarCell, Theme.Layout.SidebarGapX, Theme.Layout.SidebarGapY
 	sidebar.Size = UDim2.fromOffset(cell * 2 + gapX, cell * 3 + gapY * 2)
-	if Components.isTouch() then
-		sidebar.Position = UDim2.fromOffset(12, 6)
-	else
-		sidebar.Position = UDim2.new(0, 16, 0.5, -20)
-		sidebar.AnchorPoint = Vector2.new(0, 0.5)
-	end
+	sidebar.AnchorPoint = Vector2.new(0, 0.5)
+	sidebar.Position = if Components.isTouch() then UDim2.new(0, 12, 0.5, -36) else UDim2.new(0, 16, 0.5, -20)
 	sidebar.Parent = layer
 	local layout = Instance.new("UIGridLayout")
 	layout.CellSize = UDim2.fromOffset(cell, cell)

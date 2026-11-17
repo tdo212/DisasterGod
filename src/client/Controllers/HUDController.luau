@@ -542,9 +542,10 @@ local function buildWelcomeOffer()
 	offer.AutoButtonColor = false
 	offer.BackgroundColor3 = Color3.new(1, 1, 1)
 	if touch then
-		-- ends above the jump button (DASH sits beside it, not above)
+		-- beside the God Chance card (bottom-aligned), so the stack never reaches the
+		-- jump / DASH thumb zone below it
 		offer.Size = UDim2.fromOffset(164, 98)
-		offer.Position = UDim2.new(1, -12, 0, Theme.Layout.TouchCardTop + 196 + Theme.Block.DepthCard + 8)
+		offer.Position = UDim2.new(1, -12 - 164 - 12, 0, Theme.Layout.TouchCardTop + 196 - 98)
 	else
 		offer.Size = UDim2.fromOffset(176, 126)
 		offer.Position = UDim2.new(1, -16, 0.5, 76)
@@ -817,7 +818,7 @@ local function buildBanner()
 	bannerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	bannerFrame.Visible = false
 	bannerFrame.Parent = layer
-	bannerTitle = Components.label({ Name = "Title", Text = "", TextSize = 56, Size = UDim2.new(1, 0, 0, 64), StrokeThickness = 5, Parent = bannerFrame })
+	bannerTitle = Components.label({ Name = "Title", Text = "", TextSize = 56, Size = UDim2.new(1, 0, 0, 64), StrokeThickness = 4, Parent = bannerFrame })
 	bannerSub = Components.label({ Name = "Subtitle", Text = "", TextSize = 23, Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 66), Parent = bannerFrame })
 	bannerScale = Instance.new("UIScale")
 	bannerScale.Parent = bannerFrame
