@@ -483,19 +483,60 @@ local Config = {
 		GritDamage = 0.8, -- ... take this share of disaster damage
 		MaxHit = 48, -- no single disaster hit does more than this (fluid / void still kill)
 		WarningScale = 0.85, -- every disaster's telegraph x this ...
-		SuddenDeathWarningScale = 0.65, -- ... and x this in sudden death (God Overdrive)
+		PrecisionWarningScale = 0.75, -- ... precision strikes (below) x this instead ...
+		PrecisionAbilities = { Lightning = true, Meteor = true, ChainLightning = true, MeteorBarrage = true } :: { [string]: boolean },
+		SuddenDeathWarningScale = 0.8, -- ... and either one x this again in sudden death (God Overdrive)
 	},
 
-	-- The Rising Tide (MatchService): every round the sea climbs from FluidStartY toward
-	-- FluidEndY, pushing survivors off the streets and onto what is still standing.
+	-- Area denial: open-ground casts keep restricting movement after they land (ComboService).
+	Lingering = {
+		CraterDuration = 6, -- every meteor impact leaves a burning crater this long ...
+		CraterRadiusShare = 0.55, -- ... this share of the impact radius
+		CraterDamage = 7, -- per Combos.FireTick
+		ChargeDuration = 4, -- a lightning strike leaves the ground (or a puddle under it) live this long
+		ChargeDamage = 6, -- per Combos.FireTick
+		ChargeColor = Color3.fromRGB(120, 210, 255),
+		WindPull = 16, -- Gust: survivors in the ring are dragged toward its centre during the warning ...
+		WindPullEvery = 0.2, -- ... every this many seconds (below ragdoll strength: sprint or dash out)
+	},
+
+	-- God aim assist (GodController): the reticle softly snaps onto a survivor near it and
+	-- rings them, on PC and on touch (hidden survivors are never snapped to).
+	GodAim = {
+		SnapRadius = 9, -- studs (flat) from the reticle
+		SnapStrength = 0.6, -- 0 = no pull, 1 = right on the survivor
+		HighlightColor = Color3.fromRGB(255, 210, 60),
+	},
+
+	-- The Rising Tide (MatchService / MapService): every round the map's sea (toxic
+	-- floodwater, or magma on lava maps) rises from below the ground to a ceiling worked out
+	-- from the arena's own buildings, pushing survivors off the streets and onto what is
+	-- still standing. Big collapses make it surge.
 	Tide = {
-		StartElapsed = 30, -- seconds into the round (prep included) the tide starts rising ...
-		MidShare = 0.55, -- ... reaching this share of the way to FluidEndY by sudden death
-		FinalShare = 0.8, -- sudden death: the rest of the way in this share of its time
-		FlashStartElapsed = 12, -- Flash Flood twist: right after prep ...
-		FlashMidShare = 0.8, -- ... higher before sudden death ...
-		FlashExtraHeight = 6, -- ... and this many studs past FluidEndY at the peak
+		StartElapsed = 40, -- seconds into the round (prep included) the tide starts rising ...
+		PreSuddenAbove = 2, -- ... to this many studs above the ground by sudden death (streets flooded)
+		CeilingShare = 0.35, -- sudden death peak: this share of the way from the ground to the tallest structure ...
+		CeilingPercentile = 0.5, -- ... but no higher than the median structure top (half of what stands stays dry) ...
+		MinDepth = 6, -- ... and at least this deep over the ground ...
+		MaxDepth = 24, -- ... and never deeper than this
+		FinalShare = 0.8, -- sudden death: up to the peak in this share of its time
+		WarnLead = 5, -- seconds of screen-edge warning before the water reaches the ground
+		CollapseSurge = 1.2, -- a building / floor collapse pushes the level up this much (capped at the peak) ...
+		SurgeCooldown = 2.5, -- ... at most this often ...
+		SurgeTime = 1.5, -- ... rising over at least this long
+		FlashStartElapsed = 15, -- Flash Flood twist: right after prep ...
+		FlashPreSuddenAbove = 5, -- ... deeper before sudden death ...
+		FlashExtraHeight = 4, -- ... and this many studs past the peak
+		SplashEvery = 0.8, -- in the tide: a hit flash + an upward splash this often (damage: SuddenDeath.FluidDamagePerSecond)
+		SplashUp = 30, -- studs/s upward kick, so a dash or a jump gets you out
+		ToxicColor = Color3.fromRGB(110, 190, 60), -- floodwater tint on water maps
+		GlowColorWater = Color3.fromRGB(150, 255, 90),
+		GlowColorLava = Color3.fromRGB(255, 120, 30),
+		GlowTransparency = 0.8,
+		RumbleVolume = 0.6,
 		BannerColor = Color3.fromRGB(70, 170, 255),
+		WarnColorWater = Color3.fromRGB(120, 230, 70),
+		WarnColorLava = Color3.fromRGB(255, 110, 30),
 	},
 
 	-- Low-population servers (1-3 real players): AI survivor bots fill the arena, a brand-new
@@ -770,6 +811,8 @@ local Config = {
 	-- whole floor at once, pays bonus Chaos Energy and coins (DisasterService).
 	GodCombo = {
 		Window = 5, -- seconds between destructive casts to keep the chain alive
+		ElementalWindow = 6, -- two different disasters cast this close: ELEMENTAL COMBO (once a round) ...
+		ElementalEnergy = 15, -- ... pays this much Chaos Energy
 		MinParts = 3, -- a cast must break this many parts to count as a link
 		EnergyPerLink = 6,
 		CoinsPerLink = 8,
@@ -967,6 +1010,11 @@ local Config = {
 
 	-- Client presentation: round intro fly-by, end-of-round pan, danger edge pulse.
 	Presentation = {
+		-- Rising Tide warning (PolishController): the screen edges pulse the tide's colour
+		TideWarnPulses = 4,
+		TideWarnGap = 1.1,
+		TideWarnStrength = 0.25, -- edge background transparency at the peak of a pulse
+		TideSplashStrength = 0.3, -- the hit flash while standing in the tide
 		IntroSeconds = 2.5,
 		-- first round in a role: the fly-by continues into a short letterboxed cinematic
 		-- (PolishController) that shows the God / the survivors / a demo strike

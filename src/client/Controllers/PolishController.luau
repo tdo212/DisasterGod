@@ -7,6 +7,8 @@
 --     that edge of the screen.
 --   * Stress cues (ClientEffect "Stress"): dust sifts out of a building about to give way
 --     and nearby cameras tremble.
+--   * Rising Tide: a screen-edge warning (ClientEffect "TideWarning") a few seconds before
+--     the flood / magma reaches the ground, and a hit flash on every splash ("TideSplash").
 --   * Arena Cam: a holographic screen in the Sky Lodge shows a live miniature of the match
 --     (big parts only, refreshed once a second) so the lobby can watch buildings fall.
 --   * The lodge streak chest shows your own day count.
@@ -513,8 +515,41 @@ local function pulse(name: string)
 	if not f then
 		return
 	end
+	f.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
 	f.BackgroundTransparency = 0.35
 	TweenService:Create(f, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 1 }):Play()
+end
+
+-- every screen edge glows `color` and fades out
+local function tint(color: Color3, strength: number, fade: number)
+	for _, f in edges do
+		f.BackgroundColor3 = color
+		f.BackgroundTransparency = strength
+		TweenService:Create(f, TweenInfo.new(fade, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 1 }):Play()
+	end
+end
+
+local function inArena(): boolean
+	return player:GetAttribute(Attributes.Role) == "Survivor" and player:GetAttribute(Attributes.Alive) == true
+end
+
+-- the tide is about to flood the ground: the edges pulse its colour and the HUD says why
+local function onTideWarning(text: string, color: Color3)
+	if not inArena() then
+		return
+	end
+	for k = 0, PR.TideWarnPulses - 1 do
+		task.delay(k * PR.TideWarnGap, function()
+			tint(color, PR.TideWarnStrength, PR.TideWarnGap * 0.9)
+		end)
+	end
+	local hud = require(script.Parent:WaitForChild("HUDController") :: ModuleScript) :: any
+	hud.Popup(text, color)
+end
+
+-- standing in the tide: a quick hit flash in its colour
+local function onTideSplash(lava: boolean)
+	tint(if lava then Config.Tide.WarnColorLava else Config.Tide.WarnColorWater, PR.TideSplashStrength, 0.45)
 end
 
 local function onTelegraph(part: Instance)
@@ -1028,6 +1063,7 @@ function PolishController.Start()
 	edge("Left", UDim2.fromScale(0.12, 1), UDim2.fromScale(0, 0), 0)
 	edge("Right", UDim2.fromScale(0.12, 1), UDim2.fromScale(0.88, 0), 180)
 	edge("Bottom", UDim2.fromScale(1, 0.16), UDim2.fromScale(0, 0.84), 270)
+	edge("Top", UDim2.fromScale(1, 0.12), UDim2.fromScale(0, 0), 90)
 
 	local hazards = workspace:WaitForChild("Hazards", 10)
 	if hazards then
@@ -1051,6 +1087,10 @@ function PolishController.Start()
 	Remotes.get("ClientEffect").OnClientEvent:Connect(function(kind: string, a: any, b: any, c: any, d: any)
 		if kind == "Stress" and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
 			onStress(a, b, if typeof(c) == "number" then c else 45, if typeof(d) == "number" then d else 0.25)
+		elseif kind == "TideWarning" and typeof(a) == "string" and typeof(b) == "Color3" then
+			onTideWarning(a, b)
+		elseif kind == "TideSplash" then
+			onTideSplash(a == true)
 		end
 	end)
 

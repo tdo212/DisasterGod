@@ -290,16 +290,62 @@ local function destroyReticle()
 	if reticle then
 		reticle:Destroy()
 	end
+	snapRing = nil
 	reticle, ring, line, beam = nil, nil, nil, nil
 end
 
--- Mouse: under the cursor. Touch: the centre of the screen.
-local function aimPoint(): Vector3?
+-- Aim assist (Config.GodAim): a survivor (or AI survivor bot) close to `point` pulls the
+-- aim part of the way onto them. Hidden survivors are never snapped to.
+local AIM = Config.GodAim
+local function snapAim(point: Vector3): (Vector3, Model?)
+	local best: Model? = nil
+	local bestPos = point
+	local bestDist = AIM.SnapRadius
+	local function consider(model: Model?)
+		local root = model and model:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+		if model and root and humanoid and humanoid.Health > 0 then
+			local d = Vector3.new(root.Position.X - point.X, 0, root.Position.Z - point.Z).Magnitude
+			if d < bestDist then
+				best = model
+				bestDist = d
+				bestPos = root.Position
+			end
+		end
+	end
+	for _, p in Players:GetPlayers() do
+		if p ~= player and p:GetAttribute(Attributes.Role) == "Survivor" and p:GetAttribute(Attributes.Alive) == true and p:GetAttribute(Attributes.Hidden) ~= true then
+			consider(p.Character)
+		end
+	end
+	local bots = workspace:FindFirstChild("SurvivorBots")
+	if bots then
+		for _, model in bots:GetChildren() do
+			if model:IsA("Model") then
+				consider(model)
+			end
+		end
+	end
+	if not best then
+		return point, nil
+	end
+	local s = AIM.SnapStrength
+	return Vector3.new(point.X + (bestPos.X - point.X) * s, point.Y, point.Z + (bestPos.Z - point.Z) * s), best
+end
+
+-- Mouse: under the cursor. Touch: the centre of the screen. Softly snapped (above).
+local function aimPoint(): (Vector3?, Model?)
+	local raw: Vector3?
 	if touch then
 		local camera = workspace.CurrentCamera
-		return if camera then OrbitCamera.ScreenToWorld(camera.ViewportSize / 2) else nil
+		raw = if camera then OrbitCamera.ScreenToWorld(camera.ViewportSize / 2) else nil
+	else
+		raw = OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
 	end
-	return OrbitCamera.ScreenToWorld(UserInputService:GetMouseLocation())
+	if not raw then
+		return nil, nil
+	end
+	return snapAim(raw)
 end
 
 -- The reticle drives the God rig in the sky for everyone (CosmeticService relays it):
@@ -320,9 +366,25 @@ local function sendAim(point: Vector3)
 	aimRemote:FireServer(point)
 end
 
+local snapRing: Highlight? = nil
+
 local function updateReticle()
 	local def = loadout[selected]
-	local point = aimPoint()
+	local point, target = aimPoint()
+	-- ring the survivor the aim is locked onto
+	if not snapRing and reticle then
+		local h = Instance.new("Highlight")
+		h.Name = "AimLock"
+		h.FillTransparency = 1
+		h.OutlineColor = AIM.HighlightColor
+		h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		h.Parent = reticle
+		snapRing = h
+	end
+	if snapRing then
+		snapRing.Adornee = target
+		snapRing.Enabled = target ~= nil
+	end
 	if not (def and point and ring and line and beam) then
 		return
 	end
@@ -384,7 +446,8 @@ end
 -- Cast the selected ability at `at` (or wherever the reticle is aiming).
 cast = function(at: Vector3?)
 	local def = loadout[selected]
-	local point = at or aimPoint()
+	-- a tap on the arena is snapped like the reticle
+	local point = if at then (snapAim(at)) else (aimPoint())
 	if not (def and point) then
 		return
 	end

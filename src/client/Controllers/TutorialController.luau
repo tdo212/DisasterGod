@@ -39,6 +39,7 @@ local hint: Frame
 local hintLabel: TextLabel
 local ring: Frame
 local arrow: ImageLabel
+local callout: TextLabel -- "[3] TRY METEORS!" over the slot a God step points at
 local beamFolder: Folder? = nil
 local beamTarget: Part? = nil
 local touch = false
@@ -201,7 +202,18 @@ type Rule = {
 	World: (() -> Vector3?)?,
 	Done: () -> boolean,
 	Dynamic: boolean?, -- the hint text has {key} / {name} / {tip} filled in live
+	Callout: (() -> string?)?, -- a short shout over the pointed-at button
 }
+
+-- "[3] TRY METEORS!" (PC) / "TRY METEORS!" (touch) for the untried hotbar slot
+local function tryCallout(): string?
+	local slot, key, name = untriedSlot()
+	if not slot then
+		return nil
+	end
+	local shout = "TRY " .. string.upper(name) .. "!"
+	return if touch then shout else string.format("[%d] %s", key, shout)
+end
 
 local function untriedTarget(): GuiObject?
 	return (untriedSlot())
@@ -248,6 +260,7 @@ local RULES: { [string]: Rule } = {
 		end,
 		Target = untriedTarget,
 		Dynamic = true,
+		Callout = tryCallout,
 		Done = function()
 			return castKinds >= 2
 		end,
@@ -258,6 +271,7 @@ local RULES: { [string]: Rule } = {
 		end,
 		Target = untriedTarget,
 		Dynamic = true,
+		Callout = tryCallout,
 		Done = function()
 			return castKinds >= 3
 		end,
@@ -267,6 +281,7 @@ local RULES: { [string]: Rule } = {
 		When = godMixWhen,
 		Target = untriedTarget,
 		Dynamic = true,
+		Callout = tryCallout,
 		Done = function()
 			return (castsSinceNudge > 0 and sameStreak == 1) or os.clock() - nudgeSince > TU.NudgeSeconds
 		end,
@@ -355,6 +370,7 @@ end
 local function hidePointer()
 	ring.Visible = false
 	arrow.Visible = false
+	callout.Visible = false
 end
 
 local function pointAt(target: GuiObject)
@@ -379,6 +395,19 @@ local function pointAt(target: GuiObject)
 		arrow.Position = UDim2.fromOffset(pos.X + size.X / 2 - s / 2, pos.Y - s - pad - 6 + bob)
 	end
 	arrow.Visible = true
+	-- the callout rides just above the arrow (below it when the arrow points up)
+	local rule = active and RULES[active.Id]
+	local shout = rule and rule.Callout and rule.Callout()
+	if shout then
+		callout.Text = shout
+		local above = arrow.Rotation == 0
+		callout.Position = UDim2.fromOffset(pos.X + size.X / 2, if above then pos.Y - s - pad - 10 + bob else pos.Y + size.Y + pad + s + 10 - bob)
+		callout.AnchorPoint = Vector2.new(0.5, if above then 1 else 0)
+		callout.Rotation = math.sin(t * 7) * 3
+		callout.Visible = true
+	else
+		callout.Visible = false
+	end
 	local pulse = (math.sin(t * 5) + 1) / 2
 	local stroke = ring:FindFirstChildOfClass("UIStroke")
 	if stroke then
@@ -414,6 +443,9 @@ local function buildGui()
 	arrow.Image = TU.ArrowImage
 	arrow.Visible = false
 	arrow.Parent = gui
+
+	callout = Components.label({ Name = "Callout", Text = "", TextSize = if touch then 24 else 28, Color = C.GoldLight, Size = UDim2.fromOffset(320, 36), Parent = gui })
+	callout.Visible = false
 
 	-- the hint line sits low and centred (above the hotbars), never over the middle
 	local layer = Components.scaledRoot(gui)

@@ -168,6 +168,9 @@ end
 -- within a few seconds pay bonus Chaos Energy and coins, so mixing powers beats spamming.
 local GC = Config.GodCombo
 local lastCastId: { [Player]: string } = {}
+-- Elemental Combo: two different disasters cast close together (once a round per God)
+local lastCast: { [Player]: { Id: string, At: number } } = {}
+local elementalPaid: { [Player]: boolean } = {}
 local chains: { [Player]: { At: number, Ids: { [string]: boolean }, Links: number } } = {}
 local bonusEnergy: (Player, number) -> () -- set below once pools exist
 
@@ -291,8 +294,9 @@ local function strike(def: Ability, ground: Vector3, caster: Player?)
 	shakeAll(0.5, 0.3, ground)
 	creditDestruction(caster, DestructionService.DamageArea(ground, def.Radius, def.StructureDamage))
 	blast(ground, def.Radius, def.PlayerDamage, caster, 30, def.DisplayName)
-	-- conducts through nearby metal, the rising water and puddles
+	-- conducts through nearby metal, the rising water and puddles, and leaves the ground live
 	ComboService.Electrify(ground, def.Radius, caster)
+	ComboService.Charge(ground, def.Radius, caster)
 end
 
 local BOLT_BLUE = Color3.fromRGB(120, 200, 255)
@@ -483,7 +487,24 @@ end
 
 local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?)
 	ringTelegraph(ground, def.Radius, def.WarningTime, Color3.fromRGB(220, 240, 255))
-	task.wait(def.WarningTime)
+	-- the wind drags survivors in toward the centre before it blasts (Config.Lingering)
+	local L = Config.Lingering
+	local waited = 0
+	while waited < def.WarningTime do
+		local step = math.min(L.WindPullEvery, def.WarningTime - waited)
+		task.wait(step)
+		waited += step
+		for _, player in RoleService.GetAliveSurvivors() do
+			local hrp = hrpAndHumanoid(player)
+			if hrp then
+				local flat = Vector3.new(ground.X - hrp.Position.X, 0, ground.Z - hrp.Position.Z)
+				if flat.Magnitude <= def.Radius + 4 and flat.Magnitude > 2 then
+					clientEffect:FireClient(player, "Knockback", flat.Unit * L.WindPull)
+				end
+			end
+		end
+		BotService.Pull(ground, def.Radius + 4, L.WindPull)
+	end
 	sound("Gust", ground, 2.4, 0.8)
 	for i = 1, 10 do
 		local r = math.floor(def.Radius)
@@ -555,6 +576,8 @@ local function meteors(def: Ability, ground: Vector3, caster: Player?)
 			shakeAll(0.8, 0.4, point)
 			creditDestruction(caster, DestructionService.DamageArea(point, impact, def.StructureDamage))
 			blast(point, impact, def.PlayerDamage, caster, 45, def.DisplayName)
+			-- a burning crater keeps the spot off-limits for a few seconds
+			ComboService.Crater(point, impact * Config.Lingering.CraterRadiusShare, Config.Lingering.CraterDuration, caster)
 		end)
 		task.wait(0.28)
 	end
@@ -1238,6 +1261,16 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	pool.NextCast = now + Config.Balance.CastGap -- no machine-gunning separate abilities
 	if caster then
 		lastCastId[caster] = id
+		-- ELEMENTAL COMBO: a different disaster right after the last one pays Chaos Energy
+		if def.Tier ~= "Utility" then
+			local prev = lastCast[caster]
+			if prev and prev.Id ~= id and now - prev.At <= GC.ElementalWindow and not elementalPaid[caster] then
+				elementalPaid[caster] = true
+				pool.Energy = math.min(Config.Chaos.Max, pool.Energy + GC.ElementalEnergy)
+				ScoringService.Notify(caster, string.format("ELEMENTAL COMBO! +%d ⚡", GC.ElementalEnergy), Color3.fromRGB(255, 200, 60))
+			end
+			lastCast[caster] = { Id = id, At = now }
+		end
 	end
 	publish(caster)
 
@@ -1267,7 +1300,8 @@ local function tryCast(caster: Player?, key: any, id: string, target: Vector3, r
 	AnalyticsService.AbilityUsed(caster, id, def.Tier)
 	-- telegraphs get shorter as the round heats up (Config.Balance): late-round survivors
 	-- can't side-step every strike on a flattened map
-	local warnScale = if state.SuddenDeath then Config.Balance.SuddenDeathWarningScale else Config.Balance.WarningScale
+	local B = Config.Balance
+	local warnScale = (if B.PrecisionAbilities[id] then B.PrecisionWarningScale else B.WarningScale) * (if state.SuddenDeath then B.SuddenDeathWarningScale else 1)
 	local live = def
 	if warnScale ~= 1 then
 		live = table.clone(def)
@@ -1475,6 +1509,8 @@ function DisasterService.EndRound()
 	table.clear(pools)
 	table.clear(chains)
 	table.clear(lastCastId)
+	table.clear(lastCast)
+	table.clear(elementalPaid)
 end
 
 function DisasterService.Init()

@@ -310,6 +310,18 @@ function BotService.HitBox(cf: CFrame, size: Vector3, damage: number, caster: Pl
 	threat(cf.Position, math.max(half.X, half.Z))
 end
 
+-- Drag bots within `radius` toward `center` (a Gust's wind before it blasts).
+function BotService.Pull(center: Vector3, radius: number, strength: number)
+	for _, bot in bots do
+		if bot.Alive then
+			local flat = Vector3.new(center.X - bot.Root.Position.X, 0, center.Z - bot.Root.Position.Z)
+			if flat.Magnitude <= radius and flat.Magnitude > 2 then
+				bot.Root.AssemblyLinearVelocity += flat.Unit * strength
+			end
+		end
+	end
+end
+
 -- A random living bot's position (the Director aims at bots too), or nil.
 function BotService.RandomTarget(): Vector3?
 	local alive = {}

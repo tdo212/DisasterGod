@@ -7,6 +7,8 @@
 --     catches light and drops burning patches along its path.
 --   * Puddles: a toppled water tower or broken pipe gantry floods the ground. Puddles put
 --     out fires, conduct lightning and make knockback stronger (slippery).
+--   * Area denial (Config.Lingering): meteor impacts leave burning craters and lightning
+--     leaves the ground (or the puddle under it) live for a few seconds.
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,17 +20,20 @@ local AudioService = require(script.Parent.AudioService)
 local DestructionService = require(script.Parent.DestructionService)
 local MapService = require(script.Parent.MapService)
 local RoleService = require(script.Parent.RoleService)
+local BotService = require(script.Parent.BotService)
 local SaveService = require(script.Parent.SaveService)
 local ScoringService = require(script.Parent.ScoringService)
 
 local CB = Config.Combos
+local L = Config.Lingering
 
 local ComboService = {}
 
-type Zone = { Position: Vector3, Radius: number, Until: number, Damaging: boolean, Caster: Player?, Part: BasePart? }
+type Zone = { Position: Vector3, Radius: number, Until: number, Damaging: boolean, Caster: Player?, Part: BasePart?, Damage: number?, Cause: string? }
 
 local fires: { Zone } = {}
 local puddles: { Zone } = {}
+local charges: { Zone } = {} -- live ground after a lightning strike
 
 local SPARK = Color3.fromRGB(190, 230, 255)
 local FIRE = Color3.fromRGB(255, 120, 30)
@@ -208,6 +213,33 @@ function ComboService.DropFire(position: Vector3, caster: Player?)
 	table.insert(fires, { Position = ground, Radius = CB.FireRadius, Until = os.clock() + duration, Damaging = true, Caster = caster, Part = part })
 end
 
+-- A burning meteor crater (Config.Lingering): survivors standing in it keep burning.
+function ComboService.Crater(position: Vector3, radius: number, duration: number, caster: Player?)
+	if inZone(puddles, position) then
+		return
+	end
+	local part = disc(position, radius, FIRE, 0.4)
+	local flame = Instance.new("Fire")
+	flame.Size = radius * 1.2
+	flame.Heat = 6
+	flame.Parent = part
+	TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Linear), { Transparency = 0.9 }):Play()
+	Debris:AddItem(part, duration)
+	table.insert(fires, { Position = position, Radius = radius, Until = os.clock() + duration, Damaging = true, Caster = caster, Part = part, Damage = L.CraterDamage, Cause = "Meteor Crater" })
+end
+
+-- Lightning leaves the ground live for a few seconds; a puddle under the strike carries
+-- the charge across the whole puddle.
+function ComboService.Charge(position: Vector3, radius: number, caster: Player?)
+	local puddle = inZone(puddles, position, radius)
+	local center = if puddle then puddle.Position else MapService.GroundAt(position)
+	local r = if puddle then puddle.Radius else radius
+	local part = disc(center, r, L.ChargeColor, 0.55, Enum.Material.Neon)
+	TweenService:Create(part, TweenInfo.new(0.12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.85 }):Play()
+	Debris:AddItem(part, L.ChargeDuration)
+	table.insert(charges, { Position = center, Radius = r, Until = os.clock() + L.ChargeDuration, Damaging = true, Caster = caster, Part = part, Damage = L.ChargeDamage, Cause = "Live Wire" })
+end
+
 -- Put out every fire within `radius` (the Maelstrom Vortex). Returns how many.
 function ComboService.Extinguish(position: Vector3, radius: number): number
 	local count = 0
@@ -253,8 +285,14 @@ function ComboService.Reset()
 			z.Part:Destroy()
 		end
 	end
+	for _, z in charges do
+		if z.Part and z.Part.Parent then
+			z.Part:Destroy()
+		end
+	end
 	table.clear(fires)
 	table.clear(puddles)
+	table.clear(charges)
 end
 
 function ComboService.Init()
@@ -281,17 +319,31 @@ function ComboService.Init()
 					table.remove(puddles, i)
 				end
 			end
-			for _, player in RoleService.GetAliveSurvivors() do
-				local character = player.Character
-				local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-				local zone = hrp and inZone(fires, hrp.Position)
-				if zone and zone.Damaging then
-					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-					if humanoid and humanoid.Health > 0 then
-						ScoringService.NoteHit(player, zone.Caster, "Firenado")
-						if not SaveService.TryAegis(player, humanoid, CB.FireDamage) then
-							humanoid:TakeDamage(CB.FireDamage)
+			for i = #charges, 1, -1 do
+				if charges[i].Until <= now then
+					table.remove(charges, i)
+				end
+			end
+			for _, list in { fires, charges } do
+				for _, player in RoleService.GetAliveSurvivors() do
+					local character = player.Character
+					local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+					local zone = hrp and inZone(list, hrp.Position)
+					if zone and zone.Damaging then
+						local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+						local damage = zone.Damage or CB.FireDamage
+						if humanoid and humanoid.Health > 0 then
+							ScoringService.NoteHit(player, zone.Caster, zone.Cause or "Firenado")
+							if not SaveService.TryAegis(player, humanoid, damage) then
+								humanoid:TakeDamage(damage)
+							end
 						end
+					end
+				end
+				-- AI survivor bots burn / get shocked too (and run out of it)
+				for _, zone in list do
+					if zone.Damaging and zone.Until > now then
+						BotService.HitSphere(zone.Position, zone.Radius, zone.Damage or CB.FireDamage, zone.Caster, zone.Cause or "Firenado")
 					end
 				end
 			end

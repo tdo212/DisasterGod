@@ -51,6 +51,10 @@ local participants: { [Player]: boolean } = {}
 local survivorsAssigned = false
 local started = false
 local siren: Sound? = nil
+local tideRumble: Sound? = nil
+local tideCap: number? = nil -- the Rising Tide's peak this round (nil before it starts)
+local lastSurge = 0
+local splashAt: { [Player]: number } = {}
 local finalKill = false -- the last survivor just died: hold the round end for the camera
 
 local GOD_HINT = "Pick a disaster, then {tap} the arena to unleash it" -- {tap} is swapped per device on the client
@@ -321,6 +325,14 @@ local function hazardStep(dt: number)
 		elseif fluidTop and y < fluidTop - 1 then
 			ScoringService.NoteHit(player, nil, "Fluid:" .. (if info then info.FluidName else "WATER"))
 			humanoid:TakeDamage(Config.SuddenDeath.FluidDamagePerSecond * dt)
+			-- a hit flash and an upward splash: a jump or a dash gets you out
+			local now = os.clock()
+			if now - (splashAt[player] or 0) >= Config.Tide.SplashEvery then
+				splashAt[player] = now
+				local effect = Remotes.get("ClientEffect")
+				effect:FireClient(player, "TideSplash", MapService.LavaSea())
+				effect:FireClient(player, "Knockback", Vector3.new(0, Config.Tide.SplashUp, 0))
+			end
 		elseif info and info.HazardFloorY and y < info.HazardFloorY then
 			ScoringService.NoteHit(player, nil, "HazardFloor")
 			humanoid:TakeDamage(Config.Player.HazardFloorDamagePerSecond * dt)
@@ -425,16 +437,32 @@ local function active(god: Player?)
 	while state.TimeRemaining > 0 do
 		tick()
 		local elapsed = M.RoundDuration - state.TimeRemaining
-		-- the Rising Tide (Config.Tide): every round the sea creeps up over the streets, so
+		-- the Rising Tide (Config.Tide): from 40 s in, the sea creeps up over the streets, so
 		-- survivors are pushed onto upper floors and rooftops as the buildings come down
+		local T = Config.Tide
 		local flood = MutatorService.Get() == "FlashFlood"
 		local info = MapService.GetCurrent()
-		if not tideRising and info and elapsed >= (if flood then Config.Tide.FlashStartElapsed else Config.Tide.StartElapsed) then
+		if not tideRising and info and elapsed >= (if flood then T.FlashStartElapsed else T.StartElapsed) then
 			tideRising = true
-			local share = if flood then Config.Tide.FlashMidShare else Config.Tide.MidShare
+			local ground, ceiling = MapService.TideLevels()
+			tideCap = ceiling + (if flood then T.FlashExtraHeight else 0)
+			local target = ground + (if flood then T.FlashPreSuddenAbove else T.PreSuddenAbove)
 			local untilSudden = math.max(1, state.TimeRemaining - M.SuddenDeathDuration)
-			MapService.RaiseFluid(info.FluidStartY + (info.FluidEndY - info.FluidStartY) * share, untilSudden)
-			banner:FireAllClients("THE " .. info.FluidName .. " IS RISING", "Get off the streets: climb to upper floors and rooftops!", Config.Tide.BannerColor)
+			local startTop = info.FluidStartY + 0.5
+			MapService.RaiseFluid(target, untilSudden, true)
+			MapService.StartTideFX()
+			tideRumble = AudioService.playGlobal("Rumble", T.RumbleVolume, true)
+			banner:FireAllClients("THE " .. info.FluidName .. " IS RISING", "Get off the streets: climb to upper floors and rooftops!", T.BannerColor)
+			-- a screen-edge warning WarnLead seconds before it floods the ground
+			local lava = MapService.LavaSea()
+			local word = if lava then "MAGMA" elseif info.FluidName == "WATER" then "FLOOD" else info.FluidName
+			local reach = untilSudden * math.clamp((ground - startTop) / math.max(0.1, target + 0.5 - startTop), 0, 1)
+			local round = state.RoundNumber
+			task.delay(math.max(0, reach - T.WarnLead), function()
+				if state.RoundNumber == round and state.Phase == "Active" then
+					Remotes.get("ClientEffect"):FireAllClients("TideWarning", "⚠️ " .. word .. " RISING — GET TO HIGH GROUND!", if lava then T.WarnColorLava else T.WarnColorWater)
+				end
+			end)
 		end
 		if not castingOpen and elapsed >= M.PrepDuration then
 			startSurvivors = #RoleService.GetAliveSurvivors() + BotService.AliveCount()
@@ -449,9 +477,11 @@ local function active(god: Player?)
 			DisasterService.SetSuddenDeath(true)
 			-- God Overdrive: the tide climbs to its peak (higher still on a Flash Flood round),
 			-- so the finale is the God against the last few on the high ground
-			local peak = if info then info.FluidEndY + (if flood then Config.Tide.FlashExtraHeight else 0) else nil
-			if peak then
-				MapService.RaiseFluid(peak, M.SuddenDeathDuration * Config.Tide.FinalShare)
+			if info then
+				local _, ceiling = MapService.TideLevels()
+				tideCap = tideCap or (ceiling + (if flood then T.FlashExtraHeight else 0))
+				MapService.RaiseFluid(tideCap :: number, M.SuddenDeathDuration * T.FinalShare)
+				MapService.StartTideFX()
 			end
 			local reached = RoleService.GetAliveSurvivors()
 			local godNow = RoleService.GetGod()
@@ -508,6 +538,11 @@ local function roundEnd(mapName: string)
 		siren:Destroy()
 		siren = nil
 	end
+	if tideRumble then
+		tideRumble:Destroy()
+		tideRumble = nil
+	end
+	tideCap = nil
 
 	local list = {}
 	local survivedSet: { [Player]: boolean } = {}
@@ -608,9 +643,19 @@ function MatchService.Init()
 		participants[player] = nil
 		lastHealth[player] = nil
 		hurtAt[player] = nil
+		splashAt[player] = nil
 		task.defer(updateAlive)
 	end)
 	RoleService.SoloSwapRequested:Connect(onSoloSwap)
+	-- big collapses make the tide surge (Config.Tide)
+	DestructionService.Collapsed:Connect(function(_building: Model, _center: Vector3, size: Vector3)
+		local cap = tideCap
+		local now = os.clock()
+		if cap and state.Phase == "Active" and size.Magnitude >= Config.GodCombo.CollapseMinSize and now - lastSurge >= Config.Tide.SurgeCooldown then
+			lastSurge = now
+			MapService.SurgeFluid(Config.Tide.CollapseSurge, cap)
+		end
+	end)
 	BotService.AliveChanged:Connect(updateAlive)
 	Remotes.get("TutorialSeen").OnServerEvent:Connect(function(player, kind)
 		if typeof(kind) ~= "string" then

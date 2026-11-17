@@ -55,6 +55,11 @@ local hazards: Folder
 local current: Types.MapInfo? = nil
 local fluid: BasePart? = nil
 local sea: BasePart? = nil
+-- the Rising Tide: where it is heading and when it gets there, plus the levels measured
+-- from the arena at build time (ground under the spawns, sudden-death peak)
+local tide = { Target = 0, EndsAt = 0, Ground = 0, Ceiling = 0 }
+local tideGlow: BasePart? = nil
+local measureTide: (Types.MapInfo) -> ()
 local rotationIndex = 0
 
 local function ensureFolder(name: string): Folder
@@ -204,6 +209,7 @@ function MapService.Clear()
 	current = nil
 	fluid = nil
 	sea = nil
+	tideGlow = nil
 	DestructionService.SetArena(nil)
 end
 
@@ -488,6 +494,43 @@ local function sealInterior(info: Types.MapInfo)
 	folder.Parent = info.Model
 end
 
+-- Rising Tide levels for this arena (Config.Tide): the ground is the floor under the spawn
+-- points (median), the peak a share of the way up to the tallest destructible structure,
+-- so a low arena floods shallow and a skyline arena deep, and something is always left.
+measureTide = function(info: Types.MapInfo)
+	local T = Config.Tide
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { arena }
+	local ys = {}
+	for _, cf in info.SpawnPoints do
+		local hit = workspace:Raycast(cf.Position + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
+		if hit then
+			table.insert(ys, hit.Position.Y)
+		end
+	end
+	table.sort(ys)
+	local ground = if #ys > 0 then ys[(#ys + 1) // 2] else info.FluidStartY + T.MinDepth
+	local tops = {}
+	for _, d in arena:GetDescendants() do
+		if d:IsA("BasePart") and d:GetAttribute("Structural") == true then
+			table.insert(tops, d.Position.Y + d.Size.Y / 2)
+		end
+	end
+	table.sort(tops)
+	local top = math.max(ground, tops[#tops] or ground)
+	-- a share of the tallest structure, but never over most of what is standing
+	local depth = (top - ground) * T.CeilingShare
+	local keepDry = tops[math.max(1, math.floor(#tops * T.CeilingPercentile))]
+	if keepDry then
+		depth = math.min(depth, keepDry - ground)
+	end
+	tide.Ground = ground
+	tide.Ceiling = ground + math.clamp(depth, T.MinDepth, T.MaxDepth)
+	tide.Target = info.FluidStartY
+	tide.EndsAt = 0
+end
+
 function MapService.Build(name: string): Types.MapInfo
 	MapService.Clear()
 	local builder = Builders[name]
@@ -518,20 +561,84 @@ function MapService.Build(name: string): Types.MapInfo
 
 	current = info
 	DestructionService.SetArena(info.Model)
+	measureTide(info)
 	return info
 end
 
 -- Raise the sea to `targetY` over `duration` seconds (the Rising Tide; a later call
--- takes over from wherever the last one got to).
-function MapService.RaiseFluid(targetY: number, duration: number)
+-- takes over from wherever the last one got to). `linear` keeps a steady pace, so the
+-- moment it reaches the ground can be predicted for the warning.
+function MapService.RaiseFluid(targetY: number, duration: number, linear: boolean?)
 	local info = current
 	local s = sea
 	if not (info and s) then
 		return
 	end
 	fluid = s
+	tide.Target = targetY
+	tide.EndsAt = os.clock() + duration
 	local goal = CFrame.new(info.Center.X, targetY, info.Center.Z)
-	TweenService:Create(s, TweenInfo.new(math.max(0.5, duration), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = goal }):Play()
+	local style = if linear then Enum.EasingStyle.Linear else Enum.EasingStyle.Sine
+	TweenService:Create(s, TweenInfo.new(math.max(0.5, duration), style, Enum.EasingDirection.InOut), { CFrame = goal }):Play()
+end
+
+-- A collapse pushes the tide up by `extra` studs (never past `cap`), keeping its pace.
+function MapService.SurgeFluid(extra: number, cap: number)
+	if not fluid then
+		return
+	end
+	local target = math.min(cap, tide.Target + extra)
+	if target <= tide.Target then
+		return
+	end
+	MapService.RaiseFluid(target, math.max(Config.Tide.SurgeTime, tide.EndsAt - os.clock()), true)
+end
+
+-- (ground Y, sudden-death peak Y) measured for the current arena.
+function MapService.TideLevels(): (number, number)
+	return tide.Ground, tide.Ceiling
+end
+
+-- True when the sea is magma (lava maps) rather than water.
+function MapService.LavaSea(): boolean
+	local info = current
+	return info ~= nil and (info.HazardFloorY ~= nil or info.FluidMaterial == Enum.Material.CrackedLava)
+end
+
+-- The tide turns into a hazard you can read at a glance: floodwater goes toxic green (lava
+-- stays lava, walled arenas keep their own fluid) and a glowing sheet rides its surface.
+function MapService.StartTideFX()
+	local info = current
+	local s = sea
+	if not (info and s) or tideGlow then
+		return
+	end
+	local T = Config.Tide
+	local lava = MapService.LavaSea()
+	if not lava and info.Walled ~= true then
+		TweenService:Create(s, TweenInfo.new(3), { Color = T.ToxicColor }):Play()
+	end
+	local glow = Instance.new("Part")
+	glow.Name = "TideGlow"
+	glow.Anchored = false
+	glow.CanCollide = false
+	glow.CanQuery = false
+	glow.CanTouch = false
+	glow.Massless = true
+	glow.CastShadow = false
+	glow.Material = Enum.Material.Neon
+	glow.Color = if lava then T.GlowColorLava else T.GlowColorWater
+	glow.Transparency = T.GlowTransparency
+	glow.Size = Vector3.new(s.Size.X, 0.2, s.Size.Z)
+	glow.CFrame = s.CFrame + Vector3.new(0, s.Size.Y / 2 + 0.15, 0)
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = s
+	weld.Part1 = glow
+	weld.Parent = glow
+	glow.Parent = s.Parent
+	tideGlow = glow
+	-- a slow shimmer on the surface
+	TweenService:Create(glow, TweenInfo.new(1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = math.min(0.95, T.GlowTransparency + 0.12) }):Play()
 end
 
 -- Raise the sea to FluidEndY over `duration` seconds.
