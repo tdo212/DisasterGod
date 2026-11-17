@@ -2,8 +2,8 @@
 -- QuestController: the Daily Quests window. Three rows with a progress bar and a claim
 -- button each; the footer shows the all-done bonus, the daily streak and the reset timer.
 -- State arrives as JSON in the player's QuestState attribute (see QuestService).
--- In the lodge a small tracker button under the menu tiles shows "QUESTS 1/3" and opens the
--- window; it pulses CLAIM when a quest is done.
+-- The menu's Quests tile shows the day's progress ("1/3", or "!" when a quest can be
+-- claimed) from QuestController.Progress.
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -52,6 +52,19 @@ local function decode(): QuestState
 		end
 	end
 	return { Streak = 0, ResetAt = 0, Quests = {} }
+end
+
+-- (claimed, total, claimable) for today's quests
+function QuestController.Progress(): (number, number, number)
+	local done, claimable = 0, 0
+	for _, quest in state.Quests do
+		if quest.Claimed then
+			done += 1
+		elseif quest.Progress >= quest.Goal then
+			claimable += 1
+		end
+	end
+	return done, #state.Quests, claimable
 end
 
 function QuestController.ClaimableCount(): number
@@ -145,85 +158,13 @@ local function onState()
 	changed:Fire()
 end
 
--- the lodge tracker pill: a small button under the menu tiles (never over the play area).
--- Tapping it opens the Daily Quests window; it pulses gold when a quest can be claimed.
-local tracker: TextButton? = nil
-local trackerText: TextLabel? = nil
-local trackerPulse: UIScale? = nil
-local trackerIcon: GuiObject? = nil
-
 local function inRound(): boolean
 	local role = player:GetAttribute(Attributes.Role)
 	return ReplicatedStorage:GetAttribute(Attributes.RoundPhase) == "Active" and (role == "DisasterGod" or (role == "Survivor" and player:GetAttribute(Attributes.Alive) == true))
 end
 
-local function refreshTracker()
-	local t, text = tracker, trackerText
-	if not (t and text) then
-		return
-	end
-	t.Visible = #state.Quests > 0 and not inRound()
-	local done, claimable = 0, 0
-	for _, quest in state.Quests do
-		if quest.Claimed then
-			done += 1
-		elseif quest.Progress >= quest.Goal then
-			claimable += 1
-		end
-	end
-	text.Text = if claimable > 0 then "CLAIM QUEST!" else string.format("QUESTS %d/%d", done, #state.Quests)
-	local icon = trackerIcon
-	if icon then
-		Components.setIcon(icon, if claimable > 0 then "Gift" else "Quests")
-	end
-	text.TextColor3 = if claimable > 0 then C.GoldLight else C.Text
-end
-
-local function buildTracker()
-	local touch = Components.isTouch()
-	local t = Instance.new("TextButton")
-	t.Name = "QuestTracker"
-	t.Text = ""
-	t.AutoButtonColor = false
-	t.Size = UDim2.fromOffset(160, 38)
-	-- PC: directly under the sidebar tiles (left column); phones: under the top-left tiles
-	t.Position = if touch then UDim2.fromOffset(12, 350) else UDim2.new(0, 16, 0.5, 156)
-	t.BackgroundColor3 = Color3.new(1, 1, 1)
-	t.BorderSizePixel = 0
-	Components.corner(t, Theme.Radius.Small)
-	Components.stroke(t, Theme.Stroke.Heavy)
-	Components.gradient(t, C.OrangeLight, C.Orange, 90, true)
-	Components.studs(t)
-	Components.block(t, C.Orange)
-	t.Parent = layer
-	trackerIcon = Components.icon({ Name = "Icon", Icon = "Quests", TextSize = 22, Size = UDim2.fromOffset(34, 34), Position = UDim2.new(0, 2, 0.5, -1), AnchorPoint = Vector2.new(0, 0.5), ZIndex = 2, Parent = t })
-	trackerText = Components.label({ Name = "Text", Text = "", TextSize = 17, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(36, 0), Parent = t })
-	local pulse = Instance.new("UIScale")
-	pulse.Parent = t
-	trackerPulse = pulse
-	tracker = t
-	t.Activated:Connect(function()
-		QuestController.Toggle()
-	end)
-	-- pulse while something is ready to claim
-	task.spawn(function()
-		while true do
-			local p = trackerPulse
-			if p and QuestController.ClaimableCount() > 0 and t.Visible then
-				Components.tween(p, Theme.Tweens.Fade, { Scale = 1.08 })
-				task.wait(0.5)
-				Components.tween(p, Theme.Tweens.Fade, { Scale = 1 })
-				task.wait(0.5)
-			else
-				task.wait(0.5)
-			end
-		end
-	end)
-	for _, attr in { Attributes.Role, Attributes.Alive } do
-		player:GetAttributeChangedSignal(attr):Connect(refreshTracker)
-	end
-	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refreshTracker)
-	-- the round takes the screen: put the window away when you are in play
+-- the round takes the screen: put the window away when you are in play
+local function watchRound()
 	local function closeInRound()
 		if inRound() and window and window.IsOpen() then
 			window.Close()
@@ -231,8 +172,6 @@ local function buildTracker()
 	end
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(closeInRound)
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(closeInRound)
-	changed.Event:Connect(refreshTracker)
-	refreshTracker()
 end
 
 function QuestController.Toggle()
@@ -262,7 +201,7 @@ function QuestController.Start()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	layer = Components.scaledRoot(gui)
 
-	window = Components.window(layer, "Daily Quests", UDim2.fromOffset(600, 410))
+	window = Components.window(layer, "Daily Quests", UDim2.fromOffset(600, 410), { Dim = true })
 	list = Instance.new("Frame")
 	list.Name = "List"
 	list.BackgroundTransparency = 1
@@ -283,7 +222,7 @@ function QuestController.Start()
 		Parent = window.Content,
 	})
 
-	buildTracker()
+	watchRound()
 	player:GetAttributeChangedSignal(Attributes.QuestState):Connect(onState)
 	onState()
 	task.spawn(function()

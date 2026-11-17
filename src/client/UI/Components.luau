@@ -470,10 +470,31 @@ export type WindowHandle = {
 	IsOpen: () -> boolean,
 }
 
--- Modal window (stud shop reference): a translucent slate body with a heavy black
--- outline, a cyan studded header block (depth + rim) with a huge white title, and a
--- separate square red X block to its right.
-function Components.window(parent: Instance, title: string, size: UDim2): WindowHandle
+export type WindowOptions = {
+	Dim: boolean?, -- a full-screen dimmed backdrop behind the window (tap it to close)
+	Inset: number?, -- content inset from the window edge (default 12)
+}
+
+-- Modal window (stud shop reference): a solid slate body with a heavy black outline, a
+-- cyan studded header block (depth + rim) with a huge white title, and a separate square
+-- red X block to its right.
+function Components.window(parent: Instance, title: string, size: UDim2, options: WindowOptions?): WindowHandle
+	local opts: WindowOptions = options or {}
+	local dim: TextButton? = nil
+	if opts.Dim then
+		local d = Instance.new("TextButton")
+		d.Name = title .. "Dim"
+		d.Text = ""
+		d.AutoButtonColor = false
+		d.BackgroundColor3 = Color3.new(0, 0, 0)
+		d.BackgroundTransparency = Theme.Layout.ModalDim
+		d.BorderSizePixel = 0
+		d.Size = UDim2.fromScale(1, 1)
+		d.ZIndex = 9
+		d.Visible = false
+		d.Parent = parent
+		dim = d
+	end
 	local root = Components.panel({
 		Name = title .. "Window",
 		Size = size,
@@ -519,11 +540,12 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Parent = header,
 	})
 
+	local inset = opts.Inset or 12
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.BackgroundTransparency = 1
-	content.Size = UDim2.new(1, -24, 1, -90)
-	content.Position = UDim2.fromOffset(12, 80)
+	content.Size = UDim2.new(1, -inset * 2, 1, -80 - inset + 2)
+	content.Position = UDim2.fromOffset(inset, 80)
 	content.Parent = root
 
 	local open = false
@@ -536,6 +558,9 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		end
 		open = false
 		Sound.play("Click", 0.6, 0.8)
+		if dim then
+			dim.Visible = false
+		end
 		local t = Components.tween(scale, Theme.Tweens.Fast, { Scale = 0.85 * fit })
 		t.Completed:Once(function()
 			if not open then
@@ -561,6 +586,9 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		closeDepth.Size = UDim2.new(1, 0, 0, Theme.Block.DepthCard)
 	end
 	closeButton.ZIndex = 3
+	if dim then
+		dim.Activated:Connect(close)
+	end
 
 	handle = {
 		Root = root,
@@ -568,6 +596,9 @@ function Components.window(parent: Instance, title: string, size: UDim2): Window
 		Open = function()
 			open = true
 			Sound.play("Open", 0.5, 1.2)
+			if dim then
+				dim.Visible = true
+			end
 			root.Visible = true
 			-- shrink to fit short screens (phones) instead of running off the bottom
 			fit = Components.fitScale(root, scale)
@@ -612,12 +643,16 @@ function Components.tile(parent: Instance, icon: string, caption: string, color:
 		Name = "Caption",
 		Text = caption,
 		TextSize = 16,
-		Size = UDim2.new(1, 8, 0, 20),
+		Size = UDim2.new(1, -12, 0, 20),
 		Position = UDim2.new(0.5, 0, 1, -13),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Parent = tile,
 	})
 	cap.ZIndex = 2
+	cap.TextScaled = true -- "Spectate" / "Play God" shrink a touch instead of touching the edges
+	local capSize = Instance.new("UITextSizeConstraint")
+	capSize.MaxTextSize = 16
+	capSize.Parent = cap
 
 	-- red "!" / count bubble in the top-right corner (hidden until set)
 	local badge = Components.label({
@@ -647,6 +682,7 @@ function Components.setBadge(tile: GuiObject, text: string?)
 	if badge and badge:IsA("TextLabel") then
 		badge.Visible = text ~= nil and text ~= ""
 		badge.Text = text or ""
+		badge.Size = UDim2.fromOffset(math.max(26, 12 + #(text or "") * 9), 22) -- "0/3" fits
 	end
 end
 

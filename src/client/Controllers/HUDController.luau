@@ -274,6 +274,12 @@ function HUDController.SetShopOpener(fn: (string?) -> ())
 	shopOpener = fn
 end
 
+-- ... and the Settings window toggle, for the gear beside the coin bar.
+local settingsOpener: (() -> ())? = nil
+function HUDController.SetSettingsOpener(fn: () -> ())
+	settingsOpener = fn
+end
+
 -- Phones: the round bar and the currency bar ride up into the Roblox top-bar row (the
 -- strip the GUI inset reserves, empty in the middle and on the right) instead of
 -- sitting under it. Re-run whenever the screen or the UI scale changes. PC keeps them
@@ -328,6 +334,25 @@ local function buildCoins()
 		StrokeThickness = Theme.Stroke.Heavy,
 		Parent = bar,
 	})
+	-- Settings: a compact gear just left of the coin bar (the menu grid stays a clean 2 x 3)
+	local gear = Components.button({
+		Name = "Settings",
+		Text = "",
+		Size = UDim2.fromOffset(W.Height, W.Height),
+		-- PC: left of the coin bar; phones: just under it (the round bar fills the top row)
+		Position = if touch then UDim2.new(0, -6, 1, 16) else UDim2.new(0, -30, 0, 0),
+		AnchorPoint = if touch then Vector2.zero else Vector2.new(1, 0),
+		Color = C.Blue,
+		ColorLight = C.BlueLight,
+		Parent = frame,
+		OnClick = function()
+			local open = settingsOpener
+			if open then
+				open()
+			end
+		end,
+	})
+	Components.icon({ Name = "Icon", Icon = "Settings", TextSize = 28, Size = UDim2.fromScale(0.8, 0.8), Position = UDim2.fromScale(0.5, 0.48), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 2, Parent = gear })
 	Components.button({
 		Name = "TopUp",
 		Text = "+",

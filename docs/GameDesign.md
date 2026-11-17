@@ -79,7 +79,7 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 
 **New-player God priority** (`Config.Pity.NewPlayerRounds` / `NewPlayerMultiplier`): a player with fewer than 3 rounds played who has never been the God (`GodRounds` on the profile) has their weight multiplied by 6 (+500%), so new players reliably get a God round in their first two or three rounds.
 
-**Solo testing:** with one player, the sidebar shows a **Play God / Survivor** toggle. It works mid-round: swapping to God hands over from the Director; swapping to Survivor drops you into the arena.
+**Solo testing:** with one player, the sidebar's **Play God** tile is a God / Survivor toggle (with other players it opens the Specials tab with the God pass and God Chance). It works mid-round: swapping to God hands over from the Director; swapping to Survivor drops you into the arena.
 
 ## World
 ### Sky Lodge (lobby)
@@ -241,7 +241,7 @@ Chain Bolt hops between the nearest survivors, Eruption leaves a burning lava po
 | 🌩️ Storm Sovereign (7,500 coins) | Tornado | **Maelstrom Vortex:** a vortex that follows your reticle instead of chasing survivors, puts out fires and hurls its rubble outward | | Storm Bolt |
 
 ## Daily quests
-Three quests a day (UTC), the same for everyone: two drawn from `Config.Quests.Pool` (survive 2 or 3 rounds, use Dash 12 times, smash 25 or 200 parts as God, vote in 3 map votes, near misses, escapes, gear, the obby, the wheel...) plus "survive a round on the map of the day" (which gives the map vote a purpose). Progress is saved on the profile. Dashes are counted on the server from movement speed. Claiming pays coins; claiming all three grants a wheel spin and extends a daily streak. Open them from the Quests tile or the lobby quest board, or from the **quest button** under the menu tiles on the lodge HUD (left column on PC, under the top-left tiles on phones, hidden during your round): it shows "QUESTS 1/3", opens the window, and pulses "CLAIM QUEST!" when one is ready. When two of the day's quests share a stat (Survive 2 and Survive 3), progress counts up to the bigger goal and each turns ready at its own. The Quests and wheel windows draw above the map vote (and the shop above the vote too), so opening them during intermission always works.
+Three quests a day (UTC), the same for everyone: two drawn from `Config.Quests.Pool` (survive 2 or 3 rounds, use Dash 12 times, smash 25 or 200 parts as God, vote in 3 map votes, near misses, escapes, gear, the obby, the wheel...) plus "survive a round on the map of the day" (which gives the map vote a purpose). Progress is saved on the profile. Dashes are counted on the server from movement speed. Claiming pays coins; claiming all three grants a wheel spin and extends a daily streak. Open them from the Quests tile or the lobby quest board,; the Quests tile shows a badge with progress ("1/3") or "!" when one is ready to claim. When two of the day's quests share a stat (Survive 2 and Survive 3), progress counts up to the bigger goal and each turns ready at its own. The Quests and wheel windows draw above the map vote (and the shop above the vote too), so opening them during intermission always works.
 
 ## Presentation and settings
 - **Round intro**: a 2.5 s swooping fly-by of the arena while the God's sky avatar fades in overhead. **Outro**: the camera sweeps up to the Hall of Legends.
@@ -251,7 +251,9 @@ Three quests a day (UTC), the same for everyone: two drawn from `Config.Quests.P
 - **Clear screen at round start**: the shop, quests and wheel windows close by themselves when a round you are in begins (a spin in progress finishes first), so nothing covers the arena when the disasters start. The event feed draws under the HUD, so the Round Over window always covers it. While the spectate view (cheer bar) is open, the God Chance and Welcome Pack cards step aside. The tutorial's God hint sits above the taller ability hotbar. God kits are listed cheapest first.
 - **One thing at a time** (HUDController stage queue): banners, first-time tutorial cards and centre popups wait their turn instead of stacking. While a banner or card is up, short popups go to the feed.
 - **Action buttons**: on PC, DASH and the taunt button sit side by side in the bottom-right corner with white key chips (Q, T); the God hotbar and gear slots use the same chips. On phones DASH sits above and left of the jump button, never on it.
-- **Quick settings** (gear tile, SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
+- **Lodge sidebar**: a 2×3 grid of tiles (Shop, Spin, Quests, Passes, Spectate, Play God) with even gaps; the Quests tile carries a done/total badge ("!" when a reward is ready).
+- **Shop window**: solid panel over a dimmed screen (`Theme.Layout.ModalDim`); tabs, hero and card grid share one edge inset, and every card follows title, icon, description, buy.
+- **Quick settings** (blue gear button beside the coin bar on PC, under it on phones; SettingsController): Low-FX mode (no client rubble or weather), camera shake (full / low / off), and music and sound-effect toggles, saved on the profile.
 
 ## Community and favourites
 - **Community board** (lodge, by the deck doorway): a JOIN THE COMMUNITY sign over a glowing plinth tagged FREE REWARD. Its prompt opens Roblox's join prompt for the group that owns the game (`Config.Community.GroupId`, 0 = the owning group); the server then checks membership itself and pays once per player: 500 coins and the Storm Deity God kit (1,000 coins instead if the kit is already owned). After that the prompt reads "Claimed ✓". `CommunityService` / `CommunityController`.

@@ -58,7 +58,7 @@ local Theme = {
 		RimLighten = 0.55, -- rim = base colour this far toward white
 		RimTransparency = 0.2,
 		SheenTransparency = 0.8, -- the white diagonal stripes on buy buttons
-		WindowTransparency = 0.3, -- translucent window body
+		WindowTransparency = 0, -- solid window body (nothing bleeds through between cards)
 	},
 
 	Stroke = {
@@ -101,7 +101,9 @@ local Theme = {
 	Shop = {
 		Width = 840,
 		Height = 612,
-		TabWidth = 124,
+		TabWidth = 128, -- six tabs + five 8-unit gaps fill the inner width exactly
+		Inset = 10, -- window content inset; with EdgeInset every block's face sits 16 units in
+		EdgeInset = 6, -- tabs, hero, strip and card rows keep their 4.5 stroke inside the frame
 		TabHeight = 46,
 		PageTop = 56, -- below the tab row
 		HeroHeight = 150, -- featured offer banner (Gear, Coins, Specials)
@@ -120,7 +122,12 @@ local Theme = {
 		CardWidth = 150,
 		CardHeight = 236,
 		KitCardHeight = 250, -- room for the five-disaster row
-		CardGap = 10,
+		CardGap = 12,
+		CardPadTop = 12, -- card title below the top stroke
+		CardIconTop = 40,
+		CardTextTop = 106,
+		CardTextHeight = 42,
+		CardAbilityTop = 152,
 		AbilityIcon = 25,
 		FeaturedSkin = "CelestialMask",
 	},
@@ -150,6 +157,12 @@ local Theme = {
 		TopbarMargin = 6, -- round bar and currency bar: this far below the screen top, in the Roblox top-bar row
 		PhoneMaxSide = 600, -- a touch screen this short (points) gets the touch layout even with a keyboard
 		FitMargin = 0.94, -- windows shrink to fit this share of the screen
+		SidebarCell = 74, -- left menu tile size
+		-- grid gaps: strokes (4.5 a side) and the 6-unit depth lip eat into a gap, so these
+		-- leave a clear ~8 units between tiles both ways
+		SidebarGapX = 17,
+		SidebarGapY = 23,
+		ModalDim = 0.45, -- full-screen black backdrop behind modal windows (transparency)
 		TouchModalMargin = 0.76, -- the map vote on phones leaves the round bar and side menu visible
 	},
 

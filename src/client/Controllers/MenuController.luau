@@ -93,13 +93,15 @@ type CardSpec = {
 	OnClick: () -> (),
 }
 
--- gold ribbon pinned across the top edge of a card or hero
-local function ribbon(parent: GuiObject, text: string, colors: { Color3 }, width: UDim, x: UDim, anchorX: number)
+-- a promo tag kept inside its card or hero (never over the frame above): `y` from the top,
+-- anchored at its right edge `x`, tilted like a sticker on cards
+local function ribbon(parent: GuiObject, text: string, colors: { Color3 }, width: number, x: UDim, y: number, tilt: number)
 	local badge = Instance.new("Frame")
 	badge.Name = "Badge"
-	badge.Size = UDim2.new(width.Scale, width.Offset, 0, 24)
-	badge.Position = UDim2.new(x.Scale, x.Offset, 0, -12)
-	badge.AnchorPoint = Vector2.new(anchorX, 0)
+	badge.Size = UDim2.fromOffset(width, 22)
+	badge.Position = UDim2.new(x.Scale, x.Offset, 0, y)
+	badge.AnchorPoint = Vector2.new(1, 0)
+	badge.Rotation = tilt
 	badge.BackgroundColor3 = Color3.new(1, 1, 1)
 	badge.ZIndex = 3
 	Components.corner(badge, Theme.Radius.Small)
@@ -107,8 +109,12 @@ local function ribbon(parent: GuiObject, text: string, colors: { Color3 }, width
 	Components.gradient(badge, colors[1], colors[2], 90)
 	Components.rim(badge, colors[2])
 	badge.Parent = parent
-	local label = Components.label({ Name = "Text", Text = string.upper(text), TextSize = 15, Size = UDim2.fromScale(1, 1), Parent = badge })
+	local label = Components.label({ Name = "Text", Text = string.upper(text), TextSize = 15, Size = UDim2.new(1, -10, 1, 0), Position = UDim2.fromOffset(5, 0), Parent = badge })
 	label.ZIndex = 4
+	label.TextScaled = true
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 15
+	fit.Parent = label
 	return badge
 end
 
@@ -126,11 +132,13 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 	frame.Parent = parent
 
 	if spec.Badge and spec.Badge ~= "" then
-		ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.GoldLight, C.Gold }, UDim.new(1, -24), UDim.new(0.5, 0), 0.5)
+		local tag = ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.GoldLight, C.Gold }, 86, UDim.new(1, -10), S.CardIconTop + 12, 8)
+		tag.ZIndex = 5
 	end
-	Components.label({ Name = "Title", Text = spec.Title, TextSize = if #spec.Title > 13 then 16 else 19, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 10), Parent = frame })
-	Components.icon({ Name = "Icon", Icon = spec.Icon, TextSize = 48, Size = UDim2.fromOffset(64, 64), Position = UDim2.new(0.5, 0, 0, 36), AnchorPoint = Vector2.new(0.5, 0), Parent = frame })
-	local sub = Components.label({ Name = "Subtitle", Text = spec.Subtitle, TextSize = 14, Size = UDim2.new(1, -14, 0, 46), Position = UDim2.fromOffset(7, 102), StrokeThickness = Theme.Stroke.Thin, Parent = frame })
+	-- fixed rhythm on every card: title, icon, text, (abilities), buy button
+	Components.label({ Name = "Title", Text = spec.Title, TextSize = if #spec.Title > 13 then 16 else 19, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, S.CardPadTop), Parent = frame })
+	Components.icon({ Name = "Icon", Icon = spec.Icon, TextSize = 48, Size = UDim2.fromOffset(64, 64), Position = UDim2.new(0.5, 0, 0, S.CardIconTop), AnchorPoint = Vector2.new(0.5, 0), Parent = frame })
+	local sub = Components.label({ Name = "Subtitle", Text = spec.Subtitle, TextSize = 14, Size = UDim2.new(1, -14, 0, S.CardTextHeight), Position = UDim2.fromOffset(7, S.CardTextTop), StrokeThickness = Theme.Stroke.Thin, Parent = frame })
 	sub.FontFace = Theme.FontFaceBold
 	sub.TextWrapped = true
 	if spec.Abilities then
@@ -138,7 +146,7 @@ local function card(parent: Instance, spec: CardSpec): (Frame, TextButton, TextL
 		local well = Instance.new("Frame")
 		well.Name = "Abilities"
 		well.Size = UDim2.new(1, -14, 0, 38)
-		well.Position = UDim2.new(0.5, 0, 0, 150)
+		well.Position = UDim2.new(0.5, 0, 0, S.CardAbilityTop)
 		well.AnchorPoint = Vector2.new(0.5, 0)
 		well.BackgroundColor3 = C.Outline
 		well.BackgroundTransparency = 0.7
@@ -191,8 +199,9 @@ local function hero(parent: GuiObject, spec: HeroSpec): (Frame, TextButton, { Te
 	local h = spec.Height or S.HeroHeight
 	local frame = Instance.new("Frame")
 	frame.Name = "Hero" .. spec.Name
-	frame.Size = UDim2.new(1, -20, 0, h)
+	frame.Size = UDim2.new(1, -S.EdgeInset * 2, 0, h)
 	frame.Position = UDim2.new(0.5, 0, 0, S.PageTop)
+	frame.ClipsDescendants = false
 	frame.AnchorPoint = Vector2.new(0.5, 0)
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
 	Components.corner(frame, Theme.Radius.Large)
@@ -271,7 +280,8 @@ local function hero(parent: GuiObject, spec: HeroSpec): (Frame, TextButton, { Te
 		strike.Parent = was
 	end
 	if spec.Badge and spec.Badge ~= "" then
-		ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.PinkLight, C.Pink }, UDim.new(0, 170), UDim.new(1, -14 - (h + 50) / 2), 0.5)
+		local tag = ribbon(frame, spec.Badge, BADGE_COLORS[spec.Badge] or { C.PinkLight, C.Pink }, 130, UDim.new(1, -12), 10, 0)
+		tag.ZIndex = 5
 	end
 	return frame, button, bullets
 end
@@ -281,7 +291,7 @@ end
 local function strip(parent: GuiObject, icon: string, title: string, statusText: string): TextLabel
 	local frame = Instance.new("Frame")
 	frame.Name = "Strip"
-	frame.Size = UDim2.new(1, -20, 0, S.StripHeight)
+	frame.Size = UDim2.new(1, -S.EdgeInset * 2, 0, S.StripHeight)
 	frame.Position = UDim2.new(0.5, 0, 0, S.PageTop)
 	frame.AnchorPoint = Vector2.new(0.5, 0)
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -317,10 +327,11 @@ local function grid(parent: GuiObject, name: string, top: number?): ScrollingFra
 	page.Visible = false
 	page.Parent = parent
 	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 10)
-	pad.PaddingRight = UDim.new(0, 10)
-	pad.PaddingTop = UDim.new(0, 14) -- room for the ribbons
-	pad.PaddingBottom = UDim.new(0, 12) -- and the depth edge
+	-- the scroller clips, so pad by the stroke inset (cards line up with the hero above)
+	pad.PaddingLeft = UDim.new(0, S.EdgeInset)
+	pad.PaddingRight = UDim.new(0, S.EdgeInset)
+	pad.PaddingTop = UDim.new(0, 8)
+	pad.PaddingBottom = UDim.new(0, 12) -- the depth edge
 	pad.Parent = page
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
@@ -803,13 +814,14 @@ local function buildSpecialsPage(content: Frame)
 end
 
 local function buildShop()
-	shop = Components.window(layer, "Shop!", UDim2.fromOffset(S.Width, S.Height))
+	shop = Components.window(layer, "Shop!", UDim2.fromOffset(S.Width, S.Height), { Dim = true, Inset = S.Inset })
 	local content = shop.Content
 
 	local tabs = Instance.new("Frame")
 	tabs.Name = "Tabs"
 	tabs.BackgroundTransparency = 1
-	tabs.Size = UDim2.new(1, 0, 0, S.TabHeight)
+	tabs.Size = UDim2.new(1, -S.EdgeInset * 2, 0, S.TabHeight)
+	tabs.Position = UDim2.fromOffset(S.EdgeInset, 0)
 	tabs.Parent = content
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
@@ -859,14 +871,14 @@ local function buildShop()
 	buildSpecialsPage(content)
 
 	-- wallet (left) and a per-tab hint (right) along the bottom
-	Components.icon({ Name = "WalletCoin", Icon = "Coin", TextSize = 24, Size = UDim2.fromOffset(32, 32), Position = UDim2.new(0, 4, 1, -2), AnchorPoint = Vector2.new(0, 1), Parent = content })
+	Components.icon({ Name = "WalletCoin", Icon = "Coin", TextSize = 24, Size = UDim2.fromOffset(32, 32), Position = UDim2.new(0, S.EdgeInset, 1, -2), AnchorPoint = Vector2.new(0, 1), Parent = content })
 	local wallet = Components.label({
 		Name = "Wallet",
 		Text = "",
 		TextSize = 24,
 		Color = C.Gold,
 		Size = UDim2.fromOffset(200, 30),
-		Position = UDim2.new(0, 42, 1, -3),
+		Position = UDim2.new(0, S.EdgeInset + 38, 1, -3),
 		AnchorPoint = Vector2.new(0, 1),
 		XAlign = Enum.TextXAlignment.Left,
 		Parent = content,
@@ -876,7 +888,7 @@ local function buildShop()
 		Text = "",
 		TextSize = 14,
 		Size = UDim2.new(1, -260, 0, 26),
-		Position = UDim2.new(1, -4, 1, -4),
+		Position = UDim2.new(1, -S.EdgeInset, 1, -4),
 		AnchorPoint = Vector2.new(1, 1),
 		XAlign = Enum.TextXAlignment.Right,
 		StrokeThickness = Theme.Stroke.Thin,
@@ -927,7 +939,8 @@ function MenuController.Start()
 	local sidebar = Instance.new("Frame")
 	sidebar.Name = "Sidebar"
 	sidebar.BackgroundTransparency = 1
-	sidebar.Size = UDim2.fromOffset(160, 336)
+	local cell, gapX, gapY = Theme.Layout.SidebarCell, Theme.Layout.SidebarGapX, Theme.Layout.SidebarGapY
+	sidebar.Size = UDim2.fromOffset(cell * 2 + gapX, cell * 3 + gapY * 2)
 	if Components.isTouch() then
 		sidebar.Position = UDim2.fromOffset(12, 6)
 	else
@@ -936,8 +949,8 @@ function MenuController.Start()
 	end
 	sidebar.Parent = layer
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.fromOffset(74, 74)
-	layout.CellPadding = UDim2.fromOffset(12, 12)
+	layout.CellSize = UDim2.fromOffset(cell, cell)
+	layout.CellPadding = UDim2.fromOffset(gapX, gapY)
 	layout.FillDirectionMaxCells = 2
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = sidebar
@@ -960,8 +973,10 @@ function MenuController.Start()
 
 	local questTile = Components.tile(sidebar, "Quests", "Quests", C.Orange, 3)
 	questTile.Activated:Connect(QuestController.Toggle)
+	-- the quest tile carries the day's progress ("1/3"), or "!" when one can be claimed
 	local function refreshQuestBadge()
-		Components.setBadge(questTile, if QuestController.ClaimableCount() > 0 then "!" else nil)
+		local done, total, claimable = QuestController.Progress()
+		Components.setBadge(questTile, if claimable > 0 then "!" elseif total > 0 then string.format("%d/%d", done, total) else nil)
 	end
 	QuestController.Changed:Connect(refreshQuestBadge)
 	refreshQuestBadge()
@@ -976,11 +991,12 @@ function MenuController.Start()
 	local spectateTile = Components.tile(sidebar, "Spectate", "Spectate", C.Blue, 5)
 	spectateTile.Activated:Connect(SpectateController.Toggle)
 
+	-- sixth tile: alone in a server it toggles your role; with others it opens the
+	-- Be the God offer, so the grid is always a full 2 x 3
 	local roleTile = Components.tile(sidebar, "PlayGod", "Play God", C.Purple, 6)
 	local function refreshRoleTile()
 		local solo = #Players:GetPlayers() == 1 and Config.Match.AllowSoloRoleToggle
-		roleTile.Visible = solo
-		local wantsGod = player:GetAttribute(Attributes.PreferredRole) == "DisasterGod"
+		local wantsGod = solo and player:GetAttribute(Attributes.PreferredRole) == "DisasterGod"
 		local icon = roleTile:FindFirstChild("Icon")
 		local caption = roleTile:FindFirstChild("Caption") :: TextLabel?
 		if icon and caption then
@@ -988,10 +1004,14 @@ function MenuController.Start()
 			caption.Text = if wantsGod then "Survivor" else "Play God"
 		end
 	end
-	local settingsTile = Components.tile(sidebar, "Settings", "Settings", C.Green, 7)
-	settingsTile.Activated:Connect(SettingsController.Toggle)
+	-- Settings lives on a gear button beside the coin bar (HUDController)
+	HUDController.SetSettingsOpener(SettingsController.Toggle)
 
 	roleTile.Activated:Connect(function()
+		if not (#Players:GetPlayers() == 1 and Config.Match.AllowSoloRoleToggle) then
+			MenuController.OpenShop("Specials")
+			return
+		end
 		local wantsGod = player:GetAttribute(Attributes.PreferredRole) == "DisasterGod"
 		Remotes.get("SetSoloRole"):FireServer(if wantsGod then "Survivor" else "DisasterGod")
 	end)
@@ -1010,6 +1030,7 @@ function MenuController.Start()
 		for _, tile in { shopTile, spinTile, questTile, passTile, spectateTile } do
 			tile.Visible = not flying
 		end
+		roleTile.Visible = not flying or solo
 	end
 	player:GetAttributeChangedSignal(Attributes.Role):Connect(refreshSidebar)
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.RoundPhase):Connect(refreshSidebar)
