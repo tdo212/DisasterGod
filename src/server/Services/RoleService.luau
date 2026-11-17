@@ -28,6 +28,17 @@ function RoleService.IsSolo(): boolean
 	return #Players:GetPlayers() == 1
 end
 
+-- Free first round as the God (Config.LowPop.FirstRoundGod): a player who has never
+-- played a round, in a low-pop server, who hasn't picked a role with the solo toggle.
+local function freeFirstGod(p: Player): boolean
+	if not Config.LowPop.FirstRoundGod or #Players:GetPlayers() > Config.LowPop.MaxRealPlayers then
+		return false
+	end
+	local played = p:GetAttribute(Attributes.RoundsPlayed)
+	local godRounds = p:GetAttribute(Attributes.GodRounds)
+	return typeof(played) == "number" and played == 0 and (godRounds == nil or godRounds == 0) and p:GetAttribute(Attributes.SoloRolePicked) ~= true
+end
+
 -- A brand-new player (few rounds, never the God) weighs much more, so they get to be the
 -- God in their first rounds.
 local function weightOf(p: Player): number
@@ -58,7 +69,7 @@ function RoleService.UpdateChances()
 	end
 	if #players == 1 then
 		local p = players[1]
-		p:SetAttribute(Attributes.GodChance, if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" then 100 else 0)
+		p:SetAttribute(Attributes.GodChance, if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" or freeFirstGod(p) then 100 else 0)
 		return
 	end
 	local total = 0
@@ -101,6 +112,7 @@ function RoleService.Init()
 			return
 		end
 		player:SetAttribute(Attributes.PreferredRole, role)
+		player:SetAttribute(Attributes.SoloRolePicked, true)
 		RoleService.UpdateChances()
 		soloSwap:Fire(player, role)
 	end)
@@ -172,7 +184,7 @@ function RoleService.PickGod(players: { Player }): Player?
 			p:SetAttribute(Attributes.GodQueued, false)
 			return p
 		end
-		return if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" then p else nil
+		return if p:GetAttribute(Attributes.PreferredRole) == "DisasterGod" or freeFirstGod(p) then p else nil
 	end
 	while #godQueue > 0 do
 		local queued = table.remove(godQueue, 1) :: Player
@@ -180,6 +192,16 @@ function RoleService.PickGod(players: { Player }): Player?
 			queued:SetAttribute(Attributes.GodQueued, false)
 			return queued
 		end
+	end
+	-- a quiet server: a first-timer gets the free God round (one at random if several)
+	local fresh = {}
+	for _, p in players do
+		if freeFirstGod(p) then
+			table.insert(fresh, p)
+		end
+	end
+	if #fresh > 0 then
+		return fresh[math.random(#fresh)]
 	end
 	local total = 0
 	for _, p in players do

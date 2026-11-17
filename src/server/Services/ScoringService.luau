@@ -182,6 +182,23 @@ function ScoringService.OnEliminated(victim: Player, final: boolean?)
 	lastHit[victim] = nil
 end
 
+-- An AI survivor bot (BotService) went down: the kill-feed line, and the God's kill credit
+-- (coins, round kills, quests and the kill confirm; not the lifetime "Deadliest Gods" stat).
+function ScoringService.OnBotEliminated(name: string, cause: string?, by: Player?, position: Vector3?, final: boolean?)
+	local line = name .. " was eliminated"
+	if cause then
+		local phrase = F.Phrases[cause]
+		line = if phrase then name .. " " .. phrase else string.format("%s was taken out by %s", name, cause)
+	end
+	feed:FireAllClients((if final then "💀 FINAL KILL: " else "☠️ ") .. line, RED)
+	if by and by.Parent and RoleService.GetRole(by) == "DisasterGod" then
+		record(by).Kills += 1
+		QuestService.Progress(by, "GodKill", 1)
+		ScoringService.Award(by, S.GodKillCoins, "ELIMINATED " .. string.upper(name), PURPLE)
+		Remotes.get("ClientEffect"):FireClient(by, "GodKill", name, position)
+	end
+end
+
 function ScoringService.RecordDestruction(by: Player?, count: number)
 	if by and count > 0 then
 		record(by).Destroyed += count
@@ -211,10 +228,12 @@ local function highlightOf(p: Player, r: any, isGod: boolean): string
 end
 
 -- Round-end payouts. Returns a summary per player and the podium.
-function ScoringService.FinishRound(mapName: string, god: Player?, participants: { Player }): { [Player]: Types.RoundSummary }
+-- `botsAlive`: AI survivor bots still standing (the God only "wiped everyone out" if they're gone too).
+function ScoringService.FinishRound(mapName: string, god: Player?, participants: { Player }, botsAlive: number?): { [Player]: Types.RoundSummary }
 	local summaries: { [Player]: Types.RoundSummary } = {}
 	local lines: { [Player]: { Types.SummaryLine } } = {}
-	local survivorCount = #RoleService.GetAliveSurvivors()
+	local survivorCount = #RoleService.GetAliveSurvivors() + (botsAlive or 0)
+	local lowPop = ReplicatedStorage:GetAttribute(Attributes.LowPopBonus)
 	local mapKey = ReplicatedStorage:GetAttribute(Config.Attributes.MapKey)
 	local mutator = ReplicatedStorage:GetAttribute(Config.Attributes.Mutator)
 
@@ -290,6 +309,11 @@ function ScoringService.FinishRound(mapName: string, god: Player?, participants:
 			local rush = PlayerDataService.EarnCoins(p, math.floor(r.Earned * (Config.Mutators.GoldRushPayout - 1)))
 			r.Earned += rush
 			table.insert(lines[p], { Text = "Gold Rush x" .. Config.Mutators.GoldRushPayout, Amount = rush })
+		end
+		if typeof(lowPop) == "number" and lowPop > 1 then
+			local extra = PlayerDataService.EarnCoins(p, math.floor(r.Earned * (lowPop - 1)))
+			r.Earned += extra
+			table.insert(lines[p], { Text = string.format("🔥 Low-pop bonus x%g", lowPop), Amount = extra })
 		end
 		if p:GetAttribute(Config.Attributes.FriendBoost) == true then
 			local boost = PlayerDataService.EarnCoins(p, math.floor(r.Earned * S.FriendBoost))

@@ -148,6 +148,53 @@ local function buildRoundBar()
 	})
 	local twistText = Components.label({ Name = "Text", Text = "", TextSize = 15, Size = UDim2.fromScale(1, 1), Parent = twist })
 	twist.Visible = false
+
+	-- low-pop bonus pill (BotService): round coins are boosted while the server is quiet;
+	-- it sits under the Chaos Twist badge (or in its place when there is no twist)
+	local lowPop = Components.panel({
+		Name = "LowPopBonus",
+		Size = UDim2.fromOffset(470, 24),
+		Position = UDim2.new(0.5, 0, 0, 24 + BAR_TEXT_ONLY + 6 + 28),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Color = C.Window,
+		Transparency = 0.2,
+		Radius = Theme.Radius.Pill,
+		Parent = holder,
+	})
+	local lowPopStroke = lowPop:FindFirstChildOfClass("UIStroke")
+	if lowPopStroke then
+		lowPopStroke.Color = C.Orange
+	end
+	local lowPopText = Components.label({ Name = "Text", Text = "", TextSize = 15, Color = C.GoldLight, Size = UDim2.new(1, -16, 1, 0), Position = UDim2.fromOffset(8, 0), Parent = lowPop })
+	lowPopText.TextScaled = true
+	local lowPopMax = Instance.new("UITextSizeConstraint")
+	lowPopMax.MaxTextSize = 15
+	lowPopMax.Parent = lowPopText
+	lowPop.Visible = false
+	local barHeight = BAR_TEXT_ONLY
+	local function placeBadges(animate: boolean)
+		local base = 24 + barHeight + 6 + 28
+		local twistPos = UDim2.new(0.5, 0, 0, base)
+		local lowPos = UDim2.new(0.5, 0, 0, base + (if twist.Visible then 28 else 0))
+		if animate then
+			Components.tween(twist, Theme.Tweens.Fade, { Position = twistPos })
+			Components.tween(lowPop, Theme.Tweens.Fade, { Position = lowPos })
+		else
+			twist.Position = twistPos
+			lowPop.Position = lowPos
+		end
+	end
+	local function refreshLowPop()
+		local mult = ReplicatedStorage:GetAttribute(Attributes.LowPopBonus)
+		local on = typeof(mult) == "number" and mult > 1
+		lowPop.Visible = on
+		if on then
+			lowPopText.Text = string.format("🔥 %gX COINS ACTIVE · Low-Pop Bonus! Waiting for more challengers…", mult :: number)
+		end
+	end
+	ReplicatedStorage:GetAttributeChangedSignal(Attributes.LowPopBonus):Connect(refreshLowPop)
+	refreshLowPop()
+
 	local function refreshTwist()
 		local id = ReplicatedStorage:GetAttribute(Attributes.Mutator)
 		local found = nil
@@ -165,6 +212,7 @@ local function buildRoundBar()
 				stroke.Color = found.Color
 			end
 		end
+		placeBadges(false)
 	end
 	ReplicatedStorage:GetAttributeChangedSignal(Attributes.Mutator):Connect(function()
 		refreshTwist()
@@ -190,9 +238,10 @@ local function buildRoundBar()
 		showingTrack = show
 		track.Visible = show
 		local height = if show then BAR_WITH_TRACK else BAR_TEXT_ONLY
+		barHeight = height
 		Components.tween(bar, Theme.Tweens.Fade, { Size = UDim2.new(1, 0, 0, height) })
 		Components.tween(pills, Theme.Tweens.Fade, { Position = UDim2.new(0.5, 0, 0, 24 + height + 6) })
-		Components.tween(twist, Theme.Tweens.Fade, { Position = UDim2.new(0.5, 0, 0, 24 + height + 6 + 28) })
+		placeBadges(true)
 	end
 
 	local function refresh()

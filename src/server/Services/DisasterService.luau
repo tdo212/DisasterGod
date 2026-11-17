@@ -33,6 +33,7 @@ local Attributes = Config.Attributes
 local Chaos = Config.Chaos
 
 local AudioService = require(script.Parent.AudioService)
+local BotService = require(script.Parent.BotService)
 local RagdollService = require(script.Parent.RagdollService)
 
 local RED = Color3.fromRGB(255, 50, 50)
@@ -159,6 +160,7 @@ local function blast(center: Vector3, radius: number, damage: number, caster: Pl
 			end
 		end
 	end
+	BotService.HitSphere(center, radius, math.min(damage, Config.Balance.MaxHit), caster, cause, knockback)
 	ScoringService.CheckNearMiss(center, radius, cause)
 end
 
@@ -437,6 +439,7 @@ local function eruption(def: Ability, ground: Vector3, caster: Player?)
 				end
 			end
 		end
+		BotService.HitSphere(ground, def.Radius, def.TickDamage or 10, caster, "Lava")
 	end
 	TweenService:Create(pool, TweenInfo.new(0.8), { Transparency = 1 }):Play()
 	Debris:AddItem(pool, 0.85)
@@ -474,6 +477,7 @@ local function glitch(def: Ability, ground: Vector3, caster: Player?)
 			knock(player, Vector3.new(math.cos(a) * k * 0.3, k, math.sin(a) * k * 0.3))
 		end
 	end
+	BotService.HitSphere(ground, def.Radius, def.PlayerDamage, caster, def.DisplayName, k)
 	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
 end
 
@@ -507,6 +511,7 @@ local function gust(def: Ability, ground: Vector3, dir: Vector3, caster: Player?
 			knock(player, dir * k + Vector3.new(0, 28, 0))
 		end
 	end
+	BotService.HitSphere(ground, def.Radius, def.PlayerDamage, caster, def.DisplayName, k)
 	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
 end
 
@@ -693,6 +698,7 @@ local function tornado(def: Ability, ground: Vector3, dir: Vector3, caster: Play
 					end
 				end
 			end
+			BotService.HitSphere(pos, radius, def.TickDamage or 8, caster, if burning then "Firenado" else def.DisplayName, k * 0.6)
 		end
 		if elapsed >= duration then
 			conn:Disconnect()
@@ -756,6 +762,7 @@ local function faultCleave(def: Ability, ground: Vector3, dir: Vector3, caster: 
 			end
 		end
 	end
+	BotService.HitBox(boxCf, Vector3.new(width + 2, boxSize.Y, length), def.PlayerDamage, caster, def.DisplayName, 55)
 end
 
 -- Every God's scouting tool: survivors in range show through walls for a moment.
@@ -893,6 +900,7 @@ local function singularity(def: Ability, ground: Vector3, caster: Player?, astra
 			end
 		end
 	end
+	BotService.HitSphere(center, impact, def.PlayerDamage, caster, def.DisplayName, k)
 	ScoringService.CheckNearMiss(center, impact, def.DisplayName)
 	for _, part in DestructionService.GetDebrisNear(center, impact * 1.6) do
 		local offset = part.Position - center
@@ -968,6 +976,7 @@ local function tectonicSpire(def: Ability, ground: Vector3, caster: Player?)
 				end
 			end
 		end
+		BotService.HitBox(CFrame.new(base + Vector3.new(0, h / 2, 0)), Vector3.new(w + 6, h + 6, w + 6), def.PlayerDamage, caster, def.DisplayName, def.Knockback or 95)
 		task.wait(0.08)
 	end
 	ScoringService.CheckNearMiss(ground, def.Radius, def.DisplayName)
@@ -1018,6 +1027,7 @@ local function chainArc(def: Ability, ground: Vector3, caster: Player?)
 		end
 	end
 	arcFx(pos + Vector3.new(0, 60, 0), pos, color, 0.3)
+	BotService.HitSphere(pos, def.Radius, def.PlayerDamage, caster, def.DisplayName, 30)
 	if first then
 		hit[first] = true
 		local hrp = hrpAndHumanoid(first)
@@ -1106,6 +1116,7 @@ local function pyroclastSurge(def: Ability, ground: Vector3, dir: Vector3, caste
 					end
 				end
 			end
+			BotService.HitBox(wave.CFrame, Vector3.new(width + 2, 24, 10), def.PlayerDamage, caster, def.DisplayName, 55)
 		end
 		if fireTimer >= 0.9 then
 			fireTimer = 0
@@ -1297,9 +1308,12 @@ local function directorLoop()
 		local survivors = RoleService.GetAliveSurvivors()
 		local victim = survivors[math.random(math.max(1, #survivors))]
 		local hrp = if victim then hrpAndHumanoid(victim) else nil
-		if hrp then
+		-- low-pop rounds: the Director spreads its aim over the AI survivor bots too
+		local botTarget = if not hrp or math.random() < Config.LowPop.DirectorBotTargetChance then BotService.RandomTarget() else nil
+		local aim: Vector3? = botTarget or (if hrp then hrp.Position else nil)
+		if aim then
 			local j = math.floor(Config.Director.TargetJitter)
-			target = hrp.Position + Vector3.new(math.random(-j, j), 0, math.random(-j, j))
+			target = aim + Vector3.new(math.random(-j, j), 0, math.random(-j, j))
 		else
 			local info = MapService.GetCurrent()
 			local r = math.floor(if info then info.Radius * 0.6 else 60)

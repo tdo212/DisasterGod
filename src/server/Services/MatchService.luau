@@ -13,6 +13,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 local AudioService = require(script.Parent.AudioService)
+local BotService = require(script.Parent.BotService)
 local DestructionService = require(script.Parent.DestructionService)
 local DisasterService = require(script.Parent.DisasterService)
 local EnvironmentService = require(script.Parent.EnvironmentService)
@@ -81,8 +82,9 @@ local function setSubPhase(sub: SubPhase)
 	ReplicatedStorage:SetAttribute(Attributes.SubPhase, sub)
 end
 
+-- real survivors plus any AI survivor bots (low-pop rounds)
 local function updateAlive()
-	ReplicatedStorage:SetAttribute(Attributes.AliveCount, #RoleService.GetAliveSurvivors())
+	ReplicatedStorage:SetAttribute(Attributes.AliveCount, #RoleService.GetAliveSurvivors() + BotService.AliveCount())
 end
 
 local function tick()
@@ -381,7 +383,8 @@ local function assignRoles(): Player?
 		if p == god then
 			RoleService.SetRole(p, "DisasterGod")
 			task.spawn(perch, p)
-			banner:FireClient(p, "YOU ARE THE DISASTER GOD", GOD_HINT, GOD_PURPLE)
+			local freeTrial = (p:GetAttribute(Attributes.RoundsPlayed) or 0) == 0
+			banner:FireClient(p, if freeTrial then "FREE ROUND: YOU ARE THE GOD!" else "YOU ARE THE DISASTER GOD", GOD_HINT, GOD_PURPLE)
 		else
 			index += 1
 			survivorsAssigned = true
@@ -394,6 +397,8 @@ local function assignRoles(): Player?
 	if god then
 		PlayerDataService.RecordGodRound(god)
 	end
+	-- a quiet server: AI survivor bots fill the arena (Config.LowPop)
+	BotService.SpawnForRound()
 	AnalyticsService.RoundStarted(players, god)
 	return god
 end
@@ -414,12 +419,13 @@ local function active(god: Player?)
 	local suddenDeath = false
 	local finalRush = false
 	local startSurvivors = 0
+	local hadBots = BotService.AliveCount() > 0
 	ReplicatedStorage:SetAttribute(Attributes.FinalRush, false)
 	while state.TimeRemaining > 0 do
 		tick()
 		local elapsed = M.RoundDuration - state.TimeRemaining
 		if not castingOpen and elapsed >= M.PrepDuration then
-			startSurvivors = #RoleService.GetAliveSurvivors()
+			startSurvivors = #RoleService.GetAliveSurvivors() + BotService.AliveCount()
 			castingOpen = true
 			DisasterService.SetCastingOpen(true)
 			LobbyService.SetGhostPingsOpen(true)
@@ -452,9 +458,13 @@ local function active(god: Player?)
 			end
 		end
 		updateAlive()
-		local aliveCount = #RoleService.GetAliveSurvivors()
-		if survivorsAssigned and aliveCount == 0 then
-			break -- everyone is out: skip straight to the podium
+		local humansAlive = #RoleService.GetAliveSurvivors()
+		local aliveCount = humansAlive + BotService.AliveCount()
+		if survivorsAssigned and humansAlive == 0 then
+			break -- every real survivor is out: skip straight to the podium
+		end
+		if hadBots and castingOpen and aliveCount == 0 then
+			break -- the God wiped out the bots
 		end
 		-- Final Rush: most of the survivors are out; skip ahead so the eliminated aren't left
 		-- waiting (sudden death starts FinalRushLead seconds from now)
@@ -466,7 +476,7 @@ local function active(god: Player?)
 			ReplicatedStorage:SetAttribute(Attributes.FinalRush, true)
 			banner:FireAllClients("FINAL RUSH!", string.format("%d left standing: sudden death in %d seconds", aliveCount, M.FinalRushLead), Color3.fromRGB(255, 170, 40))
 		end
-		DisasterService.SetHunterPulse(aliveCount == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
+		DisasterService.SetHunterPulse(aliveCount == 1 and humansAlive == 1 and state.TimeRemaining <= Config.HunterPulse.LastSeconds)
 		MutatorService.Update(state.TimeRemaining, M.RoundDuration, 1)
 		ShowdownService.Update(RoleService.GetAliveSurvivors(), state.TimeRemaining)
 	end
@@ -505,7 +515,8 @@ local function roundEnd(mapName: string)
 		end
 	end
 	AnalyticsService.RoundEnded(list, survivorCount, if god then "Human" else "Director")
-	local summaries = ScoringService.FinishRound(mapName, god, list)
+	local summaries = ScoringService.FinishRound(mapName, god, list, BotService.AliveCount())
+	BotService.Clear()
 	MutatorService.EndRound() -- after payouts (Gold Rush reads the twist)
 	for p, summary in summaries do
 		Remotes.get("RoundSummary"):FireClient(p, summary)
@@ -590,6 +601,7 @@ function MatchService.Init()
 		task.defer(updateAlive)
 	end)
 	RoleService.SoloSwapRequested:Connect(onSoloSwap)
+	BotService.AliveChanged:Connect(updateAlive)
 	Remotes.get("TutorialSeen").OnServerEvent:Connect(function(player, kind)
 		if typeof(kind) ~= "string" then
 			return
@@ -626,6 +638,7 @@ function MatchService.Start()
 			local ok, err = pcall(runCycle)
 			if not ok then
 				warn("[MatchService] round cycle error:", err)
+				BotService.Clear()
 				DisasterService.EndRound()
 				MutatorService.EndRound()
 				RoleService.ResetAll()

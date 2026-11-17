@@ -32,6 +32,7 @@ local StealthController = {}
 
 local fxFolder: Folder
 local tags: { [Player]: BillboardGui } = {}
+local botTags: { [Model]: BillboardGui } = {} -- AI survivor bots (BotService) in low-pop rounds
 local badge: TextLabel
 local pingFlash: TextLabel
 
@@ -75,15 +76,15 @@ end
 ---------------------------------------------------------------------------
 -- God: name tags through walls (hidden survivors drop off)
 
-local function makeTag(target: Player): BillboardGui
+local function makeTag(displayName: string, key: string): BillboardGui
 	local gui = Instance.new("BillboardGui")
-	gui.Name = "GodTag_" .. target.Name
+	gui.Name = "GodTag_" .. key
 	gui.AlwaysOnTop = true
 	gui.Size = UDim2.fromOffset(160, 26)
 	gui.StudsOffset = Vector3.new(0, 3.4, 0)
 	gui.MaxDistance = 600
 	gui.ResetOnSpawn = false
-	local label = Components.label({ Name = "Name", Text = "▼ " .. target.DisplayName, TextSize = 18, Color = C.GoldLight, Size = UDim2.fromScale(1, 1), Parent = gui })
+	local label = Components.label({ Name = "Name", Text = "▼ " .. displayName, TextSize = 18, Color = C.GoldLight, Size = UDim2.fromScale(1, 1), Parent = gui })
 	label.TextTransparency = 0.05
 	gui.Parent = player:WaitForChild("PlayerGui")
 	return gui
@@ -106,7 +107,7 @@ local function refreshTags()
 		local tag = tags[other]
 		if show then
 			if not tag then
-				tag = makeTag(other)
+				tag = makeTag(other.DisplayName, other.Name)
 				tags[other] = tag
 			end
 			tag.Adornee = head
@@ -117,6 +118,36 @@ local function refreshTags()
 		-- the default overhead name would leak hidden survivors to the God
 		if humanoid then
 			humanoid.DisplayDistanceType = if god then Enum.HumanoidDisplayDistanceType.None else Enum.HumanoidDisplayDistanceType.Viewer
+		end
+	end
+	-- AI survivor bots get the same through-wall tag while they're alive
+	local seen: { [Model]: boolean } = {}
+	local bots = workspace:FindFirstChild("SurvivorBots")
+	if bots then
+		for _, model in bots:GetChildren() do
+			if not model:IsA("Model") then
+				continue
+			end
+			seen[model] = true
+			local head = model:FindFirstChild("Head") :: BasePart?
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local tag = botTags[model]
+			if god and head and humanoid and humanoid.Health > 0 then
+				if not tag then
+					tag = makeTag(model.Name, "Bot_" .. model.Name)
+					botTags[model] = tag
+				end
+				tag.Adornee = head
+				tag.Enabled = true
+			elseif tag then
+				tag.Enabled = false
+			end
+		end
+	end
+	for model, tag in botTags do
+		if not seen[model] then
+			tag:Destroy()
+			botTags[model] = nil
 		end
 	end
 end

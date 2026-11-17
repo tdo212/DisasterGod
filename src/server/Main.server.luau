@@ -20,6 +20,7 @@ local order = {
 	"DestructionService",
 	"MapService",
 	"ScoringService",
+	"BotService",
 	"StealthService",
 	"SaveService",
 	"CosmeticService",

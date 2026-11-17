@@ -81,6 +81,12 @@ Each player has a weight: base 1, +1 per round played as a non-God, +0.5 extra f
 
 **Solo testing:** with one player, the sidebar's **Play God** tile is a God / Survivor toggle (with other players it opens the Specials tab with the God pass and God Chance). It works mid-round: swapping to God hands over from the Director; swapping to Survivor drops you into the arena.
 
+## Low-population servers (`Config.LowPop`, BotService)
+Ad traffic often lands in a server alone. With 1-3 real players:
+- **AI survivor bots**: each round spawns 4-6 bots (`7 - real players`, clamped) into the arena. They are classic blocky avatars with player-style names. They wander between safe goals (no walking off edges; `BotMaxDrop`, `BotEdgeShare`), dash and jump away from disasters that land near them, and yell when hit. Disasters hurt them through `BotService.HitSphere` / `HitBox` next to each survivor check, and the Director aims at them too. A bot the God takes out pays the usual elimination coins, counts toward kills, quests and the kill confirm, and posts a kill-feed line. It does not count toward the lifetime "Deadliest Gods" stat. The God sees bots' through-wall name tags like real survivors, and the role reveal and God intro include them. Bots are removed at round end, and mid-round once a fourth real player joins. A round ends early when the God wipes out every bot.
+- **Free first round as the God**: a player who has never played a round, and hasn't picked a role with the solo toggle, is the God in their first round (banner "FREE ROUND: YOU ARE THE GOD!"). They play against the bots, so the first 30 seconds are smashing a scattering crowd.
+- **2X coins**: round payouts get a "Low-pop bonus" line (`CoinMultiplier`, x2), and a pill under the round bar says so: "🔥 2X COINS ACTIVE · Low-Pop Bonus! Waiting for more challengers…".
+
 ## World
 ### Sky Lodge (lobby)
 A big timber great hall floating beside the arena at (0, 150, -232), built to feel wide, warm and calm: 160 x 120 studs inside, a 34-stud beamed ceiling under a pitched roof, tall side windows, candle chandeliers, a red runner rug and potted plants. It is enclosed, so nobody falls out.

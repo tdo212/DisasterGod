@@ -359,6 +359,15 @@ local function godCinematic()
 		{
 			Seconds = PR.CinematicSurvivorsShot,
 			Start = function()
+				-- AI survivor bots in a low-pop round (BotService) are survivors too
+				local bots = workspace:FindFirstChild("SurvivorBots")
+				if bots then
+					for _, model in bots:GetChildren() do
+						if model:IsA("Model") then
+							table.insert(targets, model)
+						end
+					end
+				end
 				for i, character in targets do
 					if i > 4 then
 						break
@@ -371,7 +380,7 @@ local function godCinematic()
 					h.Parent = character
 					table.insert(marks, h)
 				end
-				caption(if #targets > 0 then "🏃 THESE ARE THE SURVIVORS" else "🏃 SURVIVORS HIDE IN HERE", "Real players, scattering and hiding from you", C.GreenLight)
+				caption(if #targets > 0 then "🏃 THESE ARE THE SURVIVORS" else "🏃 SURVIVORS HIDE IN HERE", "Scattering and hiding from you", C.GreenLight)
 			end,
 			Camera = function(a)
 				local focus = center

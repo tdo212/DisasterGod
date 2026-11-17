@@ -214,19 +214,27 @@ local function reveal()
 	pop(vs, 3)
 	Sound.play("Tock", 1, 0.7)
 
-	-- 3) the survivors pop in one by one
-	local shown = math.min(#survivors, PR.RevealMaxFaces)
+	-- 3) the survivors pop in one by one (AI survivor bots in a low-pop round count too:
+	-- the alive count is real survivors plus bots)
+	local aliveCount = ReplicatedStorage:GetAttribute(Attributes.AliveCount)
+	local bots = math.max(0, (if typeof(aliveCount) == "number" then aliveCount else 0) - #survivors)
+	local total = #survivors + bots
+	local shown = math.min(total, PR.RevealMaxFaces)
 	local size = if shown <= 3 then 92 else 70
 	local perRow = 3
 	for n = 1, shown do
-		local p = survivors[n]
+		local p: Player? = survivors[n]
 		local face, glyph = portrait(grid, size, SURVIVOR_GREEN, "Face")
 		local row = (n - 1) // perRow
 		local col = (n - 1) % perRow
 		local rows = math.ceil(shown / perRow)
 		local inRow = math.min(perRow, shown - row * perRow)
 		face.Position = UDim2.new(0.5, (col - (inRow - 1) / 2) * (size + 24), 0.5, (row - (rows - 1) / 2) * (size + 14) - 6)
-		setFace(face, glyph, p)
+		if p then
+			setFace(face, glyph, p)
+		else
+			glyph.Text = "🙂" -- a bot survivor
+		end
 		if p == player then
 			youChip(face)
 		end
@@ -234,8 +242,8 @@ local function reveal()
 		Sound.play("Tick", 0.5, 1 + n * 0.08)
 		task.wait(0.07)
 	end
-	if #survivors > shown then
-		Components.label({ Name = "More", Text = "+" .. (#survivors - shown), TextSize = 30, Color = Color3.new(1, 1, 1), Size = UDim2.fromOffset(80, 36), Position = UDim2.new(1, -8, 1, -8), AnchorPoint = Vector2.new(1, 1), Parent = grid })
+	if total > shown then
+		Components.label({ Name = "More", Text = "+" .. (total - shown), TextSize = 30, Color = Color3.new(1, 1, 1), Size = UDim2.fromOffset(80, 36), Position = UDim2.new(1, -8, 1, -8), AnchorPoint = Vector2.new(1, 1), Parent = grid })
 	elseif shown == 0 then
 		Components.label({ Name = "Empty", Text = "🏃❔", TextSize = 54, StrokeThickness = 0, Size = UDim2.fromScale(1, 1), Parent = grid })
 	end

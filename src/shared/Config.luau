@@ -484,6 +484,46 @@ local Config = {
 		MaxHit = 48, -- no single disaster hit does more than this (fluid / void still kill)
 	},
 
+	-- Low-population servers (1-3 real players): AI survivor bots fill the arena, a brand-new
+	-- player gets their first round as the God, and round coins are boosted (BotService).
+	LowPop = {
+		MaxRealPlayers = 3, -- bots and the coin bonus while the server has this many real players or fewer
+		BotsBase = 7, -- bots = BotsBase - real players, clamped to MinBots..MaxBots (1 -> 6, 2 -> 5, 3 -> 4)
+		MinBots = 4,
+		MaxBots = 6,
+		CoinMultiplier = 2, -- round coins x this while the bonus is on
+		FirstRoundGod = true, -- a first-time player in a low-pop server is the God in their first round
+		BotHealth = 100,
+		BotWalkSpeed = 16,
+		BotDashSpeed = 42,
+		BotDashTime = 0.6,
+		BotDashCooldown = 3,
+		BotThinkInterval = 0.25,
+		BotWanderRange = 45, -- studs around a spawn point a bot picks its next goal in
+		BotRetargetMin = 2.5, -- seconds before a bot picks a new goal
+		BotRetargetMax = 5,
+		BotFleeRange = 24, -- a disaster landing this close makes a bot dash away
+		BotGoalTries = 8, -- candidate goals tried before a bot holds still
+		BotPathSamples = 6, -- ground checks along the straight walk to a goal
+		BotMaxDrop = 8, -- a bigger drop anywhere on the way rules the goal out (no walking off edges)
+		BotEdgeShare = 0.85, -- goals stay inside this share of the arena radius
+		BotJumpChance = 0.06, -- per think
+		BotHitCooldown = 0.3, -- one hit per bot per this many seconds (ticking disasters)
+		BotCorpseTime = 4,
+		DirectorBotTargetChance = 0.6, -- the Director aims at a bot rather than a real survivor
+		ScreamTime = 1.2,
+		Screams = { "AAAH!", "HELP!", "RUN!", "NOOO!", "WHOA!", "😱" },
+		NameFirst = { "Blox", "Turbo", "Pixel", "Noob", "Epic", "Speedy", "Lucky", "Cosmic", "Ninja", "Sneaky", "Mega", "Dizzy", "Brave", "Zippy", "Frosty", "Toasty" },
+		NameSecond = { "Runner", "Gamer", "Dude", "Bean", "Hero", "Racer", "Panda", "Fox", "Wolf", "Kid", "Pro", "Builder", "Tiger", "Dasher", "Survivor", "Cat" },
+		NameNumberMax = 999,
+		-- Roblox's stock R15 animations (server-played: a bot rig has no Animate script running)
+		Anims = { Idle = "rbxassetid://507766388", Run = "rbxassetid://913376220", Jump = "rbxassetid://507765000", Fall = "rbxassetid://507767968" },
+		AnimRunSpeed = 0.5, -- above this ground speed the run cycle plays
+		SkinTones = { Color3.fromRGB(255, 204, 153), Color3.fromRGB(234, 184, 146), Color3.fromRGB(204, 142, 105), Color3.fromRGB(160, 95, 53), Color3.fromRGB(124, 92, 70), Color3.fromRGB(253, 234, 141) },
+		ShirtColors = { Color3.fromRGB(13, 105, 172), Color3.fromRGB(196, 40, 28), Color3.fromRGB(40, 127, 71), Color3.fromRGB(245, 205, 48), Color3.fromRGB(107, 50, 124), Color3.fromRGB(218, 133, 65), Color3.fromRGB(17, 17, 17), Color3.fromRGB(242, 243, 243), Color3.fromRGB(255, 102, 204), Color3.fromRGB(0, 143, 156) },
+		PantsColors = { Color3.fromRGB(39, 70, 45), Color3.fromRGB(33, 84, 185), Color3.fromRGB(27, 42, 53), Color3.fromRGB(99, 95, 98), Color3.fromRGB(86, 66, 54), Color3.fromRGB(17, 17, 17) },
+	},
+
 	Director = {
 		MinInterval = 3,
 		MaxInterval = 6,
@@ -1488,6 +1528,8 @@ local Config = {
 		Kit = "Kit", -- Player: equipped God kit id
 		KitPrefix = "Kit_", -- Player: owns kit (bool)
 		RoundsPlayed = "RoundsPlayed", -- Player
+		LowPopBonus = "LowPopBonus", -- ReplicatedStorage: round-coin multiplier for a low-pop server (1 = off)
+		SoloRolePicked = "SoloRolePicked", -- Player: chose a role with the solo toggle (skips the free first God round)
 		TutorialPrefix = "Tut_", -- Player: has seen the role card (bool)
 		Ragdolled = "Ragdolled", -- Player
 		VoteOpen = "VoteOpen", -- ReplicatedStorage: map vote in progress
